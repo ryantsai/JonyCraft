@@ -252,10 +252,10 @@ function hash2D(x, z) {
 }
 
 function sampleHeight(x, z) {
-  const waveA = Math.sin((x + WORLD_SEED) * 0.12) * 0.38;
-  const waveB = Math.cos((z - WORLD_SEED * 0.8) * 0.1) * 0.34;
-  const jitter = (hash2D(x, z) - 0.5) * 0.48;
-  return THREE.MathUtils.clamp(Math.floor(3.2 + waveA + waveB + jitter), 2, 4);
+  const waveA = Math.sin((x + WORLD_SEED) * 0.08) * 0.22;
+  const waveB = Math.cos((z - WORLD_SEED * 0.8) * 0.08) * 0.2;
+  const jitter = (hash2D(x, z) - 0.5) * 0.18;
+  return THREE.MathUtils.clamp(Math.floor(3 + waveA + waveB + jitter), 2, 3);
 }
 
 function getBlock(x, y, z) {
@@ -408,29 +408,22 @@ function buildWorld() {
   for (let x = 0; x < WORLD_SIZE_X; x += 1) {
     for (let z = 0; z < WORLD_SIZE_Z; z += 1) {
       const height = sampleHeight(x, z);
-      const nearWater = height <= SEA_LEVEL + 1;
+      const surfaceType = hash2D(x * 5, z * 7) > 0.985 ? 'sand' : 'grass';
 
       for (let y = 0; y <= height; y += 1) {
         let type = 'stone';
         if (y === height) {
-          type = nearWater ? 'sand' : 'grass';
-        } else if (y >= height - 2) {
-          type = nearWater ? 'sand' : 'dirt';
+          type = surfaceType;
+        } else if (y >= height - 1) {
+          type = 'dirt';
         }
         world.set(worldKey(x, y, z), type);
       }
 
-      if (height < SEA_LEVEL) {
-        for (let y = height + 1; y <= SEA_LEVEL; y += 1) {
-          world.set(worldKey(x, y, z), 'water');
-        }
-      }
-
       const treeChance = hash2D(x + 11, z + 19);
       if (
-        !nearWater &&
         getBlock(x, height, z) === 'grass' &&
-        treeChance > 0.992 &&
+        treeChance > 0.996 &&
         x > 3 &&
         z > 3 &&
         x < WORLD_SIZE_X - 4 &&
@@ -511,6 +504,7 @@ function buildMaterials() {
 }
 
 function buildDiamondSword() {
+  const group = new THREE.Group();
   const swordMaterial = new THREE.MeshBasicMaterial({
     map: makeTexture('/assets/kenney/items/sword_diamond.png'),
     transparent: true,
@@ -522,10 +516,37 @@ function buildDiamondSword() {
   sword.scale.set(-1.22, 1.22, 1);
   sword.renderOrder = 50;
   sword.position.set(-0.08, 0.02, 0);
-  heldItemPivot.add(sword);
-  heldItemPivot.position.set(0.46, -0.54, -0.56);
-  heldItemPivot.rotation.set(0.34, -0.12, -1.18);
-  heldItemPivot.visible = false;
+  group.add(sword);
+  group.visible = false;
+  heldItemPivot.add(group);
+  heldSkillModels.sword = { group, sword };
+}
+
+function buildRubberPunch() {
+  const group = new THREE.Group();
+  const armAnchor = new THREE.Group();
+  group.add(armAnchor);
+
+  const armMaterial = new THREE.MeshLambertMaterial({ color: 0xd08f63 });
+  const fistMaterial = new THREE.MeshLambertMaterial({ color: 0xe0a27d });
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.42, 0.16), armMaterial);
+  const fist = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), fistMaterial);
+  arm.position.set(0, 0.2, 0);
+  fist.position.set(0, 0.76, 0);
+  armAnchor.add(arm, fist);
+  armAnchor.rotation.z = -1.05;
+  group.visible = false;
+  heldItemPivot.add(group);
+  heldSkillModels.punch = { group, armAnchor, arm, fist };
+}
+
+function buildDirtSkill() {
+  const group = new THREE.Group();
+  const cube = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), blockMaterials.dirt);
+  group.add(cube);
+  group.visible = false;
+  heldItemPivot.add(group);
+  heldSkillModels.dirt = { group, cube };
 }
 
 function spawnHitParticles(origin, color = 'white', count = 10) {
@@ -603,11 +624,8 @@ function createZombie(spawnPosition) {
     new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
   );
   hitbox.position.set(0, 0.88, 0);
-  hitbox.userData.type = 'zombie';
   root.add(hitbox);
-  zombieHitboxes.push(hitbox);
-
-  return {
+  const zombie = {
     root,
     hitbox,
     body,
@@ -623,6 +641,10 @@ function createZombie(spawnPosition) {
     knockback: new THREE.Vector3(),
     knockbackTimer: 0,
   };
+  hitbox.userData.type = 'zombie';
+  hitbox.userData.zombie = zombie;
+  zombieHitboxes.push(hitbox);
+  return zombie;
 }
 
 function getTerrainSurfaceY(x, z) {
@@ -637,28 +659,38 @@ function getTerrainSurfaceY(x, z) {
   return SEA_LEVEL + 1;
 }
 
-function removeZombie() {
-  if (!enemyState.zombie) {
+function getAliveZombies() {
+  return enemyState.zombies.filter((zombie) => zombie.alive);
+}
+
+function removeZombie(zombie) {
+  if (!zombie) {
     return;
   }
-  enemyGroup.remove(enemyState.zombie.root);
-  const hitIndex = zombieHitboxes.indexOf(enemyState.zombie.hitbox);
+  enemyGroup.remove(zombie.root);
+  const hitIndex = zombieHitboxes.indexOf(zombie.hitbox);
   if (hitIndex >= 0) {
     zombieHitboxes.splice(hitIndex, 1);
   }
-  enemyState.zombie.hitbox.geometry.dispose();
-  enemyState.zombie.hitbox.material.dispose();
-  enemyState.zombie = null;
-  gameState.enemyTarget = null;
+  zombie.hitbox.geometry.dispose();
+  zombie.hitbox.material.dispose();
+  const zombieIndex = enemyState.zombies.indexOf(zombie);
+  if (zombieIndex >= 0) {
+    enemyState.zombies.splice(zombieIndex, 1);
+  }
+  if (gameState.enemyTarget === zombie) {
+    gameState.enemyTarget = null;
+  }
 }
 
-function spawnZombieNearPlayer() {
+function findZombieSpawnPoint(seedOffset = 0) {
   const player = gameState.player;
-  const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   let spawn = null;
-  for (let distance = 3; distance <= 6; distance += 1) {
-    const attemptX = player.position.x + forward.x * distance;
-    const attemptZ = player.position.z + forward.z * distance;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    const angle = ((attempt + seedOffset) / 24) * Math.PI * 2;
+    const distance = 6 + ((attempt + seedOffset) % 5) * 2.5;
+    const attemptX = player.position.x + Math.sin(angle) * distance;
+    const attemptZ = player.position.z + Math.cos(angle) * distance;
     if (attemptX < 1 || attemptX > WORLD_SIZE_X - 2 || attemptZ < 1 || attemptZ > WORLD_SIZE_Z - 2) {
       continue;
     }
@@ -667,16 +699,37 @@ function spawnZombieNearPlayer() {
     if (block === 'water') {
       continue;
     }
+    const occupied = getAliveZombies().some(
+      (zombie) => zombie.root.position.distanceToSquared(new THREE.Vector3(attemptX, surfaceY, attemptZ)) < 9,
+    );
+    if (occupied) {
+      continue;
+    }
     spawn = new THREE.Vector3(Math.floor(attemptX) + 0.5, surfaceY, Math.floor(attemptZ) + 0.5);
     break;
   }
 
   if (!spawn) {
-    spawn = new THREE.Vector3(player.position.x + 4, getTerrainSurfaceY(player.position.x + 4, player.position.z), player.position.z);
+    spawn = new THREE.Vector3(
+      Math.min(WORLD_SIZE_X - 2, player.position.x + 8),
+      getTerrainSurfaceY(player.position.x + 8, player.position.z),
+      Math.min(WORLD_SIZE_Z - 2, player.position.z + 2),
+    );
   }
+  return spawn;
+}
 
-  removeZombie();
-  enemyState.zombie = createZombie(spawn);
+function spawnZombie(seedOffset = enemyState.zombies.length * 3) {
+  const spawn = findZombieSpawnPoint(seedOffset);
+  const zombie = createZombie(spawn);
+  enemyState.zombies.push(zombie);
+  return zombie;
+}
+
+function spawnZombieWave() {
+  while (getAliveZombies().length < INITIAL_ZOMBIE_COUNT) {
+    spawnZombie(getAliveZombies().length * 5);
+  }
 }
 function setSkybox() {
   scene.background = new THREE.Color(0x8ed0ff);
@@ -876,24 +929,48 @@ function updateWeapon(dt) {
   if (combat.cooldown > 0) {
     combat.cooldown = Math.max(0, combat.cooldown - dt * 1000);
   }
-  if (combat.swingTime > 0) {
-    combat.swingTime = Math.max(0, combat.swingTime - dt * 1000);
-  }
+  combat.swordSwingTime = Math.max(0, combat.swordSwingTime - dt * 1000);
+  combat.punchTime = Math.max(0, combat.punchTime - dt * 1000);
 
-  const swingPhase = combat.swingTime > 0 ? 1 - combat.swingTime / SWORD_SWING_MS : 0;
-  const windup = THREE.MathUtils.smoothstep(swingPhase, 0, 0.28);
-  const release = THREE.MathUtils.smoothstep(swingPhase, 0.18, 0.78);
-  const recover = THREE.MathUtils.smoothstep(swingPhase, 0.78, 1);
-  const slashProgress = release - recover * 0.28;
-  const sweepX = THREE.MathUtils.lerp(0.46, 0.04, slashProgress);
-  const sweepY = THREE.MathUtils.lerp(-0.54, -0.76, slashProgress) + windup * 0.05;
-  const sweepZ = THREE.MathUtils.lerp(-0.56, -0.34, slashProgress);
-  const rotX = THREE.MathUtils.lerp(0.34, -0.88, slashProgress) + windup * 0.1;
-  const rotY = THREE.MathUtils.lerp(-0.12, -0.28, slashProgress);
-  const rotZ = THREE.MathUtils.lerp(-1.18, -0.02, slashProgress) - windup * 0.14;
-  heldItemPivot.position.set(sweepX, sweepY, sweepZ);
-  heldItemPivot.rotation.set(rotX, rotY, rotZ);
-  heldItemPivot.visible = gameState.mode === 'playing';
+  Object.values(heldSkillModels).forEach((entry) => {
+    entry.group.visible = false;
+  });
+
+  const selectedSkill = getSelectedSkill();
+  if (selectedSkill.id === 'sword') {
+    const swingPhase = combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / SWORD_SWING_MS : 0;
+    const windup = THREE.MathUtils.smoothstep(swingPhase, 0, 0.28);
+    const release = THREE.MathUtils.smoothstep(swingPhase, 0.18, 0.78);
+    const recover = THREE.MathUtils.smoothstep(swingPhase, 0.78, 1);
+    const slashProgress = release - recover * 0.28;
+    const sweepX = THREE.MathUtils.lerp(0.46, 0.04, slashProgress);
+    const sweepY = THREE.MathUtils.lerp(-0.54, -0.76, slashProgress) + windup * 0.05;
+    const sweepZ = THREE.MathUtils.lerp(-0.56, -0.34, slashProgress);
+    const rotX = THREE.MathUtils.lerp(0.34, -0.88, slashProgress) + windup * 0.1;
+    const rotY = THREE.MathUtils.lerp(-0.12, -0.28, slashProgress);
+    const rotZ = THREE.MathUtils.lerp(-1.18, -0.02, slashProgress) - windup * 0.14;
+    heldSkillModels.sword.group.position.set(sweepX, sweepY, sweepZ);
+    heldSkillModels.sword.group.rotation.set(rotX, rotY, rotZ);
+    heldSkillModels.sword.group.visible = gameState.mode === 'playing';
+  } else if (selectedSkill.id === 'punch') {
+    const punchPhase = combat.punchTime > 0 ? 1 - combat.punchTime / PUNCH_SWING_MS : 0;
+    const extend = Math.sin(punchPhase * Math.PI);
+    const armScale = 1 + extend * 2.1;
+    heldSkillModels.punch.arm.scale.y = armScale;
+    heldSkillModels.punch.arm.position.y = 0.2 * armScale;
+    heldSkillModels.punch.fist.position.y = 0.34 + armScale * 0.42;
+    heldSkillModels.punch.group.position.set(
+      0.52 - extend * 0.22,
+      -0.58 + extend * 0.08,
+      -0.56 + extend * 0.14,
+    );
+    heldSkillModels.punch.group.rotation.set(0.22 - extend * 0.4, -0.1, -0.88 + extend * 0.18);
+    heldSkillModels.punch.group.visible = gameState.mode === 'playing';
+  } else if (selectedSkill.id === 'dirt') {
+    heldSkillModels.dirt.group.position.set(0.58, -0.56, -0.72);
+    heldSkillModels.dirt.group.rotation.set(0.22, 0.22, -0.3);
+    heldSkillModels.dirt.group.visible = gameState.mode === 'playing';
+  }
 }
 
 function updateHitParticles(dt) {
@@ -913,20 +990,7 @@ function updateHitParticles(dt) {
   }
 }
 
-function updateZombie(dt) {
-  if (!enemyState.zombie) {
-    enemyState.respawnTimer = Math.max(0, enemyState.respawnTimer - dt * 1000);
-    if (enemyState.respawnTimer === 0 && gameState.mode === 'playing') {
-      spawnZombieNearPlayer();
-    }
-    return;
-  }
-
-  const zombie = enemyState.zombie;
-  if (!zombie.alive) {
-    return;
-  }
-
+function updateSingleZombie(dt, zombie) {
   zombie.walkTime += dt * 8;
   zombie.hitFlash = Math.max(0, zombie.hitFlash - dt * 4);
   zombie.knockbackTimer = Math.max(0, zombie.knockbackTimer - dt * 1000);
@@ -965,34 +1029,64 @@ function updateZombie(dt) {
   zombie.root.rotation.set(0, Math.atan2(dx, dz), 0);
 }
 
+function updateZombies(dt) {
+  enemyState.respawnTimers = enemyState.respawnTimers
+    .map((timer) => Math.max(0, timer - dt * 1000))
+    .filter((timer) => {
+      if (timer === 0 && gameState.mode === 'playing') {
+        spawnZombie(Math.floor(Math.random() * 100));
+        return false;
+      }
+      return true;
+    });
+
+  enemyState.zombies.forEach((zombie) => {
+    if (zombie.alive) {
+      updateSingleZombie(dt, zombie);
+    }
+  });
+
+  while (gameState.mode === 'playing' && getAliveZombies().length + enemyState.respawnTimers.length < INITIAL_ZOMBIE_COUNT) {
+    spawnZombie(Math.floor(Math.random() * 100));
+  }
+}
+
 function updateEnemyTarget() {
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
   const hits = raycaster.intersectObjects(zombieHitboxes, false);
-  const zombieHit = hits.find((entry) => entry.distance <= SWORD_RANGE + 0.6);
-  return zombieHit ? enemyState.zombie : null;
+  const selectedSkill = getSelectedSkill();
+  const activeRange = selectedSkill.id === 'punch' ? PUNCH_RANGE : SWORD_RANGE;
+  const zombieHit = hits.find((entry) => entry.distance <= activeRange + 0.6);
+  return zombieHit ? zombieHit.object.userData.zombie : null;
 }
 
 function findMeleeZombieCandidate() {
-  const zombie = enemyState.zombie;
-  if (!zombie || !zombie.alive) {
-    return null;
-  }
-
-  const toZombie = new THREE.Vector3().subVectors(zombie.root.position, gameState.player.position);
-  const distance = toZombie.length();
-  if (distance > SWORD_RANGE + 0.45) {
-    return null;
-  }
-
-  toZombie.y = 0;
-  if (toZombie.lengthSq() === 0) {
-    return zombie;
-  }
-
-  toZombie.normalize();
   const forward = new THREE.Vector3(-Math.sin(gameState.player.yaw), 0, -Math.cos(gameState.player.yaw));
-  const facing = forward.dot(toZombie);
-  return facing > 0.45 ? zombie : null;
+  let bestZombie = null;
+  let bestScore = -Infinity;
+
+  getAliveZombies().forEach((zombie) => {
+    const toZombie = new THREE.Vector3().subVectors(zombie.root.position, gameState.player.position);
+    const distance = toZombie.length();
+    if (distance > PUNCH_RANGE + 0.45) {
+      return;
+    }
+    toZombie.y = 0;
+    if (toZombie.lengthSq() === 0) {
+      bestZombie = zombie;
+      bestScore = Infinity;
+      return;
+    }
+    toZombie.normalize();
+    const facing = forward.dot(toZombie);
+    const score = facing * 10 - distance;
+    if (facing > 0.35 && score > bestScore) {
+      bestScore = score;
+      bestZombie = zombie;
+    }
+  });
+
+  return bestZombie;
 }
 
 function updateTarget() {
@@ -1019,12 +1113,15 @@ function updateTarget() {
 
 function updateHud() {
   const player = gameState.player;
-  const selected = BLOCK_DEFS[getSelectedBlockType()].name;
+  const selected = getSelectedSkill().name;
   const target = gameState.target
     ? `${gameState.target.block.type} @ ${gameState.target.block.x},${gameState.target.block.y},${gameState.target.block.z}`
     : 'none';
-  const zombieText = enemyState.zombie && enemyState.zombie.alive
-    ? ` | Zombie HP ${enemyState.zombie.health}${gameState.enemyTarget ? ' in range' : ''}`
+  const aliveZombieCount = getAliveZombies().length;
+  const zombieText = gameState.enemyTarget
+    ? ` | Target Zombie HP ${gameState.enemyTarget.health} | Zombies ${aliveZombieCount}`
+    : aliveZombieCount > 0
+    ? ` | Zombies ${aliveZombieCount} alive`
     : ` | Zombies down ${gameState.combat.kills}`;
   const pointerHint = document.pointerLockElement === canvas ? 'Pointer locked' : 'Mouse free';
   statusMessage.textContent = `${selected} selected | Target: ${target}${zombieText} | ${pointerHint}`;
@@ -1041,7 +1138,7 @@ function stepSimulation(deltaMs) {
     updateHitParticles(dt);
     if (gameState.mode === 'playing') {
       applyMovement(dt);
-      updateZombie(dt);
+      updateZombies(dt);
       gameState.enemyTarget = updateEnemyTarget();
       updateTarget();
     }
@@ -1056,13 +1153,18 @@ function renderScene() {
   renderer.render(scene, camera);
 }
 
-function attackZombie() {
+function attackZombie({
+  range,
+  knockbackStrength,
+  particleColor = 'red',
+  particleCount = 12,
+}) {
   const zombie = updateEnemyTarget() ?? findMeleeZombieCandidate();
   if (!zombie || !zombie.alive) {
     return false;
   }
   const distance = zombie.root.position.distanceTo(gameState.player.position);
-  if (distance > SWORD_RANGE + 0.35) {
+  if (distance > range + 0.35) {
     return false;
   }
 
@@ -1074,23 +1176,15 @@ function attackZombie() {
     away.set(Math.sin(gameState.player.yaw), 0, Math.cos(gameState.player.yaw));
   }
   away.normalize();
-  zombie.knockback.copy(away.multiplyScalar(4.6));
+  zombie.knockback.copy(away.multiplyScalar(knockbackStrength));
   zombie.knockbackTimer = 240;
-  spawnHitParticles(zombie.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 'red', 12);
+  spawnHitParticles(zombie.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)), particleColor, particleCount);
   if (zombie.health <= 0) {
     spawnHitParticles(zombie.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 'white', 16);
     zombie.alive = false;
-    enemyGroup.remove(zombie.root);
-    const hitIndex = zombieHitboxes.indexOf(zombie.hitbox);
-    if (hitIndex >= 0) {
-      zombieHitboxes.splice(hitIndex, 1);
-    }
-    zombie.hitbox.geometry.dispose();
-    zombie.hitbox.material.dispose();
-    gameState.enemyTarget = null;
     gameState.combat.kills += 1;
-    enemyState.zombie = null;
-    enemyState.respawnTimer = ZOMBIE_RESPAWN_MS;
+    removeZombie(zombie);
+    enemyState.respawnTimers.push(ZOMBIE_RESPAWN_MS);
   }
   return true;
 }
@@ -1100,12 +1194,20 @@ function swingSword() {
     return;
   }
   gameState.combat.cooldown = SWORD_COOLDOWN_MS;
-  gameState.combat.swingTime = SWORD_SWING_MS;
-  if (attackZombie()) {
+  gameState.combat.swordSwingTime = SWORD_SWING_MS;
+  if (attackZombie({ range: SWORD_RANGE, knockbackStrength: 4.6, particleColor: 'red', particleCount: 12 })) {
     updateHud();
     return;
   }
-  handleBreak();
+}
+
+function punchAttack() {
+  if (gameState.combat.cooldown > 0) {
+    return;
+  }
+  gameState.combat.cooldown = PUNCH_COOLDOWN_MS;
+  gameState.combat.punchTime = PUNCH_SWING_MS;
+  attackZombie({ range: PUNCH_RANGE, knockbackStrength: 7.4, particleColor: 'white', particleCount: 14 });
 }
 
 function handleBreak() {
@@ -1182,9 +1284,6 @@ function initInput() {
     if (event.code === 'Digit1') gameState.selectedIndex = 0;
     if (event.code === 'Digit2') gameState.selectedIndex = 1;
     if (event.code === 'Digit3') gameState.selectedIndex = 2;
-    if (event.code === 'Digit4') gameState.selectedIndex = 3;
-    if (event.code === 'Digit5') gameState.selectedIndex = 4;
-    if (event.code === 'Digit6') gameState.selectedIndex = 5;
     if (event.code.startsWith('Digit')) {
       rebuildHotbar();
       updateHud();
@@ -1229,10 +1328,17 @@ function initInput() {
     if (gameState.mode !== 'playing') {
       return;
     }
+    const selectedSkill = getSelectedSkill();
     if (event.button === 0) {
-      swingSword();
+      if (selectedSkill.id === 'sword') {
+        swingSword();
+      } else if (selectedSkill.id === 'punch') {
+        punchAttack();
+      } else if (selectedSkill.id === 'dirt') {
+        handleBreak();
+      }
     }
-    if (event.button === 2) {
+    if (event.button === 2 && selectedSkill.id === 'dirt') {
       handlePlace();
     }
   });
@@ -1285,29 +1391,23 @@ function createStateSnapshot() {
       pitch: Number(player.pitch.toFixed(2)),
       blockBelow,
     },
-    selectedBlock: getSelectedBlockType(),
+    selectedSkill: getSelectedSkill().id,
     sword: {
-      swinging: gameState.combat.swingTime > 0,
+      swinging: gameState.combat.swordSwingTime > 0,
+      punchActive: gameState.combat.punchTime > 0,
       cooldownMs: Math.round(gameState.combat.cooldown),
     },
     combat: {
       kills: gameState.combat.kills,
-      zombieAlive: Boolean(enemyState.zombie?.alive),
-      zombieHealth: enemyState.zombie?.health ?? 0,
-      zombiePosition: enemyState.zombie
-        ? {
-            x: Number(enemyState.zombie.root.position.x.toFixed(2)),
-            y: Number(enemyState.zombie.root.position.y.toFixed(2)),
-            z: Number(enemyState.zombie.root.position.z.toFixed(2)),
-          }
-        : null,
-      zombieKnockback: enemyState.zombie
-        ? {
-            x: Number(enemyState.zombie.knockback.x.toFixed(2)),
-            z: Number(enemyState.zombie.knockback.z.toFixed(2)),
-            timerMs: Math.round(enemyState.zombie.knockbackTimer),
-          }
-        : null,
+      zombiesAlive: getAliveZombies().length,
+      zombies: getAliveZombies().slice(0, 8).map((zombie) => ({
+        hp: zombie.health,
+        x: Number(zombie.root.position.x.toFixed(2)),
+        y: Number(zombie.root.position.y.toFixed(2)),
+        z: Number(zombie.root.position.z.toFixed(2)),
+        knockbackX: Number(zombie.knockback.x.toFixed(2)),
+        knockbackZ: Number(zombie.knockback.z.toFixed(2)),
+      })),
       zombieTargeted: Boolean(gameState.enemyTarget),
       hitParticles: hitParticles.length,
     },
@@ -1328,10 +1428,12 @@ function initTestingHooks() {
 async function init() {
   buildMaterials();
   buildDiamondSword();
+  buildRubberPunch();
+  buildDirtSkill();
   setSkybox();
   buildWorld();
   setPlayerSpawn();
-  spawnZombieNearPlayer();
+  spawnZombieWave();
   rebuildHotbar();
   initInput();
   initTestingHooks();

@@ -2,6 +2,7 @@ import './style.css';
 import * as THREE from 'three';
 
 const app = document.querySelector('#app');
+const assetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 
 app.innerHTML = `
   <div class="shell">
@@ -73,19 +74,19 @@ const SKILLS = [
   {
     id: 'sword',
     name: 'Diamond Sword',
-    icon: '/assets/kenney/items/sword_diamond.png',
+    icon: assetUrl('assets/kenney/items/sword_diamond.png'),
     kind: 'attack',
   },
   {
     id: 'punch',
     name: 'Rubber Punch',
-    icon: '/assets/kenney/skills/rubber_punch.png',
+    icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
     kind: 'attack',
   },
   {
     id: 'dirt',
     name: 'Dirt Block',
-    icon: '/assets/kenney/tiles/dirt.png',
+    icon: assetUrl('assets/kenney/tiles/dirt.png'),
     kind: 'block',
     blockType: 'dirt',
   },
@@ -94,53 +95,53 @@ const SKILLS = [
 const BLOCK_DEFS = {
   grass: {
     name: 'Grass',
-    icon: '/assets/kenney/tiles/grass_top.png',
+    icon: assetUrl('assets/kenney/tiles/grass_top.png'),
     faces: {
-      side: '/assets/kenney/tiles/dirt_grass.png',
-      top: '/assets/kenney/tiles/grass_top.png',
-      bottom: '/assets/kenney/tiles/dirt.png',
+      side: assetUrl('assets/kenney/tiles/dirt_grass.png'),
+      top: assetUrl('assets/kenney/tiles/grass_top.png'),
+      bottom: assetUrl('assets/kenney/tiles/dirt.png'),
     },
     collides: true,
   },
   dirt: {
     name: 'Dirt',
-    icon: '/assets/kenney/tiles/dirt.png',
+    icon: assetUrl('assets/kenney/tiles/dirt.png'),
     faces: {
-      all: '/assets/kenney/tiles/dirt.png',
+      all: assetUrl('assets/kenney/tiles/dirt.png'),
     },
     collides: true,
   },
   stone: {
     name: 'Stone',
-    icon: '/assets/kenney/tiles/stone.png',
+    icon: assetUrl('assets/kenney/tiles/stone.png'),
     faces: {
-      all: '/assets/kenney/tiles/stone.png',
+      all: assetUrl('assets/kenney/tiles/stone.png'),
     },
     collides: true,
   },
   sand: {
     name: 'Sand',
-    icon: '/assets/kenney/tiles/sand.png',
+    icon: assetUrl('assets/kenney/tiles/sand.png'),
     faces: {
-      all: '/assets/kenney/tiles/sand.png',
+      all: assetUrl('assets/kenney/tiles/sand.png'),
     },
     collides: true,
   },
   wood: {
     name: 'Wood',
-    icon: '/assets/kenney/tiles/trunk_side.png',
+    icon: assetUrl('assets/kenney/tiles/trunk_side.png'),
     faces: {
-      side: '/assets/kenney/tiles/trunk_side.png',
-      top: '/assets/kenney/tiles/trunk_top.png',
-      bottom: '/assets/kenney/tiles/trunk_top.png',
+      side: assetUrl('assets/kenney/tiles/trunk_side.png'),
+      top: assetUrl('assets/kenney/tiles/trunk_top.png'),
+      bottom: assetUrl('assets/kenney/tiles/trunk_top.png'),
     },
     collides: true,
   },
   leaves: {
     name: 'Leaves',
-    icon: '/assets/kenney/tiles/leaves_transparent.png',
+    icon: assetUrl('assets/kenney/tiles/leaves_transparent.png'),
     faces: {
-      all: '/assets/kenney/tiles/leaves_transparent.png',
+      all: assetUrl('assets/kenney/tiles/leaves_transparent.png'),
     },
     collides: true,
     transparent: true,
@@ -148,17 +149,17 @@ const BLOCK_DEFS = {
   },
   brick: {
     name: 'Brick',
-    icon: '/assets/kenney/tiles/brick_red.png',
+    icon: assetUrl('assets/kenney/tiles/brick_red.png'),
     faces: {
-      all: '/assets/kenney/tiles/brick_red.png',
+      all: assetUrl('assets/kenney/tiles/brick_red.png'),
     },
     collides: true,
   },
   water: {
     name: 'Water',
-    icon: '/assets/kenney/tiles/water.png',
+    icon: assetUrl('assets/kenney/tiles/water.png'),
     faces: {
-      all: '/assets/kenney/tiles/water.png',
+      all: assetUrl('assets/kenney/tiles/water.png'),
     },
     collides: false,
     transparent: true,
@@ -506,7 +507,7 @@ function buildMaterials() {
 function buildDiamondSword() {
   const group = new THREE.Group();
   const swordMaterial = new THREE.MeshBasicMaterial({
-    map: makeTexture('/assets/kenney/items/sword_diamond.png'),
+    map: makeTexture(assetUrl('assets/kenney/items/sword_diamond.png')),
     transparent: true,
     alphaTest: 0.15,
     side: THREE.DoubleSide,
@@ -572,8 +573,8 @@ function buildDirtSkill() {
 
 function spawnHitParticles(origin, color = 'white', count = 10) {
   const spritePath = color === 'red'
-    ? '/assets/kenney/particles/square_red.png'
-    : '/assets/kenney/particles/square_white.png';
+    ? assetUrl('assets/kenney/particles/square_red.png')
+    : assetUrl('assets/kenney/particles/square_white.png');
 
   for (let index = 0; index < count; index += 1) {
     const sprite = new THREE.Sprite(
@@ -632,12 +633,12 @@ function createZombie(spawnPosition) {
   root.position.copy(spawnPosition);
   enemyGroup.add(root);
 
-  const body = createZombiePart('/assets/kenney/zombie/zombie_body.png', 0, 0.88, 0, 0.88, 0.84, 0.62, 0x8f6734);
-  const head = createZombiePart('/assets/kenney/zombie/zombie_head.png', 0, 1.55, 0, 0.64, 0.64, 0.72, 0x49ab67);
-  const leftArm = createZombiePart('/assets/kenney/zombie/zombie_arm.png', -0.43, 0.86, 0, 0.22, 0.76, 0.32, 0x58be75);
-  const rightArm = createZombiePart('/assets/kenney/zombie/zombie_arm.png', 0.43, 0.86, 0, 0.22, 0.76, 0.32, 0x58be75);
-  const leftLeg = createZombiePart('/assets/kenney/zombie/zombie_leg.png', -0.16, 0.3, 0, 0.24, 0.6, 0.34, 0x726454);
-  const rightLeg = createZombiePart('/assets/kenney/zombie/zombie_leg.png', 0.16, 0.3, 0, 0.24, 0.6, 0.34, 0x726454);
+  const body = createZombiePart(assetUrl('assets/kenney/zombie/zombie_body.png'), 0, 0.88, 0, 0.88, 0.84, 0.62, 0x8f6734);
+  const head = createZombiePart(assetUrl('assets/kenney/zombie/zombie_head.png'), 0, 1.55, 0, 0.64, 0.64, 0.72, 0x49ab67);
+  const leftArm = createZombiePart(assetUrl('assets/kenney/zombie/zombie_arm.png'), -0.43, 0.86, 0, 0.22, 0.76, 0.32, 0x58be75);
+  const rightArm = createZombiePart(assetUrl('assets/kenney/zombie/zombie_arm.png'), 0.43, 0.86, 0, 0.22, 0.76, 0.32, 0x58be75);
+  const leftLeg = createZombiePart(assetUrl('assets/kenney/zombie/zombie_leg.png'), -0.16, 0.3, 0, 0.24, 0.6, 0.34, 0x726454);
+  const rightLeg = createZombiePart(assetUrl('assets/kenney/zombie/zombie_leg.png'), 0.16, 0.3, 0, 0.24, 0.6, 0.34, 0x726454);
   root.add(body, head, leftArm, rightArm, leftLeg, rightLeg);
 
   const hitbox = new THREE.Mesh(

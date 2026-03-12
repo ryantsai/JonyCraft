@@ -14,6 +14,21 @@ app.innerHTML = `
         <div id="status-coords"></div>
       </div>
       <div id="hotbar" class="hotbar" aria-label="Selected skills"></div>
+      <div id="mobile-controls" class="mobile-controls" aria-label="Virtual gamepad">
+        <div class="stick-cluster">
+          <div id="move-pad" class="touch-pad" aria-label="Move pad">
+            <div id="move-knob" class="touch-knob"></div>
+          </div>
+          <div id="look-pad" class="touch-pad" aria-label="Look pad">
+            <div id="look-knob" class="touch-knob"></div>
+          </div>
+        </div>
+        <div class="mobile-actions">
+          <button id="touch-jump" type="button">Jump</button>
+          <button id="touch-primary" type="button">Use</button>
+          <button id="touch-secondary" type="button">Place</button>
+        </div>
+      </div>
     </div>
     <div id="start-screen" class="start-screen">
       <div class="start-panel">
@@ -43,6 +58,14 @@ const startButton = document.querySelector('#start-btn');
 const hotbar = document.querySelector('#hotbar');
 const statusMessage = document.querySelector('#status-message');
 const statusCoords = document.querySelector('#status-coords');
+const mobileControls = document.querySelector('#mobile-controls');
+const movePad = document.querySelector('#move-pad');
+const moveKnob = document.querySelector('#move-knob');
+const lookPad = document.querySelector('#look-pad');
+const lookKnob = document.querySelector('#look-knob');
+const touchJump = document.querySelector('#touch-jump');
+const touchPrimary = document.querySelector('#touch-primary');
+const touchSecondary = document.querySelector('#touch-secondary');
 
 const FIXED_STEP_MS = 1000 / 60;
 const PLAYER_HEIGHT = 1.75;
@@ -242,6 +265,22 @@ const enemyState = {
 const textureCache = new Map();
 const hitParticles = [];
 const heldSkillModels = {};
+const reusable = {
+  forward: new THREE.Vector3(),
+  right: new THREE.Vector3(),
+  wishMove: new THREE.Vector3(),
+  desiredVelocity: new THREE.Vector3(),
+  toZombie: new THREE.Vector3(),
+  rayOrigin: new THREE.Vector3(),
+  rayDirection: new THREE.Vector3(),
+};
+const isMobileDevice = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+const virtualInput = {
+  moveX: 0,
+  moveZ: 0,
+  lookX: 0,
+  lookY: 0,
+};
 
 function worldKey(x, y, z) {
   return `${x},${y},${z}`;
@@ -311,7 +350,6 @@ function syncBlockMesh(x, y, z) {
     if (current) {
       worldGroup.remove(current);
       removeRaycastMesh(current);
-      current.geometry.dispose?.();
       blockMeshes.delete(key);
     }
     return;
@@ -320,11 +358,10 @@ function syncBlockMesh(x, y, z) {
   if (current) {
     worldGroup.remove(current);
     removeRaycastMesh(current);
-    current.geometry.dispose?.();
     blockMeshes.delete(key);
   }
 
-  const geometry = type === 'water' ? waterGeometry.clone() : boxGeometry.clone();
+  const geometry = type === 'water' ? waterGeometry : boxGeometry;
   const material = blockMaterials[type];
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.set(x + 0.5, y + (type === 'water' ? 0.43 : 0.5), z + 0.5);
@@ -871,11 +908,11 @@ function playerCollides(x, y, z) {
 
 function applyMovement(dt) {
   const player = gameState.player;
-  const wish = new THREE.Vector3(
-    Number(keyState.has('KeyD')) - Number(keyState.has('KeyA')),
+  const wish = reusable.wishMove.set(
+    Number(keyState.has('KeyD')) - Number(keyState.has('KeyA')) + virtualInput.moveX,
     0,
     Number(keyState.has('KeyS') || keyState.has('ArrowDown')) -
-      Number(keyState.has('KeyW') || keyState.has('ArrowUp')),
+      Number(keyState.has('KeyW') || keyState.has('ArrowUp')) + virtualInput.moveZ,
   );
 
   if (keyState.has('ArrowLeft')) {
@@ -887,9 +924,10 @@ function applyMovement(dt) {
 
   if (wish.lengthSq() > 0) {
     wish.normalize();
-    const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
-    const right = new THREE.Vector3(-forward.z, 0, forward.x);
-    const desired = new THREE.Vector3()
+    const forward = reusable.forward.set(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+    const right = reusable.right.set(-forward.z, 0, forward.x);
+    const desired = reusable.desiredVelocity
+      .set(0, 0, 0)
       .addScaledVector(forward, -wish.z)
       .addScaledVector(right, wish.x)
       .normalize()
@@ -945,6 +983,72 @@ function applyMovement(dt) {
 }
 
 const raycaster = new THREE.Raycaster();
+
+function raycastVoxel(maxDistance = 6) {
+  const player = gameState.player;
+  const origin = reusable.rayOrigin.set(player.position.x, player.position.y + EYE_HEIGHT, player.position.z);
+  const direction = reusable.rayDirection.set(
+    -Math.sin(player.yaw) * Math.cos(player.pitch),
+    Math.sin(player.pitch),
+    -Math.cos(player.yaw) * Math.cos(player.pitch),
+  ).normalize();
+
+  let x = Math.floor(origin.x);
+  let y = Math.floor(origin.y);
+  let z = Math.floor(origin.z);
+  let t = 0;
+
+  const stepX = direction.x > 0 ? 1 : -1;
+  const stepY = direction.y > 0 ? 1 : -1;
+  const stepZ = direction.z > 0 ? 1 : -1;
+
+  const invDx = direction.x !== 0 ? 1 / Math.abs(direction.x) : Number.POSITIVE_INFINITY;
+  const invDy = direction.y !== 0 ? 1 / Math.abs(direction.y) : Number.POSITIVE_INFINITY;
+  const invDz = direction.z !== 0 ? 1 / Math.abs(direction.z) : Number.POSITIVE_INFINITY;
+
+  let tMaxX = direction.x > 0 ? (Math.floor(origin.x) + 1 - origin.x) * invDx : (origin.x - Math.floor(origin.x)) * invDx;
+  let tMaxY = direction.y > 0 ? (Math.floor(origin.y) + 1 - origin.y) * invDy : (origin.y - Math.floor(origin.y)) * invDy;
+  let tMaxZ = direction.z > 0 ? (Math.floor(origin.z) + 1 - origin.z) * invDz : (origin.z - Math.floor(origin.z)) * invDz;
+
+  while (t <= maxDistance) {
+    const blockType = getBlock(x, y, z);
+    if (blockType) {
+      return {
+        x,
+        y,
+        z,
+        type: blockType,
+        normal: {
+          x: tMaxX <= tMaxY && tMaxX <= tMaxZ ? -stepX : 0,
+          y: tMaxY < tMaxX && tMaxY <= tMaxZ ? -stepY : 0,
+          z: tMaxZ < tMaxX && tMaxZ < tMaxY ? -stepZ : 0,
+        },
+      };
+    }
+
+    if (tMaxX < tMaxY) {
+      if (tMaxX < tMaxZ) {
+        x += stepX;
+        t = tMaxX;
+        tMaxX += invDx;
+      } else {
+        z += stepZ;
+        t = tMaxZ;
+        tMaxZ += invDz;
+      }
+    } else if (tMaxY < tMaxZ) {
+      y += stepY;
+      t = tMaxY;
+      tMaxY += invDy;
+    } else {
+      z += stepZ;
+      t = tMaxZ;
+      tMaxZ += invDz;
+    }
+  }
+
+  return null;
+}
 
 function updateWeapon(dt) {
   const combat = gameState.combat;
@@ -1087,6 +1191,7 @@ function updateZombies(dt) {
 
 function updateEnemyTarget() {
   raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  raycaster.far = PUNCH_RANGE + 0.6;
   const hits = raycaster.intersectObjects(zombieHitboxes, false);
   const selectedSkill = getSelectedSkill();
   const activeRange = selectedSkill.id === 'punch' ? PUNCH_RANGE : SWORD_RANGE;
@@ -1095,12 +1200,12 @@ function updateEnemyTarget() {
 }
 
 function findMeleeZombieCandidate() {
-  const forward = new THREE.Vector3(-Math.sin(gameState.player.yaw), 0, -Math.cos(gameState.player.yaw));
+  const forward = reusable.forward.set(-Math.sin(gameState.player.yaw), 0, -Math.cos(gameState.player.yaw));
   let bestZombie = null;
   let bestScore = -Infinity;
 
   getAliveZombies().forEach((zombie) => {
-    const toZombie = new THREE.Vector3().subVectors(zombie.root.position, gameState.player.position);
+    const toZombie = reusable.toZombie.subVectors(zombie.root.position, gameState.player.position);
     const distance = toZombie.length();
     if (distance > PUNCH_RANGE + 0.45) {
       return;
@@ -1124,16 +1229,14 @@ function findMeleeZombieCandidate() {
 }
 
 function updateTarget() {
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-  const hits = raycaster.intersectObjects(raycastMeshes, false);
-  const hit = hits.find((entry) => entry.distance < 6);
+  const hit = raycastVoxel(6);
   if (!hit) {
     gameState.target = null;
     return;
   }
 
-  const { x, y, z, type } = hit.object.userData;
-  const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+  const { x, y, z, type } = hit;
+  const normal = hit.normal;
   const placeAt = {
     x: x + Math.round(normal.x),
     y: y + Math.round(normal.y),
@@ -1171,18 +1274,24 @@ function stepSimulation(deltaMs) {
     updateWeapon(dt);
     updateHitParticles(dt);
     if (gameState.mode === 'playing') {
+      gameState.player.yaw -= virtualInput.lookX * LOOK_SPEED * 1.3;
+      gameState.player.pitch = THREE.MathUtils.clamp(
+        gameState.player.pitch - virtualInput.lookY * LOOK_SPEED * 1.3,
+        -1.35,
+        1.35,
+      );
       applyMovement(dt);
       updateZombies(dt);
-      gameState.enemyTarget = updateEnemyTarget();
-      updateTarget();
     }
     remaining -= stepMs;
   }
 }
 
 function renderScene() {
-  gameState.enemyTarget = updateEnemyTarget();
-  updateTarget();
+  if (gameState.mode === 'playing') {
+    gameState.enemyTarget = updateEnemyTarget();
+    updateTarget();
+  }
   updateHud();
   renderer.render(scene, camera);
 }
@@ -1382,6 +1491,100 @@ function initInput() {
   });
 
   startButton.addEventListener('click', enterWorld);
+
+  if (isMobileDevice) {
+    mobileControls.dataset.visible = 'true';
+  }
+
+  const bindTouchPad = (pad, knob, onMove) => {
+    const state = { activeId: null };
+
+    const reset = () => {
+      state.activeId = null;
+      knob.style.transform = 'translate(0px, 0px)';
+      onMove(0, 0);
+    };
+
+    const update = (touch) => {
+      const rect = pad.getBoundingClientRect();
+      const radius = rect.width * 0.35;
+      const localX = touch.clientX - (rect.left + rect.width / 2);
+      const localY = touch.clientY - (rect.top + rect.height / 2);
+      const dist = Math.hypot(localX, localY);
+      const scale = dist > radius ? radius / dist : 1;
+      const clampedX = localX * scale;
+      const clampedY = localY * scale;
+      knob.style.transform = `translate(${clampedX}px, ${clampedY}px)`;
+      onMove(clampedX / radius, clampedY / radius);
+    };
+
+    pad.addEventListener('touchstart', (event) => {
+      if (state.activeId !== null) {
+        return;
+      }
+      const touch = event.changedTouches[0];
+      state.activeId = touch.identifier;
+      update(touch);
+      event.preventDefault();
+    }, { passive: false });
+
+    pad.addEventListener('touchmove', (event) => {
+      const touch = Array.from(event.changedTouches).find((entry) => entry.identifier === state.activeId);
+      if (!touch) {
+        return;
+      }
+      update(touch);
+      event.preventDefault();
+    }, { passive: false });
+
+    const endTouch = (event) => {
+      const touch = Array.from(event.changedTouches).find((entry) => entry.identifier === state.activeId);
+      if (!touch) {
+        return;
+      }
+      reset();
+      event.preventDefault();
+    };
+
+    pad.addEventListener('touchend', endTouch, { passive: false });
+    pad.addEventListener('touchcancel', endTouch, { passive: false });
+  };
+
+  bindTouchPad(movePad, moveKnob, (x, y) => {
+    virtualInput.moveX = x;
+    virtualInput.moveZ = y;
+  });
+
+  bindTouchPad(lookPad, lookKnob, (x, y) => {
+    virtualInput.lookX = x * 16;
+    virtualInput.lookY = y * 16;
+  });
+
+  const bindHoldButton = (button, onPress, onRelease = () => {}) => {
+    button.addEventListener('touchstart', (event) => {
+      onPress();
+      event.preventDefault();
+    }, { passive: false });
+    const release = (event) => {
+      onRelease();
+      event.preventDefault();
+    };
+    button.addEventListener('touchend', release, { passive: false });
+    button.addEventListener('touchcancel', release, { passive: false });
+  };
+
+  bindHoldButton(touchJump, () => keyState.add('Space'), () => keyState.delete('Space'));
+  bindHoldButton(touchPrimary, () => {
+    const selectedSkill = getSelectedSkill();
+    if (selectedSkill.id === 'sword') swingSword();
+    else if (selectedSkill.id === 'punch') punchAttack();
+    else handleBreak();
+  });
+  bindHoldButton(touchSecondary, () => {
+    if (getSelectedSkill().id === 'dirt') {
+      handlePlace();
+    }
+  });
 }
 
 function createStateSnapshot() {

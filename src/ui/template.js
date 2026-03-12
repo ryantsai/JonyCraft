@@ -12,7 +12,7 @@ export const gameTemplate = `
         <div id="status-coords"></div>
       </div>
       <div class="player-health-bar" aria-label="生命值">
-        <div class="health-label">❤ <span id="hp-text">20 / 20</span></div>
+        <div class="health-label">❤ <span id="hp-text">100 / 100</span></div>
         <div class="health-track">
           <div id="hp-fill" class="health-fill" style="width: 100%"></div>
         </div>
@@ -35,28 +35,74 @@ export const gameTemplate = `
       </div>
     </div>
     <div id="start-screen" class="start-screen">
+      <div class="menu-particles" aria-hidden="true"></div>
       <div class="start-panel">
-        <p class="eyebrow">Three.js 沙盒</p>
-        <h1>JonyCraft</h1>
-        <p class="lead">
-          以 Kenney 體素素材打造的 Minecraft 風格沙盒遊戲。
-        </p>
+        <div class="panel-glow"></div>
+        <div class="title-block">
+          <div class="title-row">
+            <div class="title-icon">
+              <img src="assets/kenney/tiles/dirt_grass.png" alt="" class="title-block-img" />
+            </div>
+            <h1 class="game-title">
+              <span class="title-jony">Jony</span><span class="title-craft">Craft</span>
+            </h1>
+          </div>
+          <p class="subtitle">體素沙盒冒險</p>
+        </div>
+
+        <div class="menu-divider"></div>
+
         <div id="mode-select" class="mode-select">
-          <p class="mode-label">選擇遊戲模式</p>
+          <p class="section-label">選擇模式</p>
           <div class="mode-list">
-            <button class="mode-btn mode-btn-active" data-mode="test" type="button">測試模式</button>
+            <button class="mode-btn mode-btn-active" data-mode="test" type="button">
+              <img src="assets/kenney/items/sword_diamond.png" alt="" class="mode-icon" />
+              <div class="mode-info">
+                <span class="mode-name">測試模式</span>
+                <span class="mode-desc">戰鬥、建造、探索</span>
+              </div>
+            </button>
           </div>
         </div>
-        <div class="control-list">
-          <span><strong>移動：</strong>WASD 或 方向鍵 上/下</span>
-          <span><strong>跳躍：</strong>空白鍵</span>
-          <span><strong>視角：</strong>滑鼠 或 方向鍵 左/右</span>
-          <span><strong>左鍵：</strong>使用已選技能</span>
-          <span><strong>右鍵：</strong>僅在技能 3 時放置泥土</span>
-          <span><strong>技能：</strong>1 鑽石劍、2 橡膠拳、3 泥土</span>
-          <span><strong>全螢幕：</strong>F</span>
+
+        <div class="menu-divider"></div>
+
+        <div class="controls-section">
+          <p class="section-label">操作說明</p>
+          <div class="control-grid">
+            <div class="control-item">
+              <kbd>W A S D</kbd>
+              <span>移動</span>
+            </div>
+            <div class="control-item">
+              <kbd>空白鍵</kbd>
+              <span>跳躍</span>
+            </div>
+            <div class="control-item">
+              <kbd>滑鼠</kbd>
+              <span>視角</span>
+            </div>
+            <div class="control-item">
+              <kbd>左鍵</kbd>
+              <span>攻擊</span>
+            </div>
+            <div class="control-item">
+              <kbd>右鍵</kbd>
+              <span>放置方塊</span>
+            </div>
+            <div class="control-item">
+              <kbd>1 2 3</kbd>
+              <span>切換技能</span>
+            </div>
+          </div>
         </div>
-        <button id="start-btn" class="start-btn" type="button">進入世界</button>
+
+        <button id="start-btn" class="start-btn" type="button">
+          <span class="start-btn-text">進入世界</span>
+          <span class="start-btn-arrow">▶</span>
+        </button>
+
+        <p class="footer-credit">Kenney 體素素材 · Three.js 引擎</p>
       </div>
     </div>
   </div>

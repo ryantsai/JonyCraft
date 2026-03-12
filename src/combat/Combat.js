@@ -24,6 +24,7 @@ export class CombatSystem {
     if (combat.cooldown > 0) return;
     combat.cooldown = SWORD_COOLDOWN_MS;
     combat.swordSwingTime = SWORD_SWING_MS;
+    events.emit('sound:sword');
     this._attackZombie({
       range: SWORD_RANGE, knockbackStrength: 4.6,
       particleColor: 'red', particleCount: 12,
@@ -35,6 +36,7 @@ export class CombatSystem {
     if (combat.cooldown > 0) return;
     combat.cooldown = PUNCH_COOLDOWN_MS;
     combat.punchTime = PUNCH_SWING_MS;
+    events.emit('sound:punch');
     this._attackZombie({
       range: PUNCH_RANGE, knockbackStrength: 7.4,
       particleColor: 'white', particleCount: 14,
@@ -47,6 +49,7 @@ export class CombatSystem {
     if (y === 0) return;
     this.world.removeBlock(x, y, z);
     this.targeting.updateTarget();
+    events.emit('sound:break');
     events.emit('hud:update');
   }
 
@@ -64,6 +67,7 @@ export class CombatSystem {
 
     this.world.setBlock(x, y, z, this.state.getSelectedBlockType());
     this.targeting.updateTarget();
+    events.emit('sound:place');
     events.emit('hud:update');
   }
 
@@ -75,6 +79,7 @@ export class CombatSystem {
 
     zombie.health -= 1;
     zombie.hitFlash = 1;
+    events.emit('sound:hit');
     const away = new THREE.Vector3().subVectors(zombie.root.position, this.state.player.position);
     away.y = 0;
     if (away.lengthSq() < 0.001) {
@@ -95,6 +100,7 @@ export class CombatSystem {
       );
       zombie.alive = false;
       this.state.combat.kills += 1;
+      events.emit('sound:kill');
       this.enemies.remove(zombie);
       this.enemies.scheduleRespawn();
     }

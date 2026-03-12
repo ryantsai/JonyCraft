@@ -18,6 +18,7 @@ import { InputManager } from './input/InputManager.js';
 import { MobileControls } from './input/MobileControls.js';
 import { HUD } from './ui/HUD.js';
 import { TestingHooks } from './testing/TestingHooks.js';
+import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
 
 // --- Bootstrap DOM ---
@@ -42,6 +43,7 @@ const combat = new CombatSystem(gameState, world, targeting, enemyManager, parti
 const inputManager = new InputManager(gameState, canvas, combat);
 const mobileControls = new MobileControls(inputManager, combat, gameState);
 const hud = new HUD(gameState, canvas, enemyManager);
+const soundManager = new SoundManager(gameState);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
@@ -61,6 +63,7 @@ function stepSimulation(deltaMs) {
         gameState.player.pitch - inputManager.virtualInput.lookY * LOOK_SPEED * 1.3,
       ));
       playerController.applyMovement(dt, inputManager.keyState, inputManager.virtualInput);
+      soundManager.updateFootsteps(dt, inputManager.keyState, inputManager.virtualInput);
       enemyManager.update(dt);
     }
     remaining -= stepMs;
@@ -91,6 +94,7 @@ async function init() {
   playerController.setSpawn();
   enemyManager.spawnWave();
   hud.init();
+  soundManager.init();
   inputManager.init();
   mobileControls.init();
   testingHooks.init();

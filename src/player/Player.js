@@ -4,6 +4,7 @@ import {
   PLAYER_HEIGHT, PLAYER_RADIUS, MOVE_SPEED, JUMP_SPEED, GRAVITY,
   WORLD_SIZE_X, WORLD_SIZE_Z, WORLD_HEIGHT, LOOK_SPEED,
 } from '../config/constants.js';
+import { events } from '../core/EventBus.js';
 
 /**
  * Handles player physics: movement, collision, jumping, and spawn selection.
@@ -74,6 +75,7 @@ export class PlayerController {
     if (keyState.has('Space') && player.onGround) {
       player.velocity.y = JUMP_SPEED;
       player.onGround = false;
+      events.emit('sound:jump');
     }
 
     player.velocity.y -= GRAVITY * dt;

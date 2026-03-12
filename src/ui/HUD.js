@@ -18,7 +18,10 @@ export class HUD {
   }
 
   init() {
-    this.startButton.addEventListener('click', () => events.emit('game:enter'));
+    this.startButton.addEventListener('click', () => {
+      events.emit('sound:click');
+      events.emit('game:enter');
+    });
 
     document.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -58,6 +61,7 @@ export class HUD {
 
       item.addEventListener('click', () => {
         this.state.selectedIndex = index;
+        events.emit('sound:click');
         this.rebuildHotbar();
         this.update();
       });

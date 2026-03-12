@@ -85,18 +85,20 @@ export class HUD {
       ? `${this.state.target.block.type} @ ${this.state.target.block.x},${this.state.target.block.y},${this.state.target.block.z}`
       : '無';
     const alive = this.enemies.getAlive().length;
-    const zombieText = this.state.enemyTarget
-      ? ` | 目標殭屍 HP ${this.state.enemyTarget.health} | 殭屍 ${alive}`
+    const et = this.state.enemyTarget;
+    const enemyName = et?.typeDef?.name || '敵人';
+    const zombieText = et
+      ? ` | 目標：${enemyName} HP ${Math.ceil(et.health)}/${et.maxHealth} | 敵人 ${alive}`
       : alive > 0
-        ? ` | 殭屍存活 ${alive}`
-        : ` | 已擊殺殭屍 ${this.state.combat.kills}`;
+        ? ` | 敵人存活 ${alive}`
+        : ` | 已擊殺 ${this.state.combat.kills}`;
     const pointer = document.pointerLockElement === this.canvas ? '指標鎖定' : '滑鼠自由';
     this.statusMessage.textContent = `已選：${selected} | 目標：${target}${zombieText} | ${pointer}`;
     this.statusCoords.textContent = `XYZ ${player.position.x.toFixed(1)} / ${player.position.y.toFixed(1)} / ${player.position.z.toFixed(1)}`;
 
     // Player health bar
     const hpRatio = player.hp / player.maxHp;
-    this.hpText.textContent = `${player.hp} / ${player.maxHp}`;
+    this.hpText.textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
     this.hpFill.style.width = `${Math.max(0, hpRatio * 100)}%`;
     this.hpFill.dataset.high = hpRatio > 0.5 ? 'true' : 'false';
     this.hpFill.dataset.mid = (hpRatio > 0.25 && hpRatio <= 0.5) ? 'true' : 'false';

@@ -38,6 +38,7 @@ const playerController = new PlayerController(gameState, world, scene);
 const enemyManager = new EnemyManager(gameState, world, scene, textureManager);
 const targeting = new Targeting(gameState, world, scene, enemyManager);
 const particles = new ParticleSystem(scene, textureManager);
+enemyManager.setParticles(particles);
 const weaponModels = new WeaponModels(scene, textureManager, blockMaterials);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles);
 const inputManager = new InputManager(gameState, canvas, combat);

@@ -1,16 +1,17 @@
 import * as THREE from 'three';
 import {
   ZOMBIE_RESPAWN_MS, INITIAL_ZOMBIE_COUNT,
-  WORLD_SIZE_X, WORLD_SIZE_Z,
-  ZOMBIE_ATTACK_RANGE, ZOMBIE_ATTACK_COOLDOWN_MS,
+  WORLD_SIZE_X, WORLD_SIZE_Z, PLAYER_RADIUS, PLAYER_HEIGHT,
 } from '../config/constants.js';
-import { createZombie, tintZombiePart, updateHealthBarSprite } from './Zombie.js';
+import { ENEMY_TYPES, SPAWN_TABLE } from '../config/enemyTypes.js';
+import { createEnemy, tintPart, updateHealthBarSprite } from './EnemyModel.js';
+import { updateEnemyBehavior } from './EnemyBehaviors.js';
 import { events } from '../core/EventBus.js';
 
+const ENEMY_COUNT = 12;
+
 /**
- * Manages zombie spawning, AI, respawn timers, and cleanup.
- * Future: generalize to support multiple enemy types and
- * server-authoritative enemy state for multiplayer.
+ * Manages all enemy types: spawning, AI dispatch, projectiles, and cleanup.
  */
 export class EnemyManager {
   constructor(gameState, world, sceneSetup, textureManager) {
@@ -18,44 +19,72 @@ export class EnemyManager {
     this.world = world;
     this.scene = sceneSetup;
     this.textureManager = textureManager;
+    this.particles = null; // set after construction
 
-    this.zombies = [];
+    this.zombies = []; // all enemies (kept as "zombies" for compat)
     this.hitboxes = [];
     this.respawnTimers = [];
+    this.projectiles = [];
+  }
+
+  setParticles(particles) {
+    this.particles = particles;
   }
 
   getAlive() {
     return this.zombies.filter((z) => z.alive);
   }
 
-  spawn(seedOffset = this.zombies.length * 3) {
+  spawn(seedOffset = this.zombies.length * 3, typeKey) {
+    if (!typeKey) {
+      typeKey = SPAWN_TABLE[Math.floor(Math.random() * SPAWN_TABLE.length)];
+    }
+    const typeDef = ENEMY_TYPES[typeKey];
+    if (!typeDef) return null;
     const position = this._findSpawnPoint(seedOffset);
-    const zombie = createZombie(this.textureManager, position, this.scene.enemyGroup);
-    this.zombies.push(zombie);
-    this.hitboxes.push(zombie.hitbox);
-    return zombie;
+    const enemy = createEnemy(this.textureManager, typeDef, typeKey, position, this.scene.enemyGroup);
+    this.zombies.push(enemy);
+    this.hitboxes.push(enemy.hitbox);
+    return enemy;
   }
 
   spawnWave() {
-    while (this.getAlive().length < INITIAL_ZOMBIE_COUNT) {
+    while (this.getAlive().length < ENEMY_COUNT) {
       this.spawn(this.getAlive().length * 5);
     }
   }
 
-  remove(zombie) {
-    if (!zombie) return;
-    this.scene.enemyGroup.remove(zombie.root);
-    const hitIdx = this.hitboxes.indexOf(zombie.hitbox);
+  remove(enemy) {
+    if (!enemy) return;
+    this.scene.enemyGroup.remove(enemy.root);
+    const hitIdx = this.hitboxes.indexOf(enemy.hitbox);
     if (hitIdx >= 0) this.hitboxes.splice(hitIdx, 1);
-    zombie.hitbox.geometry.dispose();
-    zombie.hitbox.material.dispose();
-    const zIdx = this.zombies.indexOf(zombie);
+    enemy.hitbox.geometry.dispose();
+    enemy.hitbox.material.dispose();
+    const zIdx = this.zombies.indexOf(enemy);
     if (zIdx >= 0) this.zombies.splice(zIdx, 1);
-    if (this.state.enemyTarget === zombie) this.state.enemyTarget = null;
+    if (this.state.enemyTarget === enemy) this.state.enemyTarget = null;
   }
 
   scheduleRespawn() {
     this.respawnTimers.push(ZOMBIE_RESPAWN_MS);
+  }
+
+  addProjectile(proj) {
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        color: proj.color === 'red' ? 0xff4444 : 0xffffff,
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      }),
+    );
+    sprite.scale.set(0.25, 0.25, 0.25);
+    sprite.position.copy(proj.position);
+    this.scene.particleGroup.add(sprite);
+    proj.sprite = sprite;
+    this.projectiles.push(proj);
   }
 
   update(dt) {
@@ -69,72 +98,100 @@ export class EnemyManager {
         return true;
       });
 
-    this.zombies.forEach((zombie) => {
-      if (zombie.alive) this._updateSingle(dt, zombie);
+    this.zombies.forEach((enemy) => {
+      if (enemy.alive) this._updateSingle(dt, enemy);
     });
+
+    this._updateProjectiles(dt);
 
     while (
       this.state.mode === 'playing' &&
-      this.getAlive().length + this.respawnTimers.length < INITIAL_ZOMBIE_COUNT
+      this.getAlive().length + this.respawnTimers.length < ENEMY_COUNT
     ) {
       this.spawn(Math.floor(Math.random() * 100));
     }
   }
 
-  _updateSingle(dt, zombie) {
-    zombie.walkTime += dt * 8;
-    zombie.hitFlash = Math.max(0, zombie.hitFlash - dt * 4);
-    zombie.knockbackTimer = Math.max(0, zombie.knockbackTimer - dt * 1000);
-    zombie.attackCooldown = Math.max(0, zombie.attackCooldown - dt * 1000);
+  _updateSingle(dt, enemy) {
+    enemy.walkTime += dt * 8;
+    enemy.hitFlash = Math.max(0, enemy.hitFlash - dt * 4);
+    enemy.knockbackTimer = Math.max(0, enemy.knockbackTimer - dt * 1000);
+    enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt * 1000);
 
-    const tint = zombie.hitFlash > 0 ? 0xff8a8a : 0xffffff;
-    [zombie.body, zombie.head, zombie.leftArm, zombie.rightArm, zombie.leftLeg, zombie.rightLeg]
-      .forEach((part) => tintZombiePart(part, tint));
+    const tint = enemy.hitFlash > 0 ? 0xff8a8a : 0xffffff;
+    [enemy.body, enemy.head, enemy.leftArm, enemy.rightArm, enemy.leftLeg, enemy.rightLeg]
+      .forEach((part) => tintPart(part, tint));
 
     const toPlayer = new THREE.Vector3().subVectors(
-      this.state.player.position, zombie.root.position,
+      this.state.player.position, enemy.root.position,
     );
     const flatToPlayer = new THREE.Vector2(toPlayer.x, toPlayer.z);
     const distance = flatToPlayer.length();
 
-    if (zombie.knockback.lengthSq() > 0.0001) {
-      zombie.root.position.x += zombie.knockback.x * dt;
-      zombie.root.position.z += zombie.knockback.z * dt;
-      zombie.knockback.multiplyScalar(Math.pow(0.08, dt));
+    // Apply knockback
+    if (enemy.knockback.lengthSq() > 0.0001) {
+      const resist = enemy.typeDef.knockbackResist || 0;
+      const factor = 1 - resist;
+      enemy.root.position.x += enemy.knockback.x * factor * dt;
+      enemy.root.position.z += enemy.knockback.z * factor * dt;
+      enemy.knockback.multiplyScalar(Math.pow(0.08, dt));
     } else {
-      zombie.knockback.set(0, 0, 0);
+      enemy.knockback.set(0, 0, 0);
     }
 
-    if (distance > 1.7 && zombie.knockbackTimer === 0) {
-      flatToPlayer.normalize();
-      zombie.root.position.x += flatToPlayer.x * zombie.speed * dt;
-      zombie.root.position.z += flatToPlayer.y * zombie.speed * dt;
-    }
-    zombie.root.position.y = this.world.getTerrainSurfaceY(
-      zombie.root.position.x, zombie.root.position.z,
+    // Dispatch to behavior AI
+    const ctx = {
+      state: this.state,
+      world: this.world,
+      particles: this.particles,
+      enemies: this,
+    };
+    updateEnemyBehavior(dt, enemy, this.state.player.position, distance, flatToPlayer, ctx);
+
+    // Snap to terrain
+    enemy.root.position.y = this.world.getTerrainSurfaceY(
+      enemy.root.position.x, enemy.root.position.z,
     );
 
-    // Zombie attacks player when in range
-    if (distance <= ZOMBIE_ATTACK_RANGE && zombie.attackCooldown === 0) {
-      zombie.attackCooldown = ZOMBIE_ATTACK_COOLDOWN_MS;
-      const damage = Math.max(1, zombie.baseAttack - this.state.player.baseDefense);
-      this.state.player.hp = Math.max(0, this.state.player.hp - damage);
-      events.emit('player:hit', { damage });
-      events.emit('sound:hit');
-      events.emit('hud:update');
+    updateHealthBarSprite(enemy);
+  }
+
+  _updateProjectiles(dt) {
+    const p = this.state.player;
+    for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
+      const proj = this.projectiles[i];
+      proj.age += dt;
+      proj.sprite.position.addScaledVector(proj.velocity, dt);
+
+      // Check player collision
+      const dx = proj.sprite.position.x - p.position.x;
+      const dy = proj.sprite.position.y - (p.position.y + PLAYER_HEIGHT / 2);
+      const dz = proj.sprite.position.z - p.position.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq < (PLAYER_RADIUS + 0.3) * (PLAYER_RADIUS + 0.3)) {
+        const damage = Math.max(1, proj.damage - p.baseDefense);
+        p.hp = Math.max(0, p.hp - damage);
+        events.emit('player:hit', { damage });
+        events.emit('sound:hit');
+        events.emit('hud:update');
+        if (this.particles) {
+          this.particles.spawn(proj.sprite.position.clone(), proj.color || 'white', 6);
+        }
+        this._removeProjectile(i);
+        continue;
+      }
+
+      if (proj.age >= proj.lifetime) {
+        this._removeProjectile(i);
+      }
     }
+  }
 
-    const sway = Math.sin(zombie.walkTime) * 0.12 * Math.min(1, distance / 2);
-    zombie.leftArm.position.x = -0.43 + sway;
-    zombie.rightArm.position.x = 0.43 - sway;
-    zombie.leftLeg.position.x = -0.16 - sway * 0.38;
-    zombie.rightLeg.position.x = 0.16 + sway * 0.38;
-
-    const dx = this.state.player.position.x - zombie.root.position.x;
-    const dz = this.state.player.position.z - zombie.root.position.z;
-    zombie.root.rotation.set(0, Math.atan2(dx, dz), 0);
-
-    updateHealthBarSprite(zombie);
+  _removeProjectile(index) {
+    const proj = this.projectiles[index];
+    this.scene.particleGroup.remove(proj.sprite);
+    proj.sprite.material.dispose();
+    this.projectiles.splice(index, 1);
   }
 
   _findSpawnPoint(seedOffset = 0) {

@@ -222,6 +222,68 @@ body {
   cursor: pointer;
 }
 
+.mobile-controls {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+
+.mobile-controls[data-visible='true'] {
+  display: block;
+}
+
+.stick-cluster {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 110px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.touch-pad {
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(4, 10, 18, 0.4);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+  touch-action: none;
+  position: relative;
+}
+
+.touch-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.mobile-actions {
+  position: absolute;
+  right: 14px;
+  bottom: 18px;
+  display: flex;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.mobile-actions button {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(11, 17, 23, 0.65);
+  color: #f4f7ff;
+  font: inherit;
+  padding: 10px 12px;
+}
+
 @media (max-width: 720px) {
   .status-bar {
     max-width: calc(100vw - 24px);
@@ -234,7 +296,7 @@ body {
     width: calc(100vw - 16px);
     justify-content: center;
     overflow-x: auto;
-    bottom: 10px;
+    bottom: 74px;
     padding: 10px;
   }
 
@@ -246,5 +308,9 @@ body {
 
   .start-panel {
     padding: 22px;
+  }
+
+  .crosshair {
+    opacity: 0.75;
   }
 }

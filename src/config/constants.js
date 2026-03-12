@@ -26,7 +26,7 @@ export const PUNCH_SWING_MS = 260;
 export const PUNCH_COOLDOWN_MS = 360;
 
 // Player stats
-export const PLAYER_MAX_HP = 20;
+export const PLAYER_MAX_HP = 100;
 export const PLAYER_BASE_ATTACK = 1;
 export const PLAYER_BASE_DEFENSE = 0;
 

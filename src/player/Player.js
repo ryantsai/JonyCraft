@@ -24,6 +24,44 @@ export class PlayerController {
     };
   }
 
+  moveAlongAxis(player, axis, delta) {
+    if (delta === 0) return false;
+
+    const maxStep = axis === 'y' ? 0.12 : 0.1;
+    const steps = Math.max(1, Math.ceil(Math.abs(delta) / maxStep));
+    const stepDelta = delta / steps;
+    let collided = false;
+
+    for (let i = 0; i < steps; i += 1) {
+      const next = player.position[axis] + stepDelta;
+      const testX = axis === 'x' ? next : player.position.x;
+      const testY = axis === 'y' ? next : player.position.y;
+      const testZ = axis === 'z' ? next : player.position.z;
+      if (this.playerCollides(testX, testY, testZ)) {
+        collided = true;
+        break;
+      }
+      player.position[axis] = next;
+    }
+
+    return collided;
+  }
+
+  resolvePenetration(player) {
+    if (!this.playerCollides(player.position.x, player.position.y, player.position.z)) return;
+
+    const originalY = player.position.y;
+    for (let i = 1; i <= 30; i += 1) {
+      const nudgeY = originalY + i * 0.05;
+      if (!this.playerCollides(player.position.x, nudgeY, player.position.z)) {
+        player.position.y = nudgeY;
+        return;
+      }
+    }
+
+    this.setSpawn();
+  }
+
   playerCollides(x, y, z) {
     const minX = Math.floor(x - PLAYER_RADIUS);
     const maxX = Math.floor(x + PLAYER_RADIUS);
@@ -81,28 +119,25 @@ export class PlayerController {
     player.velocity.y -= GRAVITY * dt;
     player.velocity.y = Math.max(player.velocity.y, -24);
 
-    const nextX = player.position.x + player.velocity.x * dt;
-    if (!this.playerCollides(nextX, player.position.y, player.position.z)) {
-      player.position.x = nextX;
-    } else {
+    const xCollided = this.moveAlongAxis(player, 'x', player.velocity.x * dt);
+    if (xCollided) {
       player.velocity.x = 0;
     }
 
-    const nextZ = player.position.z + player.velocity.z * dt;
-    if (!this.playerCollides(player.position.x, player.position.y, nextZ)) {
-      player.position.z = nextZ;
-    } else {
+    const zCollided = this.moveAlongAxis(player, 'z', player.velocity.z * dt);
+    if (zCollided) {
       player.velocity.z = 0;
     }
 
-    const nextY = player.position.y + player.velocity.y * dt;
-    if (!this.playerCollides(player.position.x, nextY, player.position.z)) {
-      player.position.y = nextY;
+    const yCollided = this.moveAlongAxis(player, 'y', player.velocity.y * dt);
+    if (!yCollided) {
       player.onGround = false;
     } else {
       if (player.velocity.y < 0) player.onGround = true;
       player.velocity.y = 0;
     }
+
+    this.resolvePenetration(player);
 
     if (player.position.y < -10) {
       this.setSpawn();

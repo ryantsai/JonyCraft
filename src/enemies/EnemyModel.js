@@ -127,6 +127,8 @@ export function createEnemy(textureManager, typeDef, typeKey, spawnPosition, ene
     baseDefense: typeDef.baseDefense,
     speed: typeDef.speed,
     sizeMultiplier: typeDef.sizeMultiplier,
+    velocityY: 0,
+    onGround: true,
     attackCooldown: 0,
     behaviorTimer: 0,
     behaviorPhase: 'idle',

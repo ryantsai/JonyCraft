@@ -149,19 +149,32 @@ function updateLeap(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
   enemy.behaviorTimer -= dt;
 
-  if (enemy.behaviorTimer <= 0) {
+  if (enemy.behaviorTimer <= 0 && enemy.onGround) {
     enemy.behaviorTimer = def.leapInterval || 1.2;
     if (distance > 1.5) {
       _dir.copy(flat).normalize();
-      enemy.knockback.set(_dir.x * (def.leapStrength || 5), 0, _dir.y * (def.leapStrength || 5));
+      // Use actual velocity for leap
+      enemy.velocityY = (def.leapStrength || 5);
+      enemy.onGround = false;
+      // Horizontal push via knockback
+      enemy.knockback.set(_dir.x * (def.leapStrength || 5) * 0.8, 0, _dir.y * (def.leapStrength || 5) * 0.8);
       enemy.knockbackTimer = 300;
     }
   }
 
-  const t = enemy.behaviorTimer / (def.leapInterval || 1.2);
-  const squash = 1 + Math.sin(t * Math.PI) * 0.25;
-  enemy.body.scale.set(1 / squash, squash, 1 / squash);
-  enemy.head.scale.set(1 / squash, squash, 1 / squash);
+  // Squash/stretch animation for leap type
+  if (!enemy.onGround) {
+    const jumpT = Math.max(0, enemy.velocityY / (def.leapStrength || 5));
+    const stretch = 1 + jumpT * 0.25;
+    const squash = 1 / Math.sqrt(stretch);
+    enemy.body.scale.set(squash, stretch, squash);
+    enemy.head.scale.set(squash, stretch, squash);
+  } else {
+    const t = enemy.behaviorTimer / (def.leapInterval || 1.2);
+    const squash = 1 + Math.sin(t * Math.PI) * 0.15;
+    enemy.body.scale.set(1 / squash, squash, 1 / squash);
+    enemy.head.scale.set(1 / squash, squash, 1 / squash);
+  }
 
   tryMeleeAttack(enemy, distance, ctx);
   facePlayer(enemy, playerPos);
@@ -185,6 +198,8 @@ function updateTeleport(dt, enemy, playerPos, distance, flat, ctx) {
     _pos.set(enemy.root.position.x, enemy.root.position.y + 1, enemy.root.position.z);
     ctx.particles.spawn(_pos, 'white', 8);
     enemy.root.position.set(nx, surfaceY, nz);
+    enemy.velocityY = 0;
+    enemy.onGround = true;
     _pos.set(nx, surfaceY + 1, nz);
     ctx.particles.spawn(_pos, 'white', 8);
   }
@@ -214,6 +229,8 @@ function updateRanged(dt, enemy, playerPos, distance, flat, ctx) {
     _pos.set(enemy.root.position.x, enemy.root.position.y + 1, enemy.root.position.z);
     ctx.particles.spawn(_pos, 'white', 6);
     enemy.root.position.set(nx, surfaceY, nz);
+    enemy.velocityY = 0;
+    enemy.onGround = true;
     _pos.set(nx, surfaceY + 1, nz);
     ctx.particles.spawn(_pos, 'white', 6);
   } else if (distance < preferred - 2 && enemy.knockbackTimer === 0) {

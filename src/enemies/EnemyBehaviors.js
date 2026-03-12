@@ -2,10 +2,19 @@ import * as THREE from 'three';
 import { events } from '../core/EventBus.js';
 
 /**
- * Enemy AI behavior functions. Each returns after updating the enemy's position/state.
+ * Enemy AI behavior functions. Each updates the enemy's position/state.
  * All behaviors receive (dt, enemy, playerPos, distance, flatToPlayer, context).
  * context = { state, world, particles, enemies }
  */
+
+// Reusable vectors — never allocate in hot loops
+const _dir = new THREE.Vector2();
+const _toTarget = new THREE.Vector2();
+const _perp = new THREE.Vector2();
+const _playerFwd = new THREE.Vector2();
+const _origin = new THREE.Vector3();
+const _projDir = new THREE.Vector3();
+const _pos = new THREE.Vector3();
 
 function dealDamage(enemy, ctx) {
   const damage = Math.max(1, enemy.baseAttack - ctx.state.player.baseDefense);
@@ -35,8 +44,7 @@ function animateWalk(enemy, distance) {
 }
 
 function tryMeleeAttack(enemy, distance, ctx) {
-  const range = enemy.typeDef.attackRange;
-  if (distance <= range && enemy.attackCooldown === 0) {
+  if (distance <= enemy.typeDef.attackRange && enemy.attackCooldown === 0) {
     enemy.attackCooldown = enemy.typeDef.attackCooldownMs;
     dealDamage(enemy, ctx);
     return true;
@@ -45,12 +53,16 @@ function tryMeleeAttack(enemy, distance, ctx) {
 }
 
 function spawnProjectile(enemy, playerPos, ctx) {
-  const origin = enemy.root.position.clone().add(new THREE.Vector3(0, 1.2 * enemy.sizeMultiplier, 0));
-  const dir = new THREE.Vector3().subVectors(playerPos, origin).normalize();
+  _origin.set(
+    enemy.root.position.x,
+    enemy.root.position.y + 1.2 * enemy.sizeMultiplier,
+    enemy.root.position.z,
+  );
+  _projDir.subVectors(playerPos, _origin).normalize();
   const speed = enemy.typeDef.projectileSpeed || 8;
   ctx.enemies.addProjectile({
-    position: origin,
-    velocity: dir.multiplyScalar(speed),
+    position: _origin.clone(), // must clone for projectile storage
+    velocity: _projDir.clone().multiplyScalar(speed),
     damage: enemy.baseAttack,
     owner: enemy,
     lifetime: 3,
@@ -67,21 +79,21 @@ function applyFloat(enemy, dt) {
   }
 }
 
-// --- Chase: standard zombie behavior ---
+// --- Chase ---
 function updateChase(dt, enemy, playerPos, distance, flat, ctx) {
   if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    const dir = flat.clone().normalize();
-    moveToward(enemy, dir, enemy.speed, dt);
+    _dir.copy(flat).normalize();
+    moveToward(enemy, _dir, enemy.speed, dt);
   }
   tryMeleeAttack(enemy, distance, ctx);
   animateWalk(enemy, distance);
   facePlayer(enemy, playerPos);
 }
 
-// --- Charge: slow approach, sprint burst when close ---
+// --- Charge ---
 function updateCharge(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
-  const dir = flat.clone().normalize();
+  _dir.copy(flat).normalize();
 
   if (distance <= def.chargeDistance && enemy.behaviorPhase !== 'charging') {
     enemy.behaviorPhase = 'charging';
@@ -90,13 +102,10 @@ function updateCharge(dt, enemy, playerPos, distance, flat, ctx) {
 
   if (enemy.behaviorPhase === 'charging') {
     enemy.behaviorTimer -= dt;
-    const spd = def.chargeSpeed || enemy.speed * 3;
-    moveToward(enemy, dir, spd, dt);
-    if (enemy.behaviorTimer <= 0 || distance < 1.5) {
-      enemy.behaviorPhase = 'idle';
-    }
+    moveToward(enemy, _dir, def.chargeSpeed || enemy.speed * 3, dt);
+    if (enemy.behaviorTimer <= 0 || distance < 1.5) enemy.behaviorPhase = 'idle';
   } else if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    moveToward(enemy, dir, enemy.speed, dt);
+    moveToward(enemy, _dir, enemy.speed, dt);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -104,7 +113,7 @@ function updateCharge(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Circle: strafe around, dash in to attack ---
+// --- Circle ---
 function updateCircle(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
   enemy.behaviorTimer -= dt;
@@ -116,19 +125,17 @@ function updateCircle(dt, enemy, playerPos, distance, flat, ctx) {
   }
 
   if (enemy.behaviorPhase === 'dash' && enemy.knockbackTimer === 0) {
-    const dir = flat.clone().normalize();
-    moveToward(enemy, dir, def.dashSpeed || 6, dt);
+    _dir.copy(flat).normalize();
+    moveToward(enemy, _dir, def.dashSpeed || 6, dt);
   } else if (enemy.knockbackTimer === 0) {
     const r = def.circleRadius || 3.5;
-    const targetX = playerPos.x + Math.cos(enemy.circleAngle) * r;
-    const targetZ = playerPos.z + Math.sin(enemy.circleAngle) * r;
-    const toTarget = new THREE.Vector2(
-      targetX - enemy.root.position.x,
-      targetZ - enemy.root.position.z,
+    _toTarget.set(
+      playerPos.x + Math.cos(enemy.circleAngle) * r - enemy.root.position.x,
+      playerPos.z + Math.sin(enemy.circleAngle) * r - enemy.root.position.z,
     );
-    if (toTarget.length() > 0.3) {
-      toTarget.normalize();
-      moveToward(enemy, toTarget, enemy.speed, dt);
+    if (_toTarget.length() > 0.3) {
+      _toTarget.normalize();
+      moveToward(enemy, _toTarget, enemy.speed, dt);
     }
   }
 
@@ -137,7 +144,7 @@ function updateCircle(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Leap: bouncy hopping movement ---
+// --- Leap ---
 function updateLeap(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
   enemy.behaviorTimer -= dt;
@@ -145,14 +152,12 @@ function updateLeap(dt, enemy, playerPos, distance, flat, ctx) {
   if (enemy.behaviorTimer <= 0) {
     enemy.behaviorTimer = def.leapInterval || 1.2;
     if (distance > 1.5) {
-      const dir = flat.clone().normalize();
-      const str = def.leapStrength || 5;
-      enemy.knockback.set(dir.x * str, 0, dir.y * str);
+      _dir.copy(flat).normalize();
+      enemy.knockback.set(_dir.x * (def.leapStrength || 5), 0, _dir.y * (def.leapStrength || 5));
       enemy.knockbackTimer = 300;
     }
   }
 
-  // Squash/stretch animation
   const t = enemy.behaviorTimer / (def.leapInterval || 1.2);
   const squash = 1 + Math.sin(t * Math.PI) * 0.25;
   enemy.body.scale.set(1 / squash, squash, 1 / squash);
@@ -162,7 +167,7 @@ function updateLeap(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Teleport: blink around, attack after appearing ---
+// --- Teleport ---
 function updateTeleport(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
   enemy.behaviorTimer -= dt;
@@ -177,24 +182,16 @@ function updateTeleport(dt, enemy, playerPos, distance, flat, ctx) {
     const nz = playerPos.z + Math.sin(angle) * dist;
     const surfaceY = ctx.world.getTerrainSurfaceY(nx, nz);
 
-    // Teleport particles at old position
-    ctx.particles.spawn(
-      enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0)),
-      'white', 8,
-    );
-
+    _pos.set(enemy.root.position.x, enemy.root.position.y + 1, enemy.root.position.z);
+    ctx.particles.spawn(_pos, 'white', 8);
     enemy.root.position.set(nx, surfaceY, nz);
-
-    // Particles at new position
-    ctx.particles.spawn(
-      enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0)),
-      'white', 8,
-    );
+    _pos.set(nx, surfaceY + 1, nz);
+    ctx.particles.spawn(_pos, 'white', 8);
   }
 
   if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    const dir = flat.clone().normalize();
-    moveToward(enemy, dir, enemy.speed, dt);
+    _dir.copy(flat).normalize();
+    moveToward(enemy, _dir, enemy.speed, dt);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -202,30 +199,29 @@ function updateTeleport(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Ranged: keep distance, shoot projectiles ---
+// --- Ranged ---
 function updateRanged(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
   const preferred = def.preferredDistance || 8;
-  const dir = flat.clone().normalize();
+  _dir.copy(flat).normalize();
   applyFloat(enemy, dt);
 
-  // Teleport away if player gets too close (wizard)
   if (def.teleportWhenClose && distance < (def.teleportThreshold || 4)) {
     const angle = Math.random() * Math.PI * 2;
     const nx = playerPos.x + Math.cos(angle) * preferred;
     const nz = playerPos.z + Math.sin(angle) * preferred;
     const surfaceY = ctx.world.getTerrainSurfaceY(nx, nz);
-    ctx.particles.spawn(enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 'white', 6);
+    _pos.set(enemy.root.position.x, enemy.root.position.y + 1, enemy.root.position.z);
+    ctx.particles.spawn(_pos, 'white', 6);
     enemy.root.position.set(nx, surfaceY, nz);
-    ctx.particles.spawn(enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 'white', 6);
+    _pos.set(nx, surfaceY + 1, nz);
+    ctx.particles.spawn(_pos, 'white', 6);
   } else if (distance < preferred - 2 && enemy.knockbackTimer === 0) {
-    // Back away
-    moveToward(enemy, dir, -enemy.speed, dt);
+    moveToward(enemy, _dir, -enemy.speed, dt);
   } else if (distance > preferred + 2 && enemy.knockbackTimer === 0) {
-    moveToward(enemy, dir, enemy.speed, dt);
+    moveToward(enemy, _dir, enemy.speed, dt);
   }
 
-  // Burst fire (blaze)
   if (enemy.burstRemaining > 0) {
     enemy.burstTimer -= dt * 1000;
     if (enemy.burstTimer <= 0) {
@@ -247,24 +243,21 @@ function updateRanged(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Explode: rush player, fuse, then explode ---
+// --- Explode ---
 function updateExplode(dt, enemy, playerPos, distance, flat, ctx) {
   const def = enemy.typeDef;
 
   if (enemy.fusing) {
     enemy.fuseTimer -= dt;
-    // Flash faster as fuse burns
     const flashRate = 4 + (1 - enemy.fuseTimer / def.fuseTime) * 12;
     enemy.hitFlash = Math.sin(enemy.fuseTimer * flashRate * Math.PI) > 0 ? 0.8 : 0;
 
     if (enemy.fuseTimer <= 0) {
-      // Explode!
-      const pos = enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0));
-      ctx.particles.spawn(pos, 'red', 24);
-      ctx.particles.spawn(pos, 'white', 16);
+      _pos.set(enemy.root.position.x, enemy.root.position.y + 1, enemy.root.position.z);
+      ctx.particles.spawn(_pos, 'red', 24);
+      ctx.particles.spawn(_pos, 'white', 16);
       events.emit('sound:break');
 
-      // Damage player if in range
       if (distance <= def.explosionRadius) {
         const damage = Math.max(1, enemy.baseAttack - ctx.state.player.baseDefense);
         ctx.state.player.hp = Math.max(0, ctx.state.player.hp - damage);
@@ -272,7 +265,6 @@ function updateExplode(dt, enemy, playerPos, distance, flat, ctx) {
         events.emit('sound:hit');
       }
 
-      // Destroy some blocks nearby
       const cx = Math.floor(enemy.root.position.x);
       const cy = Math.floor(enemy.root.position.y);
       const cz = Math.floor(enemy.root.position.z);
@@ -286,7 +278,6 @@ function updateExplode(dt, enemy, playerPos, distance, flat, ctx) {
         }
       }
 
-      // Die
       enemy.health = 0;
       enemy.alive = false;
       ctx.state.combat.kills += 1;
@@ -302,26 +293,23 @@ function updateExplode(dt, enemy, playerPos, distance, flat, ctx) {
   }
 
   if (!enemy.fusing && distance > 1.5 && enemy.knockbackTimer === 0) {
-    const dir = flat.clone().normalize();
-    moveToward(enemy, dir, enemy.speed, dt);
+    _dir.copy(flat).normalize();
+    moveToward(enemy, _dir, enemy.speed, dt);
   }
 
   animateWalk(enemy, distance);
   facePlayer(enemy, playerPos);
 }
 
-// --- Shield/Regen: slow tank that regenerates HP ---
+// --- Regen ---
 function updateRegen(dt, enemy, playerPos, distance, flat, ctx) {
-  const def = enemy.typeDef;
-
-  // Regenerate HP
   if (enemy.health < enemy.maxHealth) {
-    enemy.health = Math.min(enemy.maxHealth, enemy.health + (def.regenPerSecond || 0.5) * dt);
+    enemy.health = Math.min(enemy.maxHealth, enemy.health + (enemy.typeDef.regenPerSecond || 0.5) * dt);
   }
 
   if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    const dir = flat.clone().normalize();
-    moveToward(enemy, dir, enemy.speed, dt);
+    _dir.copy(flat).normalize();
+    moveToward(enemy, _dir, enemy.speed, dt);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -329,28 +317,19 @@ function updateRegen(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Flee: run away when player faces it, attack from behind ---
+// --- Flee ---
 function updateFlee(dt, enemy, playerPos, distance, flat, ctx) {
-  const dir = flat.clone().normalize();
-
-  // Check if player is roughly facing this enemy
-  const playerForward = new THREE.Vector2(
-    -Math.sin(ctx.state.player.yaw),
-    -Math.cos(ctx.state.player.yaw),
-  );
-  const dot = dir.dot(playerForward);
-  const playerFacing = dot > 0.3;
+  _dir.copy(flat).normalize();
+  _playerFwd.set(-Math.sin(ctx.state.player.yaw), -Math.cos(ctx.state.player.yaw));
+  const playerFacing = _dir.dot(_playerFwd) > 0.3;
 
   if (playerFacing && distance < 8 && enemy.knockbackTimer === 0) {
-    // Run away
-    moveToward(enemy, dir, -enemy.speed, dt);
+    moveToward(enemy, _dir, -enemy.speed, dt);
   } else if (!playerFacing && distance > 1.7 && enemy.knockbackTimer === 0) {
-    // Sneak up from behind
-    moveToward(enemy, dir, enemy.speed * 1.2, dt);
+    moveToward(enemy, _dir, enemy.speed * 1.2, dt);
   } else if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    // Circle to get behind player
-    const perp = new THREE.Vector2(-dir.y, dir.x);
-    moveToward(enemy, perp, enemy.speed, dt);
+    _perp.set(-_dir.y, _dir.x);
+    moveToward(enemy, _perp, enemy.speed, dt);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -358,7 +337,6 @@ function updateFlee(dt, enemy, playerPos, distance, flat, ctx) {
   facePlayer(enemy, playerPos);
 }
 
-// --- Behavior dispatcher ---
 const BEHAVIORS = {
   chase: updateChase,
   charge: updateCharge,

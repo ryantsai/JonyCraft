@@ -12,6 +12,7 @@ export class Targeting {
     this.enemyManager = enemyManager;
 
     this.raycaster = new THREE.Raycaster();
+    this._screenCenter = new THREE.Vector2(0, 0);
     this.reusable = {
       rayOrigin: new THREE.Vector3(),
       rayDirection: new THREE.Vector3(),
@@ -98,7 +99,7 @@ export class Targeting {
   }
 
   updateEnemyTarget() {
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.scene.camera);
+    this.raycaster.setFromCamera(this._screenCenter, this.scene.camera);
     this.raycaster.far = PUNCH_RANGE + 0.6;
     const hits = this.raycaster.intersectObjects(this.enemyManager.hitboxes, false);
     const skill = this.state.getSelectedSkill();

@@ -1,74 +1,71 @@
 import * as THREE from 'three';
 
+const _matrix = new THREE.Matrix4();
+const _position = new THREE.Vector3();
+
 /**
- * Manages block mesh creation, syncing, and removal in the scene.
- * Listens for world changes to keep meshes in sync.
+ * Renders the voxel world using InstancedMesh — one draw call per block type.
+ * Reduces ~4000+ individual mesh draw calls to ~8.
  */
 export class WorldRenderer {
   constructor(world, sceneSetup, blockMaterials) {
     this.world = world;
     this.scene = sceneSetup;
     this.blockMaterials = blockMaterials;
-    this.blockMeshes = new Map();
-    this.raycastMeshes = [];
-  }
-
-  syncBlockMesh(x, y, z) {
-    const key = `${x},${y},${z}`;
-    const type = this.world.getBlock(x, y, z);
-    const current = this.blockMeshes.get(key);
-
-    if (!type || !this.world.shouldRenderBlock(type, x, y, z)) {
-      if (current) {
-        this.scene.worldGroup.remove(current);
-        this._removeRaycastMesh(current);
-        this.blockMeshes.delete(key);
-      }
-      return;
-    }
-
-    if (current) {
-      this.scene.worldGroup.remove(current);
-      this._removeRaycastMesh(current);
-      this.blockMeshes.delete(key);
-    }
-
-    const geometry = type === 'water' ? this.scene.waterGeometry : this.scene.boxGeometry;
-    const material = this.blockMaterials.get(type);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x + 0.5, y + (type === 'water' ? 0.43 : 0.5), z + 0.5);
-    mesh.userData = { x, y, z, type };
-    this.scene.worldGroup.add(mesh);
-    this.raycastMeshes.push(mesh);
-    this.blockMeshes.set(key, mesh);
-  }
-
-  syncNeighborhood(x, y, z) {
-    const positions = [
-      [x, y, z],
-      [x + 1, y, z], [x - 1, y, z],
-      [x, y + 1, z], [x, y - 1, z],
-      [x, y, z + 1], [x, y, z - 1],
-    ];
-    positions.forEach(([px, py, pz]) => {
-      if (this.world.isInsideWorld(px, py, pz)) {
-        this.syncBlockMesh(px, py, pz);
-      }
-    });
+    this.instancedMeshes = new Map(); // blockType -> InstancedMesh
+    this._dirty = false;
   }
 
   buildAll() {
-    this.world.getAllBlockPositions().forEach(([x, y, z]) => {
-      this.syncBlockMesh(x, y, z);
+    this._rebuildInstances();
+  }
+
+  onBlockChanged() {
+    if (!this._dirty) {
+      this._dirty = true;
+      queueMicrotask(() => {
+        this._dirty = false;
+        this._rebuildInstances();
+      });
+    }
+  }
+
+  _rebuildInstances() {
+    // Remove old instanced meshes
+    this.instancedMeshes.forEach((mesh) => {
+      this.scene.worldGroup.remove(mesh);
+      mesh.dispose();
     });
-  }
+    this.instancedMeshes.clear();
 
-  onBlockChanged({ x, y, z }) {
-    this.syncNeighborhood(x, y, z);
-  }
+    // Group visible blocks by type
+    const groups = new Map();
+    const positions = this.world.getAllBlockPositions();
+    for (const [x, y, z] of positions) {
+      const type = this.world.getBlock(x, y, z);
+      if (!type || !this.world.shouldRenderBlock(type, x, y, z)) continue;
+      if (!groups.has(type)) groups.set(type, []);
+      groups.get(type).push(x, y, z); // flat array for speed
+    }
 
-  _removeRaycastMesh(mesh) {
-    const index = this.raycastMeshes.indexOf(mesh);
-    if (index >= 0) this.raycastMeshes.splice(index, 1);
+    // Create InstancedMesh per block type
+    for (const [type, coords] of groups) {
+      const count = coords.length / 3;
+      const geometry = type === 'water' ? this.scene.waterGeometry : this.scene.boxGeometry;
+      const material = this.blockMaterials.get(type);
+      const instanced = new THREE.InstancedMesh(geometry, material, count);
+
+      for (let i = 0; i < count; i += 1) {
+        const x = coords[i * 3];
+        const y = coords[i * 3 + 1];
+        const z = coords[i * 3 + 2];
+        _position.set(x + 0.5, y + (type === 'water' ? 0.43 : 0.5), z + 0.5);
+        _matrix.makeTranslation(_position.x, _position.y, _position.z);
+        instanced.setMatrixAt(i, _matrix);
+      }
+      instanced.instanceMatrix.needsUpdate = true;
+      this.scene.worldGroup.add(instanced);
+      this.instancedMeshes.set(type, instanced);
+    }
   }
 }

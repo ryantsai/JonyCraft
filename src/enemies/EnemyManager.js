@@ -10,6 +10,11 @@ import { events } from '../core/EventBus.js';
 
 const ENEMY_COUNT = 12;
 
+// Reusable vectors to avoid per-frame allocations
+const _toPlayer = new THREE.Vector3();
+const _flatToPlayer = new THREE.Vector2();
+const _spawnTest = new THREE.Vector3();
+
 /**
  * Manages all enemy types: spawning, AI dispatch, projectiles, and cleanup.
  */
@@ -25,6 +30,9 @@ export class EnemyManager {
     this.hitboxes = [];
     this.respawnTimers = [];
     this.projectiles = [];
+    this._aliveCache = [];
+    this._aliveCacheDirty = true;
+    this._ctx = { state: null, world: null, particles: null, enemies: this };
   }
 
   setParticles(particles) {
@@ -32,7 +40,15 @@ export class EnemyManager {
   }
 
   getAlive() {
-    return this.zombies.filter((z) => z.alive);
+    if (this._aliveCacheDirty) {
+      this._aliveCache = this.zombies.filter((z) => z.alive);
+      this._aliveCacheDirty = false;
+    }
+    return this._aliveCache;
+  }
+
+  _markDirty() {
+    this._aliveCacheDirty = true;
   }
 
   spawn(seedOffset = this.zombies.length * 3, typeKey) {
@@ -45,6 +61,7 @@ export class EnemyManager {
     const enemy = createEnemy(this.textureManager, typeDef, typeKey, position, this.scene.enemyGroup);
     this.zombies.push(enemy);
     this.hitboxes.push(enemy.hitbox);
+    this._markDirty();
     return enemy;
   }
 
@@ -64,6 +81,7 @@ export class EnemyManager {
     const zIdx = this.zombies.indexOf(enemy);
     if (zIdx >= 0) this.zombies.splice(zIdx, 1);
     if (this.state.enemyTarget === enemy) this.state.enemyTarget = null;
+    this._markDirty();
   }
 
   scheduleRespawn() {
@@ -118,20 +136,31 @@ export class EnemyManager {
     enemy.knockbackTimer = Math.max(0, enemy.knockbackTimer - dt * 1000);
     enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt * 1000);
 
-    const tint = enemy.hitFlash > 0 ? 0xff8a8a : 0xffffff;
-    [enemy.body, enemy.head, enemy.leftArm, enemy.rightArm, enemy.leftLeg, enemy.rightLeg]
-      .forEach((part) => tintPart(part, tint));
+    // Tint only when flash state changes
+    if (enemy.hitFlash > 0) {
+      tintPart(enemy.body, 0xff8a8a);
+      tintPart(enemy.head, 0xff8a8a);
+      tintPart(enemy.leftArm, 0xff8a8a);
+      tintPart(enemy.rightArm, 0xff8a8a);
+      tintPart(enemy.leftLeg, 0xff8a8a);
+      tintPart(enemy.rightLeg, 0xff8a8a);
+    } else if (enemy._wasTinted) {
+      tintPart(enemy.body, 0xffffff);
+      tintPart(enemy.head, 0xffffff);
+      tintPart(enemy.leftArm, 0xffffff);
+      tintPart(enemy.rightArm, 0xffffff);
+      tintPart(enemy.leftLeg, 0xffffff);
+      tintPart(enemy.rightLeg, 0xffffff);
+    }
+    enemy._wasTinted = enemy.hitFlash > 0;
 
-    const toPlayer = new THREE.Vector3().subVectors(
-      this.state.player.position, enemy.root.position,
-    );
-    const flatToPlayer = new THREE.Vector2(toPlayer.x, toPlayer.z);
-    const distance = flatToPlayer.length();
+    _toPlayer.subVectors(this.state.player.position, enemy.root.position);
+    _flatToPlayer.set(_toPlayer.x, _toPlayer.z);
+    const distance = _flatToPlayer.length();
 
     // Apply knockback
     if (enemy.knockback.lengthSq() > 0.0001) {
-      const resist = enemy.typeDef.knockbackResist || 0;
-      const factor = 1 - resist;
+      const factor = 1 - (enemy.typeDef.knockbackResist || 0);
       enemy.root.position.x += enemy.knockback.x * factor * dt;
       enemy.root.position.z += enemy.knockback.z * factor * dt;
       enemy.knockback.multiplyScalar(Math.pow(0.08, dt));
@@ -139,21 +168,22 @@ export class EnemyManager {
       enemy.knockback.set(0, 0, 0);
     }
 
-    // Dispatch to behavior AI
-    const ctx = {
-      state: this.state,
-      world: this.world,
-      particles: this.particles,
-      enemies: this,
-    };
-    updateEnemyBehavior(dt, enemy, this.state.player.position, distance, flatToPlayer, ctx);
+    // Dispatch to behavior AI (reuse ctx object)
+    this._ctx.state = this.state;
+    this._ctx.world = this.world;
+    this._ctx.particles = this.particles;
+    updateEnemyBehavior(dt, enemy, this.state.player.position, distance, _flatToPlayer, this._ctx);
 
     // Snap to terrain
     enemy.root.position.y = this.world.getTerrainSurfaceY(
       enemy.root.position.x, enemy.root.position.z,
     );
 
-    updateHealthBarSprite(enemy);
+    // Only update health bar when health changed
+    if (enemy._lastHealth !== enemy.health) {
+      enemy._lastHealth = enemy.health;
+      updateHealthBarSprite(enemy);
+    }
   }
 
   _updateProjectiles(dt) {
@@ -206,8 +236,9 @@ export class EnemyManager {
       const surfaceY = this.world.getTerrainSurfaceY(ax, az);
       const block = this.world.getBlock(Math.floor(ax), Math.floor(surfaceY - 1), Math.floor(az));
       if (block === 'water') continue;
+      _spawnTest.set(ax, surfaceY, az);
       const occupied = this.getAlive().some(
-        (z) => z.root.position.distanceToSquared(new THREE.Vector3(ax, surfaceY, az)) < 9,
+        (z) => z.root.position.distanceToSquared(_spawnTest) < 9,
       );
       if (occupied) continue;
       spawn = new THREE.Vector3(Math.floor(ax) + 0.5, surfaceY, Math.floor(az) + 0.5);

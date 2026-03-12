@@ -1,40 +1,36 @@
 import * as THREE from 'three';
-import { assetUrl } from '../config/assets.js';
 
 /**
- * Creates a generic humanoid enemy model from box parts.
- * Colors and proportions are driven by the enemy type definition.
+ * Creates enemy models using per-type Kenney character textures.
+ * Shares BoxGeometry instances to reduce GPU memory.
  */
+
+// Shared geometries — created once, reused across all enemies
+const _geoCache = new Map();
+function getGeo(w, h, d) {
+  const key = `${w},${h},${d}`;
+  if (!_geoCache.has(key)) _geoCache.set(key, new THREE.BoxGeometry(w, h, d));
+  return _geoCache.get(key);
+}
 
 function makePartMaterials(textureManager, path, sideColor, transparent) {
   const texture = textureManager.load(path);
-  const frontBackProps = {
-    map: texture,
-    transparent: transparent || false,
-    alphaTest: 0.2,
-    opacity: transparent ? 0.55 : 1,
-    color: 0xffffff,
-  };
-  const sideProps = {
-    color: sideColor,
-    transparent: transparent || false,
-    opacity: transparent ? 0.55 : 1,
-  };
-  const materials = [
-    new THREE.MeshLambertMaterial(sideProps),
-    new THREE.MeshLambertMaterial(sideProps),
-    new THREE.MeshLambertMaterial(sideProps),
-    new THREE.MeshLambertMaterial(sideProps),
-    new THREE.MeshLambertMaterial(frontBackProps),
-    new THREE.MeshLambertMaterial(frontBackProps),
-  ];
-  materials.forEach((m) => { m.userData.baseColor = m.color.getHex(); });
-  return materials;
+  const opacity = transparent ? 0.55 : 1;
+  const frontBack = new THREE.MeshLambertMaterial({
+    map: texture, transparent: transparent || false,
+    alphaTest: 0.2, opacity, color: 0xffffff,
+  });
+  const side = new THREE.MeshLambertMaterial({
+    color: sideColor, transparent: transparent || false, opacity,
+  });
+  frontBack.userData.baseColor = 0xffffff;
+  side.userData.baseColor = sideColor;
+  return [side, side, side, side, frontBack, frontBack];
 }
 
 function createPart(textureManager, path, x, y, z, w, h, d, color, transparent) {
   const part = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
+    getGeo(w, h, d),
     makePartMaterials(textureManager, path, color, transparent),
   );
   part.position.set(x, y, z);
@@ -42,14 +38,11 @@ function createPart(textureManager, path, x, y, z, w, h, d, color, transparent) 
 }
 
 export function tintPart(part, hex) {
-  const materials = Array.isArray(part.material) ? part.material : [part.material];
-  materials.forEach((m) => {
-    if (hex === 0xffffff) {
-      m.color.setHex(m.userData.baseColor ?? 0xffffff);
-      return;
-    }
-    m.color.setHex(hex);
-  });
+  const materials = part.material;
+  for (let i = 0; i < materials.length; i += 1) {
+    const m = materials[i];
+    m.color.setHex(hex === 0xffffff ? (m.userData.baseColor ?? 0xffffff) : hex);
+  }
 }
 
 function createHealthBarSprite(scale) {
@@ -88,6 +81,9 @@ export function updateHealthBarSprite(enemy) {
   sprite.visible = enemy.health < enemy.maxHealth;
 }
 
+// Shared invisible hitbox material
+const _hitboxMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+
 export function createEnemy(textureManager, typeDef, typeKey, spawnPosition, enemyGroup) {
   const s = typeDef.sizeMultiplier;
   const root = new THREE.Group();
@@ -97,23 +93,17 @@ export function createEnemy(textureManager, typeDef, typeKey, spawnPosition, ene
 
   const c = typeDef.colors;
   const tr = typeDef.transparent || false;
-  const bodyTex = assetUrl('assets/kenney/zombie/zombie_body.png');
-  const headTex = assetUrl('assets/kenney/zombie/zombie_head.png');
-  const armTex = assetUrl('assets/kenney/zombie/zombie_arm.png');
-  const legTex = assetUrl('assets/kenney/zombie/zombie_leg.png');
+  const tex = typeDef.textures;
 
-  const body = createPart(textureManager, bodyTex, 0, 0.88, 0, 0.88, 0.84, 0.62, c.body, tr);
-  const head = createPart(textureManager, headTex, 0, 1.55, 0, 0.64, 0.64, 0.72, c.head, tr);
-  const leftArm = createPart(textureManager, armTex, -0.43, 0.86, 0, 0.22, 0.76, 0.32, c.arms, tr);
-  const rightArm = createPart(textureManager, armTex, 0.43, 0.86, 0, 0.22, 0.76, 0.32, c.arms, tr);
-  const leftLeg = createPart(textureManager, legTex, -0.16, 0.3, 0, 0.24, 0.6, 0.34, c.legs, tr);
-  const rightLeg = createPart(textureManager, legTex, 0.16, 0.3, 0, 0.24, 0.6, 0.34, c.legs, tr);
+  const body = createPart(textureManager, tex.body, 0, 0.88, 0, 0.88, 0.84, 0.62, c.body, tr);
+  const head = createPart(textureManager, tex.head, 0, 1.55, 0, 0.64, 0.64, 0.72, c.head, tr);
+  const leftArm = createPart(textureManager, tex.arm, -0.43, 0.86, 0, 0.22, 0.76, 0.32, c.arms, tr);
+  const rightArm = createPart(textureManager, tex.arm, 0.43, 0.86, 0, 0.22, 0.76, 0.32, c.arms, tr);
+  const leftLeg = createPart(textureManager, tex.leg, -0.16, 0.3, 0, 0.24, 0.6, 0.34, c.legs, tr);
+  const rightLeg = createPart(textureManager, tex.leg, 0.16, 0.3, 0, 0.24, 0.6, 0.34, c.legs, tr);
   root.add(body, head, leftArm, rightArm, leftLeg, rightLeg);
 
-  const hitbox = new THREE.Mesh(
-    new THREE.BoxGeometry(0.85, 1.75, 0.85),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 }),
-  );
+  const hitbox = new THREE.Mesh(getGeo(0.85, 1.75, 0.85), _hitboxMat);
   hitbox.position.set(0, 0.88, 0);
   root.add(hitbox);
 
@@ -138,7 +128,6 @@ export function createEnemy(textureManager, typeDef, typeKey, spawnPosition, ene
     speed: typeDef.speed,
     sizeMultiplier: typeDef.sizeMultiplier,
     attackCooldown: 0,
-    // Behavior state
     behaviorTimer: 0,
     behaviorPhase: 'idle',
     circleAngle: Math.random() * Math.PI * 2,
@@ -146,9 +135,11 @@ export function createEnemy(textureManager, typeDef, typeKey, spawnPosition, ene
     fusing: false,
     burstRemaining: 0,
     burstTimer: 0,
+    _wasTinted: false,
+    _lastHealth: typeDef.maxHealth,
   };
 
   hitbox.userData.type = typeKey;
-  hitbox.userData.zombie = enemy; // keep compat with targeting system
+  hitbox.userData.zombie = enemy;
   return enemy;
 }

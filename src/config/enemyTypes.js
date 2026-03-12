@@ -1,19 +1,18 @@
+import { assetUrl } from './assets.js';
+
 /**
- * Enemy type definitions. Each type defines appearance, stats, and behavior.
- *
- * Behavior types:
- *   'chase'      - Walk straight toward player (zombie default)
- *   'charge'     - Slow approach, then burst-sprint when close
- *   'circle'     - Strafe around player, dash in to attack
- *   'leap'       - Hop toward player in big jumps
- *   'teleport'   - Blink to random positions near player
- *   'ranged'     - Keep distance, shoot projectiles
- *   'explode'    - Rush player, explode on contact (dies)
- *   'shield'     - High defense, drops guard periodically
- *   'swarm'      - Tiny, fast, jittery movement
- *   'regen'      - Slow, regenerates HP over time
- *   'flee'       - Runs away when player faces it, attacks from behind
+ * Enemy type definitions. Each type defines appearance, stats, behavior,
+ * and Kenney texture set.
  */
+
+function texSet(folder, prefix) {
+  return {
+    body: assetUrl(`assets/kenney/${folder}/${prefix}_body.png`),
+    head: assetUrl(`assets/kenney/${folder}/${prefix}_head.png`),
+    arm: assetUrl(`assets/kenney/${folder}/${prefix}_arm.png`),
+    leg: assetUrl(`assets/kenney/${folder}/${prefix}_leg.png`),
+  };
+}
 
 export const ENEMY_TYPES = {
   zombie: {
@@ -27,6 +26,7 @@ export const ENEMY_TYPES = {
     attackRange: 1.8,
     attackCooldownMs: 1000,
     knockbackResist: 0,
+    textures: texSet('zombie', 'zombie'),
     colors: {
       body: 0x8f6734, head: 0x49ab67,
       arms: 0x58be75, legs: 0x726454,
@@ -48,6 +48,7 @@ export const ENEMY_TYPES = {
     knockbackResist: 0,
     projectileSpeed: 10,
     preferredDistance: 8,
+    textures: texSet('skeleton', 'skeleton'),
     colors: {
       body: 0xd4cfc4, head: 0xe8e4d8,
       arms: 0xccc7b8, legs: 0xb0a898,
@@ -69,6 +70,7 @@ export const ENEMY_TYPES = {
     knockbackResist: 0.3,
     leapInterval: 1.2,
     leapStrength: 5,
+    textures: texSet('alien', 'alien'),
     colors: {
       body: 0x44dd55, head: 0x55ee66,
       arms: 0x44dd55, legs: 0x33cc44,
@@ -90,6 +92,7 @@ export const ENEMY_TYPES = {
     knockbackResist: 0.7,
     chargeDistance: 6,
     chargeSpeed: 4.5,
+    textures: texSet('santa', 'santa'),
     colors: {
       body: 0x7a5533, head: 0x8a6543,
       arms: 0x6a4523, legs: 0x5a3513,
@@ -112,6 +115,7 @@ export const ENEMY_TYPES = {
     circleRadius: 3.5,
     dashSpeed: 6,
     dashInterval: 2.5,
+    textures: texSet('gnome', 'gnome'),
     colors: {
       body: 0x333333, head: 0x551111,
       arms: 0x444444, legs: 0x222222,
@@ -135,6 +139,7 @@ export const ENEMY_TYPES = {
     teleportRadius: 6,
     transparent: true,
     floatAmplitude: 0.5,
+    textures: texSet('skeleton', 'skeleton'),
     colors: {
       body: 0xaabbdd, head: 0xccddff,
       arms: 0x99aacc, legs: 0x8899bb,
@@ -156,6 +161,7 @@ export const ENEMY_TYPES = {
     knockbackResist: 0,
     fuseTime: 1.5,
     explosionRadius: 3,
+    textures: texSet('alien', 'alien'),
     colors: {
       body: 0x33aa33, head: 0x44bb44,
       arms: 0x33aa33, legs: 0x228822,
@@ -179,6 +185,7 @@ export const ENEMY_TYPES = {
     preferredDistance: 9,
     teleportWhenClose: true,
     teleportThreshold: 4,
+    textures: texSet('female', 'female'),
     colors: {
       body: 0x4422aa, head: 0x6644cc,
       arms: 0x5533bb, legs: 0x332288,
@@ -199,6 +206,7 @@ export const ENEMY_TYPES = {
     attackCooldownMs: 2000,
     knockbackResist: 0.85,
     regenPerSecond: 0.5,
+    textures: texSet('male', 'male'),
     colors: {
       body: 0x888888, head: 0x999999,
       arms: 0x777777, legs: 0x666666,
@@ -219,6 +227,7 @@ export const ENEMY_TYPES = {
     attackCooldownMs: 700,
     knockbackResist: 0,
     fleeAngle: 2.5,
+    textures: texSet('gnome', 'gnome'),
     colors: {
       body: 0x1a1a2e, head: 0x222244,
       arms: 0x16162a, legs: 0x101020,
@@ -243,6 +252,7 @@ export const ENEMY_TYPES = {
     burstCount: 3,
     burstDelay: 150,
     floatAmplitude: 0.4,
+    textures: texSet('santa', 'santa'),
     colors: {
       body: 0xff6600, head: 0xff8833,
       arms: 0xff5500, legs: 0xcc4400,
@@ -252,7 +262,7 @@ export const ENEMY_TYPES = {
   },
 };
 
-// Build weighted spawn table (excludes zombie which is handled separately)
+// Build weighted spawn table
 export const SPAWN_TABLE = [];
 for (const [key, def] of Object.entries(ENEMY_TYPES)) {
   for (let i = 0; i < def.spawnWeight; i += 1) {

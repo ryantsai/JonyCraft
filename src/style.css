@@ -103,6 +103,48 @@ body {
   font-size: 0.84rem;
 }
 
+.player-health-bar {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 220px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(9, 16, 24, 0.48);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.health-label {
+  font-size: 0.84rem;
+  margin-bottom: 6px;
+  color: rgba(255, 240, 240, 0.92);
+}
+
+.health-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.health-fill {
+  height: 100%;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #e04040, #ff6b6b);
+  transition: width 200ms ease;
+}
+
+.health-fill[data-high='true'] {
+  background: linear-gradient(90deg, #40c040, #6bff6b);
+}
+
+.health-fill[data-mid='true'] {
+  background: linear-gradient(90deg, #c0a030, #ffe060);
+}
+
 .hotbar {
   position: absolute;
   bottom: 18px;
@@ -349,6 +391,13 @@ body {
 
   .start-panel {
     padding: 22px;
+  }
+
+  .player-health-bar {
+    top: 12px;
+    right: 12px;
+    width: 160px;
+    padding: 8px 10px;
   }
 
   .crosshair {

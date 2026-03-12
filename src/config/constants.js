@@ -25,10 +25,19 @@ export const PUNCH_RANGE = 6.2;
 export const PUNCH_SWING_MS = 260;
 export const PUNCH_COOLDOWN_MS = 360;
 
+// Player stats
+export const PLAYER_MAX_HP = 20;
+export const PLAYER_BASE_ATTACK = 1;
+export const PLAYER_BASE_DEFENSE = 0;
+
 // Enemies
 export const ZOMBIE_SPEED = 1.12;
 export const ZOMBIE_RESPAWN_MS = 4500;
 export const ZOMBIE_MAX_HEALTH = 3;
+export const ZOMBIE_BASE_ATTACK = 1;
+export const ZOMBIE_BASE_DEFENSE = 0;
+export const ZOMBIE_ATTACK_RANGE = 1.8;
+export const ZOMBIE_ATTACK_COOLDOWN_MS = 1000;
 export const INITIAL_ZOMBIE_COUNT = 5;
 
 // Particles

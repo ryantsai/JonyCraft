@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BLOCK_DEFS } from '../config/blocks.js';
 import {
-  PLAYER_HEIGHT, PLAYER_RADIUS, MOVE_SPEED, JUMP_SPEED, GRAVITY,
+  PLAYER_HEIGHT, PLAYER_RADIUS, JUMP_SPEED, GRAVITY,
   WORLD_SIZE_X, WORLD_SIZE_Z, WORLD_HEIGHT, LOOK_SPEED,
 } from '../config/constants.js';
 import { events } from '../core/EventBus.js';
@@ -64,7 +64,7 @@ export class PlayerController {
         .addScaledVector(forward, -wish.z)
         .addScaledVector(right, wish.x)
         .normalize()
-        .multiplyScalar(MOVE_SPEED);
+        .multiplyScalar(player.speed);
       player.velocity.x = THREE.MathUtils.lerp(player.velocity.x, desired.x, 0.16);
       player.velocity.z = THREE.MathUtils.lerp(player.velocity.z, desired.z, 0.16);
     } else {
@@ -104,7 +104,7 @@ export class PlayerController {
       player.velocity.y = 0;
     }
 
-    if (player.position.y < -10) {
+    if (player.position.y < -10 || player.hp <= 0) {
       this.setSpawn();
     }
 
@@ -151,6 +151,7 @@ export class PlayerController {
     const player = this.state.player;
     player.position.copy(bestPos);
     player.velocity.set(0, 0, 0);
+    player.hp = player.maxHp;
     const lookDir = new THREE.Vector3(center.x + 2 - bestPos.x, 0, center.y + 2 - bestPos.z);
     player.yaw = Math.atan2(lookDir.x, lookDir.z);
     player.pitch = -0.38;

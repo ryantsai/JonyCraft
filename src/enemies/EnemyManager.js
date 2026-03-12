@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import {
-  ZOMBIE_SPEED, ZOMBIE_RESPAWN_MS, INITIAL_ZOMBIE_COUNT,
+  ZOMBIE_RESPAWN_MS, INITIAL_ZOMBIE_COUNT,
   WORLD_SIZE_X, WORLD_SIZE_Z,
+  ZOMBIE_ATTACK_RANGE, ZOMBIE_ATTACK_COOLDOWN_MS,
 } from '../config/constants.js';
-import { createZombie, tintZombiePart } from './Zombie.js';
+import { createZombie, tintZombiePart, updateHealthBarSprite } from './Zombie.js';
+import { events } from '../core/EventBus.js';
 
 /**
  * Manages zombie spawning, AI, respawn timers, and cleanup.
@@ -83,6 +85,7 @@ export class EnemyManager {
     zombie.walkTime += dt * 8;
     zombie.hitFlash = Math.max(0, zombie.hitFlash - dt * 4);
     zombie.knockbackTimer = Math.max(0, zombie.knockbackTimer - dt * 1000);
+    zombie.attackCooldown = Math.max(0, zombie.attackCooldown - dt * 1000);
 
     const tint = zombie.hitFlash > 0 ? 0xff8a8a : 0xffffff;
     [zombie.body, zombie.head, zombie.leftArm, zombie.rightArm, zombie.leftLeg, zombie.rightLeg]
@@ -104,12 +107,22 @@ export class EnemyManager {
 
     if (distance > 1.7 && zombie.knockbackTimer === 0) {
       flatToPlayer.normalize();
-      zombie.root.position.x += flatToPlayer.x * ZOMBIE_SPEED * dt;
-      zombie.root.position.z += flatToPlayer.y * ZOMBIE_SPEED * dt;
+      zombie.root.position.x += flatToPlayer.x * zombie.speed * dt;
+      zombie.root.position.z += flatToPlayer.y * zombie.speed * dt;
     }
     zombie.root.position.y = this.world.getTerrainSurfaceY(
       zombie.root.position.x, zombie.root.position.z,
     );
+
+    // Zombie attacks player when in range
+    if (distance <= ZOMBIE_ATTACK_RANGE && zombie.attackCooldown === 0) {
+      zombie.attackCooldown = ZOMBIE_ATTACK_COOLDOWN_MS;
+      const damage = Math.max(1, zombie.baseAttack - this.state.player.baseDefense);
+      this.state.player.hp = Math.max(0, this.state.player.hp - damage);
+      events.emit('player:hit', { damage });
+      events.emit('sound:hit');
+      events.emit('hud:update');
+    }
 
     const sway = Math.sin(zombie.walkTime) * 0.12 * Math.min(1, distance / 2);
     zombie.leftArm.position.x = -0.43 + sway;
@@ -120,6 +133,8 @@ export class EnemyManager {
     const dx = this.state.player.position.x - zombie.root.position.x;
     const dz = this.state.player.position.z - zombie.root.position.z;
     zombie.root.rotation.set(0, Math.atan2(dx, dz), 0);
+
+    updateHealthBarSprite(zombie);
   }
 
   _findSpawnPoint(seedOffset = 0) {

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { ZOMBIE_MAX_HEALTH } from '../config/constants.js';
+import {
+  ZOMBIE_MAX_HEALTH, ZOMBIE_BASE_ATTACK, ZOMBIE_BASE_DEFENSE, ZOMBIE_SPEED,
+} from '../config/constants.js';
 import { assetUrl } from '../config/assets.js';
 
 function makeZombiePartMaterials(textureManager, path, sideColor) {
@@ -62,16 +64,68 @@ export function createZombie(textureManager, spawnPosition, enemyGroup) {
   hitbox.position.set(0, 0.88, 0);
   root.add(hitbox);
 
+  // Health bar sprite above head
+  const healthBar = createHealthBarSprite();
+  healthBar.position.set(0, 2.15, 0);
+  root.add(healthBar);
+
   const zombie = {
     root, hitbox, body, head, leftArm, rightArm, leftLeg, rightLeg,
+    healthBar,
     health: ZOMBIE_MAX_HEALTH,
+    maxHealth: ZOMBIE_MAX_HEALTH,
     alive: true,
     hitFlash: 0,
     walkTime: 0,
     knockback: new THREE.Vector3(),
     knockbackTimer: 0,
+    // Stats
+    baseAttack: ZOMBIE_BASE_ATTACK,
+    baseDefense: ZOMBIE_BASE_DEFENSE,
+    speed: ZOMBIE_SPEED,
+    sizeMultiplier: 1,
+    attackCooldown: 0,
   };
   hitbox.userData.type = 'zombie';
   hitbox.userData.zombie = zombie;
   return zombie;
+}
+
+function createHealthBarSprite() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 8;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(1.2, 0.15, 1);
+  sprite.userData.canvas = canvas;
+  sprite.userData.texture = texture;
+  return sprite;
+}
+
+export function updateHealthBarSprite(zombie) {
+  const sprite = zombie.healthBar;
+  if (!sprite) return;
+  const canvas = sprite.userData.canvas;
+  const ctx = canvas.getContext('2d');
+  const ratio = Math.max(0, zombie.health / zombie.maxHealth);
+
+  ctx.clearRect(0, 0, 64, 8);
+
+  // Background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.roundRect(0, 0, 64, 8, 3);
+  ctx.fill();
+
+  // Fill
+  if (ratio > 0) {
+    ctx.fillStyle = ratio > 0.5 ? '#4ae04a' : ratio > 0.25 ? '#e0c030' : '#e04040';
+    ctx.roundRect(1, 1, Math.round(62 * ratio), 6, 2);
+    ctx.fill();
+  }
+
+  sprite.userData.texture.needsUpdate = true;
+  sprite.visible = zombie.health < zombie.maxHealth;
 }

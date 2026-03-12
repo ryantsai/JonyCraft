@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
+import {
+  WORLD_SIZE_X, WORLD_SIZE_Z,
+  PLAYER_MAX_HP, PLAYER_BASE_ATTACK, PLAYER_BASE_DEFENSE, MOVE_SPEED,
+} from '../config/constants.js';
 import { SKILLS } from '../config/skills.js';
 
 /**
@@ -21,6 +24,13 @@ export class GameState {
       yaw: Math.PI / 4,
       pitch: -0.38,
       onGround: false,
+      // Stats
+      hp: PLAYER_MAX_HP,
+      maxHp: PLAYER_MAX_HP,
+      baseAttack: PLAYER_BASE_ATTACK,
+      baseDefense: PLAYER_BASE_DEFENSE,
+      speed: MOVE_SPEED,
+      sizeMultiplier: 1,
     };
 
     this.target = null;

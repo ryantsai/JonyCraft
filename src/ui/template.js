@@ -11,6 +11,12 @@ export const gameTemplate = `
         <div id="status-message">正在載入 Kenney 體素資源...</div>
         <div id="status-coords"></div>
       </div>
+      <div class="player-health-bar" aria-label="生命值">
+        <div class="health-label">❤ <span id="hp-text">20 / 20</span></div>
+        <div class="health-track">
+          <div id="hp-fill" class="health-fill" style="width: 100%"></div>
+        </div>
+      </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">
         <div class="stick-cluster">

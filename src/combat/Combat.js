@@ -77,7 +77,8 @@ export class CombatSystem {
     const distance = zombie.root.position.distanceTo(this.state.player.position);
     if (distance > range + 0.35) return false;
 
-    zombie.health -= 1;
+    const damage = Math.max(1, this.state.player.baseAttack - zombie.baseDefense);
+    zombie.health -= damage;
     zombie.hitFlash = 1;
     events.emit('sound:hit');
     const away = new THREE.Vector3().subVectors(zombie.root.position, this.state.player.position);

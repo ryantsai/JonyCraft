@@ -15,6 +15,8 @@ export class HUD {
     this.statusCoords = document.querySelector('#status-coords');
     this.startScreen = document.querySelector('#start-screen');
     this.startButton = document.querySelector('#start-btn');
+    this.hpText = document.querySelector('#hp-text');
+    this.hpFill = document.querySelector('#hp-fill');
   }
 
   init() {
@@ -91,6 +93,13 @@ export class HUD {
     const pointer = document.pointerLockElement === this.canvas ? '指標鎖定' : '滑鼠自由';
     this.statusMessage.textContent = `已選：${selected} | 目標：${target}${zombieText} | ${pointer}`;
     this.statusCoords.textContent = `XYZ ${player.position.x.toFixed(1)} / ${player.position.y.toFixed(1)} / ${player.position.z.toFixed(1)}`;
+
+    // Player health bar
+    const hpRatio = player.hp / player.maxHp;
+    this.hpText.textContent = `${player.hp} / ${player.maxHp}`;
+    this.hpFill.style.width = `${Math.max(0, hpRatio * 100)}%`;
+    this.hpFill.dataset.high = hpRatio > 0.5 ? 'true' : 'false';
+    this.hpFill.dataset.mid = (hpRatio > 0.25 && hpRatio <= 0.5) ? 'true' : 'false';
   }
 
   enterWorld() {

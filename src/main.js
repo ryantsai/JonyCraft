@@ -525,19 +525,40 @@ function buildDiamondSword() {
 function buildRubberPunch() {
   const group = new THREE.Group();
   const armAnchor = new THREE.Group();
+  const forearmPivot = new THREE.Group();
+  armAnchor.add(forearmPivot);
   group.add(armAnchor);
 
-  const armMaterial = new THREE.MeshLambertMaterial({ color: 0xd08f63 });
-  const fistMaterial = new THREE.MeshLambertMaterial({ color: 0xe0a27d });
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.42, 0.16), armMaterial);
-  const fist = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), fistMaterial);
-  arm.position.set(0, 0.2, 0);
-  fist.position.set(0, 0.76, 0);
-  armAnchor.add(arm, fist);
-  armAnchor.rotation.z = -1.05;
+  const sleeveMaterial = new THREE.MeshLambertMaterial({ color: 0xc6452d });
+  const armMaterial = new THREE.MeshLambertMaterial({ color: 0xd59a72 });
+  const fistMaterial = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+
+  const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.28), sleeveMaterial);
+  sleeve.position.set(0, 0, -0.08);
+
+  const armGeometry = new THREE.BoxGeometry(0.18, 0.18, 0.86);
+  armGeometry.translate(0, 0, -0.43);
+  const arm = new THREE.Mesh(armGeometry, armMaterial);
+
+  const fist = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 0.28), fistMaterial);
+  fist.position.set(0, 0, -0.86);
+
+  const cuff = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.08), sleeveMaterial);
+  cuff.position.set(0, 0, -0.18);
+
+  forearmPivot.add(arm, fist, cuff);
+  armAnchor.add(sleeve);
   group.visible = false;
   heldItemPivot.add(group);
-  heldSkillModels.punch = { group, armAnchor, arm, fist };
+  heldSkillModels.punch = {
+    group,
+    armAnchor,
+    forearmPivot,
+    arm,
+    fist,
+    cuff,
+    baseLength: 0.86,
+  };
 }
 
 function buildDirtSkill() {
@@ -954,17 +975,29 @@ function updateWeapon(dt) {
     heldSkillModels.sword.group.visible = gameState.mode === 'playing';
   } else if (selectedSkill.id === 'punch') {
     const punchPhase = combat.punchTime > 0 ? 1 - combat.punchTime / PUNCH_SWING_MS : 0;
-    const extend = Math.sin(punchPhase * Math.PI);
-    const armScale = 1 + extend * 2.1;
-    heldSkillModels.punch.arm.scale.y = armScale;
-    heldSkillModels.punch.arm.position.y = 0.2 * armScale;
-    heldSkillModels.punch.fist.position.y = 0.34 + armScale * 0.42;
+    const windup = THREE.MathUtils.smoothstep(punchPhase, 0, 0.18);
+    const release = THREE.MathUtils.smoothstep(punchPhase, 0.12, 0.45);
+    const recover = THREE.MathUtils.smoothstep(punchPhase, 0.48, 1);
+    const extend = Math.max(0, release - recover * 0.92);
+    const armScale = 1 + extend * 3.6;
+    const reach = heldSkillModels.punch.baseLength * armScale;
+
+    heldSkillModels.punch.arm.scale.z = armScale;
+    heldSkillModels.punch.fist.position.z = -reach;
+    heldSkillModels.punch.cuff.position.z = -0.18 - extend * 0.08;
+
     heldSkillModels.punch.group.position.set(
-      0.52 - extend * 0.22,
-      -0.58 + extend * 0.08,
-      -0.56 + extend * 0.14,
+      0.76 - extend * 0.24 + windup * 0.06,
+      -0.74 + extend * 0.18 + windup * 0.05,
+      -0.98 - extend * 0.24,
     );
-    heldSkillModels.punch.group.rotation.set(0.22 - extend * 0.4, -0.1, -0.88 + extend * 0.18);
+    heldSkillModels.punch.group.rotation.set(
+      0.56 - extend * 0.12 - windup * 0.1,
+      -0.52 + extend * 0.18,
+      -0.46 + extend * 0.08,
+    );
+    heldSkillModels.punch.armAnchor.rotation.set(-0.08 - extend * 0.05, 0.1 - extend * 0.06, 0.04);
+    heldSkillModels.punch.forearmPivot.rotation.set(-0.06 + extend * 0.04, 0.02, 0);
     heldSkillModels.punch.group.visible = gameState.mode === 'playing';
   } else if (selectedSkill.id === 'dirt') {
     heldSkillModels.dirt.group.position.set(0.58, -0.56, -0.72);

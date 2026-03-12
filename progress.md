@@ -28,6 +28,18 @@ Original prompt: Create a web based minecraft cline with three.js, using assets 
   - `test-actions-combat.json` confirmed sword hits reduce zombie health and can complete a kill (`kills: 1` in automation state output).
   - `test-actions-knockback.json` confirmed one-hit knockback via state delta and screenshot review.
 - Adjusted spawn selection to prefer open ground and removed auto-pointer-lock on start to keep automated runs stable.
+- Flattened the terrain into a larger sparse test map (56x56 footprint, mostly height 2-3) with lighter tree density and no water fill.
+- Reworked the hotbar into a 3-skill inventory: Diamond Sword, Rubber Punch, and Dirt Block.
+- Restricted block breaking/placing to the Dirt skill so Sword and Rubber Punch are combat-only on left click.
+- Increased the living zombie wave size to 5 simultaneous zombies with the same respawn loop.
+- Fixed HUD/start-screen layering so the canvas no longer steals clicks from UI overlays and hotbar interactions.
+- Rebuilt Rubber Punch as a visible blocky first-person arm that sits in the lower-right while selected and stretches across the screen during the punch attack.
+- Adjusted Rubber Punch again so the stretch direction aims toward the center crosshair instead of sweeping left across the screen.
+- Added `test-actions-skills.json` and `test-actions-punch.json` for broader regression coverage while iterating on the flatter map and new skill behavior.
+- Verified the updated Rubber Punch using browser automation and screenshots:
+  - `output/rubber-punch-idle-3.png` shows the blocky arm idle in the lower-right when skill 2 is selected.
+  - `output/rubber-punch-attack-3.png` shows the arm stretched across the view during a punch.
+  - Browser state checks confirmed `selectedSkill: "punch"` and `punchActive: true` during attack.
 
 TODO
 - Optional polish: add chunk meshing or instancing if the world size grows beyond the current compact sandbox.

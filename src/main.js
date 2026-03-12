@@ -6,47 +6,53 @@ const assetUrl = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, ''
 
 app.innerHTML = `
   <div class="shell">
-    <canvas class="game-canvas" aria-label="JonyCraft voxel sandbox"></canvas>
+    <canvas class="game-canvas" aria-label="JonyCraft 體素沙盒"></canvas>
     <div class="hud">
       <div class="crosshair" aria-hidden="true"></div>
       <div class="status-bar">
-        <div id="status-message">Loading Kenney voxel assets...</div>
+        <div id="status-message">正在載入 Kenney 體素資源...</div>
         <div id="status-coords"></div>
       </div>
-      <div id="hotbar" class="hotbar" aria-label="Selected skills"></div>
-      <div id="mobile-controls" class="mobile-controls" aria-label="Virtual gamepad">
+      <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
+      <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">
         <div class="stick-cluster">
-          <div id="move-pad" class="touch-pad" aria-label="Move pad">
+          <div id="move-pad" class="touch-pad" aria-label="移動搖桿">
             <div id="move-knob" class="touch-knob"></div>
           </div>
-          <div id="look-pad" class="touch-pad" aria-label="Look pad">
+          <div id="look-pad" class="touch-pad" aria-label="視角搖桿">
             <div id="look-knob" class="touch-knob"></div>
           </div>
         </div>
         <div class="mobile-actions">
-          <button id="touch-jump" type="button">Jump</button>
-          <button id="touch-primary" type="button">Use</button>
-          <button id="touch-secondary" type="button">Place</button>
+          <button id="touch-jump" type="button">跳躍</button>
+          <button id="touch-primary" type="button">使用</button>
+          <button id="touch-secondary" type="button">放置</button>
         </div>
       </div>
     </div>
     <div id="start-screen" class="start-screen">
       <div class="start-panel">
-        <p class="eyebrow">Three.js sandbox</p>
+        <p class="eyebrow">Three.js 沙盒</p>
         <h1>JonyCraft</h1>
         <p class="lead">
-          A compact Minecraft-inspired sandbox built with Kenney voxel textures.
+          以 Kenney 體素素材打造的 Minecraft 風格沙盒遊戲。
         </p>
-        <div class="control-list">
-          <span><strong>Move:</strong> WASD or Arrow Up/Down</span>
-          <span><strong>Jump:</strong> Space</span>
-          <span><strong>Look:</strong> Mouse or Arrow Left/Right</span>
-          <span><strong>Left Click:</strong> selected skill</span>
-          <span><strong>Right Click:</strong> place dirt only in skill 3</span>
-          <span><strong>Skills:</strong> 1 Sword, 2 Rubber Punch, 3 Dirt</span>
-          <span><strong>Fullscreen:</strong> F</span>
+        <div id="mode-select" class="mode-select">
+          <p class="mode-label">選擇遊戲模式</p>
+          <div class="mode-list">
+            <button class="mode-btn mode-btn-active" data-mode="test" type="button">測試模式</button>
+          </div>
         </div>
-        <button id="start-btn" class="start-btn" type="button">Enter World</button>
+        <div class="control-list">
+          <span><strong>移動：</strong>WASD 或 方向鍵 上/下</span>
+          <span><strong>跳躍：</strong>空白鍵</span>
+          <span><strong>視角：</strong>滑鼠 或 方向鍵 左/右</span>
+          <span><strong>左鍵：</strong>使用已選技能</span>
+          <span><strong>右鍵：</strong>僅在技能 3 時放置泥土</span>
+          <span><strong>技能：</strong>1 鑽石劍、2 橡膠拳、3 泥土</span>
+          <span><strong>全螢幕：</strong>F</span>
+        </div>
+        <button id="start-btn" class="start-btn" type="button">進入世界</button>
       </div>
     </div>
   </div>
@@ -96,19 +102,19 @@ const CONTROL_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ArrowLeft', 'Arr
 const SKILLS = [
   {
     id: 'sword',
-    name: 'Diamond Sword',
+    name: '鑽石劍',
     icon: assetUrl('assets/kenney/items/sword_diamond.png'),
     kind: 'attack',
   },
   {
     id: 'punch',
-    name: 'Rubber Punch',
+    name: '橡膠拳',
     icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
     kind: 'attack',
   },
   {
     id: 'dirt',
-    name: 'Dirt Block',
+    name: '泥土方塊',
     icon: assetUrl('assets/kenney/tiles/dirt.png'),
     kind: 'block',
     blockType: 'dirt',
@@ -117,7 +123,7 @@ const SKILLS = [
 
 const BLOCK_DEFS = {
   grass: {
-    name: 'Grass',
+    name: '草地',
     icon: assetUrl('assets/kenney/tiles/grass_top.png'),
     faces: {
       side: assetUrl('assets/kenney/tiles/dirt_grass.png'),
@@ -127,7 +133,7 @@ const BLOCK_DEFS = {
     collides: true,
   },
   dirt: {
-    name: 'Dirt',
+    name: '泥土',
     icon: assetUrl('assets/kenney/tiles/dirt.png'),
     faces: {
       all: assetUrl('assets/kenney/tiles/dirt.png'),
@@ -135,7 +141,7 @@ const BLOCK_DEFS = {
     collides: true,
   },
   stone: {
-    name: 'Stone',
+    name: '石頭',
     icon: assetUrl('assets/kenney/tiles/stone.png'),
     faces: {
       all: assetUrl('assets/kenney/tiles/stone.png'),
@@ -143,7 +149,7 @@ const BLOCK_DEFS = {
     collides: true,
   },
   sand: {
-    name: 'Sand',
+    name: '沙子',
     icon: assetUrl('assets/kenney/tiles/sand.png'),
     faces: {
       all: assetUrl('assets/kenney/tiles/sand.png'),
@@ -151,7 +157,7 @@ const BLOCK_DEFS = {
     collides: true,
   },
   wood: {
-    name: 'Wood',
+    name: '木頭',
     icon: assetUrl('assets/kenney/tiles/trunk_side.png'),
     faces: {
       side: assetUrl('assets/kenney/tiles/trunk_side.png'),
@@ -161,7 +167,7 @@ const BLOCK_DEFS = {
     collides: true,
   },
   leaves: {
-    name: 'Leaves',
+    name: '樹葉',
     icon: assetUrl('assets/kenney/tiles/leaves_transparent.png'),
     faces: {
       all: assetUrl('assets/kenney/tiles/leaves_transparent.png'),
@@ -171,7 +177,7 @@ const BLOCK_DEFS = {
     alphaTest: 0.25,
   },
   brick: {
-    name: 'Brick',
+    name: '磚塊',
     icon: assetUrl('assets/kenney/tiles/brick_red.png'),
     faces: {
       all: assetUrl('assets/kenney/tiles/brick_red.png'),
@@ -179,7 +185,7 @@ const BLOCK_DEFS = {
     collides: true,
   },
   water: {
-    name: 'Water',
+    name: '水',
     icon: assetUrl('assets/kenney/tiles/water.png'),
     faces: {
       all: assetUrl('assets/kenney/tiles/water.png'),
@@ -233,6 +239,7 @@ const keyState = new Set();
 
 const gameState = {
   mode: 'loading',
+  gameMode: 'test',
   started: false,
   useManualClock: false,
   selectedIndex: 0,
@@ -1253,15 +1260,15 @@ function updateHud() {
   const selected = getSelectedSkill().name;
   const target = gameState.target
     ? `${gameState.target.block.type} @ ${gameState.target.block.x},${gameState.target.block.y},${gameState.target.block.z}`
-    : 'none';
+    : '無';
   const aliveZombieCount = getAliveZombies().length;
   const zombieText = gameState.enemyTarget
-    ? ` | Target Zombie HP ${gameState.enemyTarget.health} | Zombies ${aliveZombieCount}`
+    ? ` | 目標殭屍 HP ${gameState.enemyTarget.health} | 殭屍 ${aliveZombieCount}`
     : aliveZombieCount > 0
-    ? ` | Zombies ${aliveZombieCount} alive`
-    : ` | Zombies down ${gameState.combat.kills}`;
-  const pointerHint = document.pointerLockElement === canvas ? 'Pointer locked' : 'Mouse free';
-  statusMessage.textContent = `${selected} selected | Target: ${target}${zombieText} | ${pointerHint}`;
+    ? ` | 殭屍存活 ${aliveZombieCount}`
+    : ` | 已擊殺殭屍 ${gameState.combat.kills}`;
+  const pointerHint = document.pointerLockElement === canvas ? '指標鎖定' : '滑鼠自由';
+  statusMessage.textContent = `已選：${selected} | 目標：${target}${zombieText} | ${pointerHint}`;
   statusCoords.textContent = `XYZ ${player.position.x.toFixed(1)} / ${player.position.y.toFixed(1)} / ${player.position.z.toFixed(1)}`;
 }
 
@@ -1492,6 +1499,14 @@ function initInput() {
 
   startButton.addEventListener('click', enterWorld);
 
+  document.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('mode-btn-active'));
+      btn.classList.add('mode-btn-active');
+      gameState.gameMode = btn.dataset.mode;
+    });
+  });
+
   if (isMobileDevice) {
     mobileControls.dataset.visible = 'true';
   }
@@ -1679,8 +1694,8 @@ async function init() {
   updateHud();
 
   gameState.mode = 'menu';
-  statusMessage.textContent = 'Press Enter World to start exploring.';
-  statusCoords.textContent = 'Ready';
+  statusMessage.textContent = '按下「進入世界」開始探索。';
+  statusCoords.textContent = '準備就緒';
 
   let lastTime = performance.now();
   const animate = (now) => {
@@ -1698,5 +1713,5 @@ window.addEventListener('resize', onResize);
 
 init().catch((error) => {
   console.error(error);
-  statusMessage.textContent = 'Failed to load JonyCraft assets.';
+  statusMessage.textContent = '載入 JonyCraft 資源失敗。';
 });

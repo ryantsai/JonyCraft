@@ -1,0 +1,241 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Trebuchet MS', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at top, rgba(255, 245, 214, 0.18), transparent 40%),
+    linear-gradient(180deg, #8ed0ff 0%, #4e87bb 55%, #1d3145 100%);
+  color: #f6f8fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app,
+.shell {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background:
+    linear-gradient(180deg, rgba(196, 229, 255, 0.22), rgba(13, 27, 40, 0.7)),
+    #0f2232;
+}
+
+.game-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  margin-top: -12px;
+}
+
+.crosshair::before,
+.crosshair::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.28);
+}
+
+.crosshair::before {
+  left: 11px;
+  top: 0;
+  width: 2px;
+  height: 24px;
+}
+
+.crosshair::after {
+  top: 11px;
+  left: 0;
+  width: 24px;
+  height: 2px;
+}
+
+.status-bar {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  display: grid;
+  gap: 6px;
+  max-width: min(640px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  background: rgba(9, 16, 24, 0.48);
+  backdrop-filter: blur(12px);
+  line-height: 1.25;
+}
+
+#status-message {
+  font-size: 0.94rem;
+}
+
+#status-coords {
+  color: rgba(236, 244, 255, 0.82);
+  font-size: 0.84rem;
+}
+
+.hotbar {
+  position: absolute;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(11, 17, 23, 0.55);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.hotbar-item {
+  width: 86px;
+  min-height: 84px;
+  display: grid;
+  align-content: space-between;
+  padding: 10px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  color: inherit;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.18)),
+    rgba(16, 25, 34, 0.9);
+  background-repeat: no-repeat;
+  background-position: center 13px;
+  background-size: 34px 34px;
+  background-image: var(--icon);
+  text-align: left;
+  cursor: pointer;
+}
+
+.hotbar-item[data-selected='true'] {
+  transform: translateY(-6px);
+  border-color: rgba(255, 230, 136, 0.95);
+  box-shadow: 0 18px 32px rgba(0, 0, 0, 0.28);
+}
+
+.slot-number {
+  font-size: 0.72rem;
+  color: rgba(255, 246, 214, 0.86);
+}
+
+.slot-name {
+  align-self: end;
+  font-size: 0.8rem;
+}
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at center, rgba(164, 215, 255, 0.18), transparent 42%),
+    rgba(6, 13, 20, 0.72);
+  backdrop-filter: blur(6px);
+  transition: opacity 180ms ease;
+}
+
+.start-screen[data-hidden='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.start-panel {
+  width: min(560px, 100%);
+  padding: 28px;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(145deg, rgba(20, 34, 46, 0.95), rgba(10, 18, 26, 0.92)),
+    rgba(0, 0, 0, 0.35);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  color: #ffd77a;
+}
+
+.start-panel h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 8vw, 4.6rem);
+  line-height: 0.95;
+}
+
+.lead {
+  margin: 16px 0 18px;
+  font-size: 1rem;
+  color: rgba(241, 245, 255, 0.85);
+}
+
+.control-list {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 20px;
+  color: rgba(241, 245, 255, 0.86);
+}
+
+.start-btn {
+  padding: 14px 18px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffd973, #ffb339);
+  color: #2d1f00;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .status-bar {
+    max-width: calc(100vw - 24px);
+    top: 12px;
+    left: 12px;
+    padding: 10px 12px;
+  }
+
+  .hotbar {
+    width: calc(100vw - 16px);
+    justify-content: center;
+    overflow-x: auto;
+    bottom: 10px;
+    padding: 10px;
+  }
+
+  .hotbar-item {
+    width: 74px;
+    min-height: 72px;
+    background-size: 28px 28px;
+  }
+
+  .start-panel {
+    padding: 22px;
+  }
+}

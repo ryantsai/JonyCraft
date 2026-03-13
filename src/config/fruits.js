@@ -16,6 +16,7 @@ import { assetUrl } from './assets.js';
  *   damage      – base damage multiplier (applied on top of player.baseAttack)
  *   particleColor – hit particle colour
  *   particleCount – number of particles on hit
+ *   weaponType  – animation type: sword, punch, cast, slam, uppercut, clap
  */
 
 export const FRUITS = [
@@ -54,7 +55,7 @@ export const FRUITS = [
         damage: 2,
         particleColor: 'yellow',
         particleCount: 20,
-        weaponType: 'punch',
+        weaponType: 'uppercut',
       },
       {
         id: 'rubber_bazooka',
@@ -69,7 +70,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'orange',
         particleCount: 18,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
       {
         id: 'rubber_bell',
@@ -84,7 +85,7 @@ export const FRUITS = [
         damage: 4,
         particleColor: 'gold',
         particleCount: 22,
-        weaponType: 'punch',
+        weaponType: 'slam',
       },
     ],
   },
@@ -123,7 +124,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'red',
         particleCount: 24,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'flame_emperor',
@@ -138,7 +139,7 @@ export const FRUITS = [
         damage: 5,
         particleColor: 'orange',
         particleCount: 28,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
     ],
   },
@@ -177,7 +178,7 @@ export const FRUITS = [
         damage: 4,
         particleColor: 'white',
         particleCount: 30,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'ice_saber',
@@ -216,7 +217,7 @@ export const FRUITS = [
         damage: 2,
         particleColor: 'yellow',
         particleCount: 18,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'lightning_rush',
@@ -231,7 +232,7 @@ export const FRUITS = [
         damage: 2,
         particleColor: 'white',
         particleCount: 16,
-        weaponType: 'punch',
+        weaponType: 'uppercut',
       },
       {
         id: 'thunder_dragon',
@@ -246,7 +247,7 @@ export const FRUITS = [
         damage: 5,
         particleColor: 'yellow',
         particleCount: 26,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
     ],
   },
@@ -270,7 +271,7 @@ export const FRUITS = [
         damage: 1,
         particleColor: 'purple',
         particleCount: 14,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'black_hole',
@@ -285,7 +286,7 @@ export const FRUITS = [
         damage: 4,
         particleColor: 'purple',
         particleCount: 24,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
       {
         id: 'liberation',
@@ -300,7 +301,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'black',
         particleCount: 20,
-        weaponType: 'punch',
+        weaponType: 'slam',
       },
     ],
   },
@@ -324,7 +325,7 @@ export const FRUITS = [
         damage: 2,
         particleColor: 'yellow',
         particleCount: 12,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'flash_step',
@@ -339,7 +340,7 @@ export const FRUITS = [
         damage: 1,
         particleColor: 'white',
         particleCount: 16,
-        weaponType: 'punch',
+        weaponType: 'uppercut',
       },
       {
         id: 'light_sword',
@@ -369,7 +370,7 @@ export const FRUITS = [
         damage: 5,
         particleColor: 'yellow',
         particleCount: 30,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
     ],
   },
@@ -393,7 +394,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'white',
         particleCount: 20,
-        weaponType: 'punch',
+        weaponType: 'slam',
       },
       {
         id: 'seismic_wave',
@@ -408,7 +409,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'yellow',
         particleCount: 22,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'space_shatter',
@@ -423,7 +424,7 @@ export const FRUITS = [
         damage: 5,
         particleColor: 'white',
         particleCount: 28,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
     ],
   },
@@ -462,7 +463,7 @@ export const FRUITS = [
         damage: 5,
         particleColor: 'orange',
         particleCount: 30,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
       {
         id: 'magma_hound',
@@ -477,7 +478,7 @@ export const FRUITS = [
         damage: 2,
         particleColor: 'red',
         particleCount: 16,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
     ],
   },
@@ -516,7 +517,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'yellow',
         particleCount: 20,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'sandstorm',
@@ -531,7 +532,7 @@ export const FRUITS = [
         damage: 4,
         particleColor: 'orange',
         particleCount: 26,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
     ],
   },
@@ -555,7 +556,7 @@ export const FRUITS = [
         damage: 2,
         particleColor: 'orange',
         particleCount: 18,
-        weaponType: 'punch',
+        weaponType: 'slam',
       },
       {
         id: 'land_mine',
@@ -570,7 +571,7 @@ export const FRUITS = [
         damage: 3,
         particleColor: 'red',
         particleCount: 22,
-        weaponType: 'punch',
+        weaponType: 'cast',
       },
       {
         id: 'big_explosion',
@@ -585,7 +586,7 @@ export const FRUITS = [
         damage: 6,
         particleColor: 'red',
         particleCount: 32,
-        weaponType: 'punch',
+        weaponType: 'clap',
       },
     ],
   },

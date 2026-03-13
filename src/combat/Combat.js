@@ -36,8 +36,9 @@ export class CombatSystem {
       combat.swordSwingTime = skill.swingMs;
       events.emit('sound:sword');
     } else {
+      // punch, cast, slam, uppercut, clap all use punchTime as their animation timer
       combat.punchTime = skill.swingMs;
-      events.emit('sound:punch');
+      events.emit(skill.weaponType === 'slam' ? 'sound:punch' : 'sound:punch');
     }
 
     // Trigger fruit-specific visual effects (shake, flash)

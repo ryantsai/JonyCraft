@@ -34,6 +34,8 @@ const DEFAULT_MOD = { stretchMul: 1.0, fistScale: 1.0, shake: 0, flashAlpha: 0, 
 /**
  * Builds and animates held weapon/skill 3D models in first person.
  * Supports per-fruit color tinting, animation modifiers, screen shake, and flash.
+ *
+ * Weapon types: sword, punch, cast, slam, uppercut, clap, dirt
  */
 export class WeaponModels {
   constructor(sceneSetup, textureManager, blockMaterials) {
@@ -66,6 +68,10 @@ export class WeaponModels {
   buildAll() {
     this._buildDiamondSword();
     this._buildRubberPunch();
+    this._buildCastHand();
+    this._buildSlamFist();
+    this._buildUppercutFist();
+    this._buildClapFists();
     this._buildDirtSkill();
     this._createFlashOverlay();
 
@@ -98,6 +104,14 @@ export class WeaponModels {
       this._animateSword(combat, swingMs, mod, gameState);
     } else if (wt === 'punch') {
       this._animatePunch(combat, swingMs, mod, gameState);
+    } else if (wt === 'cast') {
+      this._animateCast(combat, swingMs, mod, gameState);
+    } else if (wt === 'slam') {
+      this._animateSlam(combat, swingMs, mod, gameState);
+    } else if (wt === 'uppercut') {
+      this._animateUppercut(combat, swingMs, mod, gameState);
+    } else if (wt === 'clap') {
+      this._animateClap(combat, swingMs, mod, gameState);
     } else if (wt === 'dirt') {
       this.models.dirt.group.position.set(0.58, -0.56, -0.72);
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
@@ -189,6 +203,201 @@ export class WeaponModels {
     this.models.punch.group.visible = gameState.mode === 'playing';
   }
 
+  // ── Cast animation: open palm pushes forward with magic orb ──
+
+  _animateCast(combat, swingMs, mod, gameState) {
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+    const charge = THREE.MathUtils.smoothstep(phase, 0, 0.25);
+    const release = THREE.MathUtils.smoothstep(phase, 0.2, 0.55);
+    const recover = THREE.MathUtils.smoothstep(phase, 0.6, 1);
+    const push = Math.max(0, release - recover * 0.8);
+    const m = this.models.cast;
+
+    // Palm pushes forward from lower-right
+    m.group.position.set(
+      0.52 - push * 0.36,
+      -0.68 + charge * 0.12 + push * 0.22,
+      -0.82 - push * 0.48,
+    );
+
+    // Palm rotates to face forward during cast
+    const swirlWave = Math.sin(phase * Math.PI * 3.0) * mod.swirl * 0.6;
+    m.group.rotation.set(
+      0.3 - push * 0.5 + swirlWave,
+      -0.4 + push * 0.2,
+      -0.2 - charge * 0.15,
+    );
+
+    // Fingers spread open during charge
+    const spread = charge * 0.18;
+    m.fingers.forEach((f, i) => {
+      const angle = (i - 1.5) * spread;
+      f.rotation.set(-charge * 0.08, angle, 0);
+    });
+
+    // Orb pulses and grows during cast
+    const orbScale = 0.12 + push * 0.22 * mod.fistScale;
+    const orbGlow = phase > 0 ? (1 - phase) * 0.7 : 0.15;
+    m.orb.scale.setScalar(orbScale);
+    m.orb.material.opacity = orbGlow;
+    m.orb.position.set(0, 0.02, -0.52 - push * 0.3);
+
+    // Orb ring spins
+    if (m.orbRing) {
+      m.orbRing.rotation.z += 0.08;
+      m.orbRing.rotation.x += 0.03;
+      m.orbRing.scale.setScalar(orbScale * 2.2);
+      m.orbRing.material.opacity = orbGlow * 0.5;
+      m.orbRing.position.copy(m.orb.position);
+    }
+
+    m.group.visible = gameState.mode === 'playing';
+  }
+
+  // ── Slam animation: overhead fist smashes downward ──
+
+  _animateSlam(combat, swingMs, mod, gameState) {
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+    const windup = THREE.MathUtils.smoothstep(phase, 0, 0.3);
+    const smash = THREE.MathUtils.smoothstep(phase, 0.25, 0.5);
+    const recover = THREE.MathUtils.smoothstep(phase, 0.55, 1);
+    const m = this.models.slam;
+
+    // Fist raises up during windup, then slams down
+    const yOffset = windup * 0.6 - smash * 1.1 + recover * 0.5;
+    const zOffset = -smash * 0.3 + recover * 0.15;
+
+    m.group.position.set(
+      0.3 - smash * 0.2,
+      -0.4 + yOffset,
+      -0.9 + zOffset,
+    );
+
+    // Rotate: tilts back during windup, forward during slam
+    const tiltX = -windup * 0.6 + smash * 1.4 - recover * 0.8;
+    const shake = phase > 0.4 && phase < 0.6
+      ? Math.sin(phase * Math.PI * 12) * mod.shake * 8
+      : 0;
+    m.group.rotation.set(
+      tiltX + shake,
+      -0.15,
+      -0.1 + smash * 0.08,
+    );
+
+    // Fist scales up on impact
+    const impactBoost = phase > 0.35 && phase < 0.6
+      ? Math.sin((phase - 0.35) / 0.25 * Math.PI) * (mod.fistScale - 1) * 0.6
+      : 0;
+    m.fist.scale.setScalar(1 + impactBoost);
+
+    m.group.visible = gameState.mode === 'playing';
+  }
+
+  // ── Uppercut animation: fist swings upward from below ──
+
+  _animateUppercut(combat, swingMs, mod, gameState) {
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+    const crouch = THREE.MathUtils.smoothstep(phase, 0, 0.2);
+    const swing = THREE.MathUtils.smoothstep(phase, 0.15, 0.5);
+    const recover = THREE.MathUtils.smoothstep(phase, 0.55, 1);
+    const m = this.models.uppercut;
+
+    // Fist drops low then sweeps upward
+    const yOffset = -crouch * 0.4 + swing * 1.0 - recover * 0.6;
+    const zOffset = -swing * 0.35 + recover * 0.2;
+
+    m.group.position.set(
+      0.6 - swing * 0.25,
+      -0.9 + yOffset,
+      -0.85 + zOffset,
+    );
+
+    // Arm rotates through the uppercut arc
+    const arcAngle = -crouch * 0.3 + swing * 1.2 - recover * 0.9;
+    const swirlWave = Math.sin(phase * Math.PI * 3.5) * mod.swirl * 0.8;
+    m.group.rotation.set(
+      arcAngle + swirlWave,
+      -0.4 + swing * 0.15,
+      -0.3 + swing * 0.2 - recover * 0.1,
+    );
+
+    // Fist scales on impact
+    const impactBoost = phase > 0.3 && phase < 0.55
+      ? Math.sin((phase - 0.3) / 0.25 * Math.PI) * (mod.fistScale - 1) * 0.5
+      : 0;
+    m.fist.scale.setScalar(1 + impactBoost);
+
+    // Arm stretches slightly
+    const armStretch = 1 + swing * 0.4 * mod.stretchMul;
+    m.arm.scale.z = armStretch;
+
+    m.group.visible = gameState.mode === 'playing';
+  }
+
+  // ── Clap animation: two fists converge and thrust forward ──
+
+  _animateClap(combat, swingMs, mod, gameState) {
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+    const spread = THREE.MathUtils.smoothstep(phase, 0, 0.2);
+    const converge = THREE.MathUtils.smoothstep(phase, 0.15, 0.45);
+    const thrust = THREE.MathUtils.smoothstep(phase, 0.4, 0.65);
+    const recover = THREE.MathUtils.smoothstep(phase, 0.7, 1);
+    const m = this.models.clap;
+
+    // Both fists spread apart then clap together and push forward
+    const separation = spread * 0.6 - converge * 0.6;
+    const zPush = -thrust * 0.5 + recover * 0.3;
+
+    m.leftFist.position.set(
+      -0.18 - separation,
+      0,
+      -0.4 + zPush,
+    );
+    m.rightFist.position.set(
+      0.18 + separation,
+      0,
+      -0.4 + zPush,
+    );
+
+    // Group position
+    m.group.position.set(
+      0.15,
+      -0.65 + thrust * 0.12,
+      -0.7 - thrust * 0.3,
+    );
+
+    // Rotation — hands tilt inward to meet
+    const tiltAngle = converge * 0.3 - recover * 0.15;
+    m.leftFist.rotation.set(0, tiltAngle, converge * 0.2);
+    m.rightFist.rotation.set(0, -tiltAngle, -converge * 0.2);
+
+    m.group.rotation.set(
+      0.2 - thrust * 0.15,
+      -0.1,
+      0,
+    );
+
+    // Impact flash: both fists scale up on converge
+    const impactBoost = phase > 0.35 && phase < 0.55
+      ? Math.sin((phase - 0.35) / 0.2 * Math.PI) * (mod.fistScale - 1) * 0.7
+      : 0;
+    m.leftFist.scale.setScalar(1 + impactBoost);
+    m.rightFist.scale.setScalar(1 + impactBoost);
+
+    // Energy burst between fists on impact
+    if (m.energyBurst) {
+      const burstAlpha = phase > 0.38 && phase < 0.65
+        ? Math.sin((phase - 0.38) / 0.27 * Math.PI) * 0.8
+        : 0;
+      m.energyBurst.material.opacity = burstAlpha;
+      m.energyBurst.visible = burstAlpha > 0.01;
+      m.energyBurst.scale.setScalar(0.15 + burstAlpha * 0.25);
+      m.energyBurst.rotation.z += 0.12;
+    }
+
+    m.group.visible = gameState.mode === 'playing';
+  }
+
   // ── Fruit color tinting ──
 
   _updateFruitTint(gameState) {
@@ -199,16 +408,46 @@ export class WeaponModels {
 
     if (fruit) {
       const c = new THREE.Color(fruit.color);
-      // Tint fist with fruit color
+      // Tint punch fist with fruit color
       this.models.punch.fist.material.color.copy(c);
-      // Blend arm color between fruit and skin tone
       this.models.punch.arm.material.color.copy(
         new THREE.Color(0xd59a72).lerp(c, 0.4),
       );
-      // Tint the sleeve too
       this.models.punch.cuff.material.color.copy(
         new THREE.Color(0xc6452d).lerp(c, 0.5),
       );
+
+      // Tint cast hand + orb
+      this.models.cast.palm.material.color.copy(
+        new THREE.Color(0xefb48f).lerp(c, 0.3),
+      );
+      this.models.cast.orb.material.color.copy(c);
+      if (this.models.cast.orbRing) {
+        this.models.cast.orbRing.material.color.copy(c);
+      }
+      this.models.cast.fingers.forEach(f => {
+        f.material.color.copy(new THREE.Color(0xefb48f).lerp(c, 0.3));
+      });
+
+      // Tint slam fist
+      this.models.slam.fist.material.color.copy(c);
+      this.models.slam.arm.material.color.copy(
+        new THREE.Color(0xd59a72).lerp(c, 0.4),
+      );
+
+      // Tint uppercut fist
+      this.models.uppercut.fist.material.color.copy(c);
+      this.models.uppercut.arm.material.color.copy(
+        new THREE.Color(0xd59a72).lerp(c, 0.4),
+      );
+
+      // Tint clap fists
+      this.models.clap.leftMat.color.copy(c);
+      this.models.clap.rightMat.color.copy(c);
+      if (this.models.clap.energyBurst) {
+        this.models.clap.energyBurst.material.color.copy(c);
+      }
+
       // Update sword glow color
       if (this.models.sword.glowMesh) {
         this.models.sword.glowMesh.material.color.copy(c);
@@ -218,6 +457,17 @@ export class WeaponModels {
       this.models.punch.fist.material.color.setHex(0xefb48f);
       this.models.punch.arm.material.color.setHex(0xd59a72);
       this.models.punch.cuff.material.color.setHex(0xc6452d);
+      this.models.cast.palm.material.color.setHex(0xefb48f);
+      this.models.cast.orb.material.color.setHex(0xaaddff);
+      if (this.models.cast.orbRing) this.models.cast.orbRing.material.color.setHex(0xaaddff);
+      this.models.cast.fingers.forEach(f => f.material.color.setHex(0xefb48f));
+      this.models.slam.fist.material.color.setHex(0xefb48f);
+      this.models.slam.arm.material.color.setHex(0xd59a72);
+      this.models.uppercut.fist.material.color.setHex(0xefb48f);
+      this.models.uppercut.arm.material.color.setHex(0xd59a72);
+      this.models.clap.leftMat.color.setHex(0xefb48f);
+      this.models.clap.rightMat.color.setHex(0xefb48f);
+      if (this.models.clap.energyBurst) this.models.clap.energyBurst.material.color.setHex(0xffffff);
       if (this.models.sword.glowMesh) {
         this.models.sword.glowMesh.material.color.setHex(0xffffff);
       }
@@ -383,6 +633,182 @@ export class WeaponModels {
     group.visible = false;
     this.scene.heldItemPivot.add(group);
     this.models.punch = { group, armAnchor, forearmPivot, arm, fist, cuff, baseLength: 0.86 };
+  }
+
+  _buildCastHand() {
+    const group = new THREE.Group();
+    const palmMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+
+    // Open palm (flat box)
+    const palm = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.06, 0.22), palmMat);
+    palm.position.set(0, 0, -0.3);
+    group.add(palm);
+
+    // Four fingers (thin boxes extending from palm)
+    const fingers = [];
+    for (let i = 0; i < 4; i++) {
+      const fingerMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+      const finger = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.04, 0.16), fingerMat);
+      finger.position.set(-0.08 + i * 0.053, 0.01, -0.5);
+      group.add(finger);
+      fingers.push(finger);
+    }
+
+    // Thumb
+    const thumbMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+    const thumb = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.1), thumbMat);
+    thumb.position.set(-0.14, 0.01, -0.34);
+    thumb.rotation.y = 0.5;
+    group.add(thumb);
+
+    // Wrist / sleeve
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: 0xc6452d });
+    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.2, 0.18), sleeveMat);
+    sleeve.position.set(0, -0.04, -0.12);
+    group.add(sleeve);
+
+    // Magic orb floating in front of palm
+    const orbMat = new THREE.MeshBasicMaterial({
+      color: 0xaaddff,
+      transparent: true,
+      opacity: 0.15,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+    });
+    const orb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 8), orbMat);
+    orb.position.set(0, 0.02, -0.52);
+    orb.renderOrder = 52;
+    group.add(orb);
+
+    // Orbit ring around orb
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xaaddff,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+    });
+    const ringGeo = new THREE.RingGeometry(0.14, 0.18, 16);
+    const orbRing = new THREE.Mesh(ringGeo, ringMat);
+    orbRing.position.copy(orb.position);
+    orbRing.renderOrder = 53;
+    group.add(orbRing);
+
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+    this.models.cast = { group, palm, fingers, orb, orbRing, sleeve };
+  }
+
+  _buildSlamFist() {
+    const group = new THREE.Group();
+    const armMat = new THREE.MeshLambertMaterial({ color: 0xd59a72 });
+    const fistMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: 0xc6452d });
+
+    // Larger fist for slam
+    const fist = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.34), fistMat);
+    fist.position.set(0, 0, -0.7);
+
+    // Thick arm
+    const armGeo = new THREE.BoxGeometry(0.2, 0.2, 0.6);
+    armGeo.translate(0, 0, -0.3);
+    const arm = new THREE.Mesh(armGeo, armMat);
+
+    // Sleeve
+    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.2), sleeveMat);
+    sleeve.position.set(0, 0, -0.04);
+
+    // Knuckle ridges for emphasis
+    const knuckleMat = new THREE.MeshLambertMaterial({ color: 0xe0a080 });
+    for (let i = 0; i < 3; i++) {
+      const knuckle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.06), knuckleMat);
+      knuckle.position.set(-0.1 + i * 0.1, 0.18, -0.7);
+      group.add(knuckle);
+    }
+
+    group.add(arm, fist, sleeve);
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+    this.models.slam = { group, fist, arm, sleeve };
+  }
+
+  _buildUppercutFist() {
+    const group = new THREE.Group();
+    const armMat = new THREE.MeshLambertMaterial({ color: 0xd59a72 });
+    const fistMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: 0xc6452d });
+
+    // Fist angled upward
+    const fist = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), fistMat);
+    fist.position.set(0, 0.05, -0.78);
+
+    // Forearm
+    const armGeo = new THREE.BoxGeometry(0.17, 0.17, 0.7);
+    armGeo.translate(0, 0, -0.35);
+    const arm = new THREE.Mesh(armGeo, armMat);
+
+    // Sleeve
+    const sleeve = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.22), sleeveMat);
+    sleeve.position.set(0, 0, -0.04);
+
+    group.add(arm, fist, sleeve);
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+    this.models.uppercut = { group, fist, arm, sleeve };
+  }
+
+  _buildClapFists() {
+    const group = new THREE.Group();
+    const leftMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+    const rightMat = new THREE.MeshLambertMaterial({ color: 0xefb48f });
+    const sleeveMat = new THREE.MeshLambertMaterial({ color: 0xc6452d });
+
+    // Left fist
+    const leftFist = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), leftMat);
+    leftFist.position.set(-0.18, 0, -0.4);
+
+    // Right fist
+    const rightFist = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.26, 0.26), rightMat);
+    rightFist.position.set(0.18, 0, -0.4);
+
+    // Left arm
+    const leftArmMat = new THREE.MeshLambertMaterial({ color: 0xd59a72 });
+    const leftArmGeo = new THREE.BoxGeometry(0.14, 0.14, 0.35);
+    leftArmGeo.translate(0, 0, -0.18);
+    const leftArm = new THREE.Mesh(leftArmGeo, leftArmMat);
+    leftArm.position.set(-0.22, 0, 0);
+
+    // Right arm
+    const rightArmMat = new THREE.MeshLambertMaterial({ color: 0xd59a72 });
+    const rightArmGeo = new THREE.BoxGeometry(0.14, 0.14, 0.35);
+    rightArmGeo.translate(0, 0, -0.18);
+    const rightArm = new THREE.Mesh(rightArmGeo, rightArmMat);
+    rightArm.position.set(0.22, 0, 0);
+
+    // Sleeves
+    const leftSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.14), sleeveMat);
+    leftSleeve.position.set(-0.22, 0, 0.12);
+    const rightSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.14), sleeveMat);
+    rightSleeve.position.set(0.22, 0, 0.12);
+
+    // Energy burst sphere between fists on clap impact
+    const burstMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+    });
+    const energyBurst = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 6), burstMat);
+    energyBurst.position.set(0, 0, -0.4);
+    energyBurst.renderOrder = 52;
+    energyBurst.visible = false;
+
+    group.add(leftFist, rightFist, leftArm, rightArm, leftSleeve, rightSleeve, energyBurst);
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+    this.models.clap = { group, leftFist, rightFist, leftMat, rightMat, energyBurst };
   }
 
   _buildDirtSkill() {

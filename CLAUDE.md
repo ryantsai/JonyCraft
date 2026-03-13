@@ -22,12 +22,12 @@ src/
     assets.js              - Asset URL helper
     blocks.js              - Block type definitions (faces, collision, transparency)
     skills.js              - Default skill/hotbar definitions
-    fruits.js              - Fruit definitions with per-fruit combat skills
-    enemyTypes.js          - Enemy type definitions (stats, behavior, model)
+    fruits.js              - 10 Devil Fruit definitions with per-fruit combat skills & animStyle
+    enemyTypes.js          - 11 enemy type definitions (stats, behavior, model, spawn weight)
 
   core/
     EventBus.js            - Pub/sub event system for decoupled communication
-    GameState.js           - Central game state object
+    GameState.js           - Central game state object (player, combat, defense, fruit)
 
   renderer/
     SceneSetup.js          - Three.js renderer, scene, camera, lighting, groups
@@ -43,17 +43,17 @@ src/
     Targeting.js           - DDA voxel raycast, enemy target detection
 
   combat/
-    Combat.js              - Attack logic (sword/punch), block break/place
+    Combat.js              - Attack logic (sword/punch/fruit), block break/place, damage
 
   enemies/
-    Zombie.js              - Zombie 3D model creation, tinting
-    EnemyModel.js          - Generic enemy 3D model builder
-    EnemyBehaviors.js      - Enemy AI behavior definitions
-    EnemyManager.js        - Spawning, AI updates, respawn timers
+    Zombie.js              - Zombie 3D model creation, tinting (legacy)
+    EnemyModel.js          - Generic enemy 3D model builder (used by all enemy types)
+    EnemyBehaviors.js      - Enemy AI behaviors (chase, charge, circle, leap, teleport, ranged, explode, regen, flee)
+    EnemyManager.js        - Spawning, AI dispatch, projectiles, respawn, defeat/clearAll
 
   effects/
     Particles.js           - Hit particle system
-    WeaponModels.js        - First-person held weapon models and animation
+    WeaponModels.js        - First-person weapon models, per-fruit animations, screen shake/flash, cooldown HUD
 
   input/
     InputManager.js        - Keyboard, mouse, pointer lock
@@ -62,9 +62,12 @@ src/
   audio/
     SoundManager.js        - Sound effects loading and playback
 
+  modes/
+    HomelandDefenseMode.js - Wave-based tower defense mode (fortress, turrets, shop, wave scaling)
+
   ui/
-    template.js            - Game HTML shell template
-    HUD.js                 - Hotbar, status bar, start screen
+    template.js            - Game HTML shell template (canvas, HUD, defense scoreboard, start screen)
+    HUD.js                 - Hotbar, status bar, defense scoreboard, start screen
     FruitSelect.js         - Fruit selection overlay UI
 
   testing/
@@ -77,15 +80,17 @@ vite.config.js             - Vite config with BASE_PATH env support
 ```
 
 ## Key Architecture Patterns
-- **Event Bus**: Systems communicate via `events.emit()`/`events.on()` (e.g. `block:changed`, `hud:update`, `game:enter`). This enables adding multiplayer networking, database hooks, or new systems without modifying existing code.
-- **GameState**: Central state object shared by all systems. Future multiplayer: becomes the authoritative client state synced with server.
+- **Event Bus**: Systems communicate via `events.emit()`/`events.on()` (e.g. `block:changed`, `hud:update`, `game:enter`, `combat:fruit-attack`, `enemy:killed`, `shop:purchase`). This enables adding multiplayer networking, database hooks, or new systems without modifying existing code.
+- **GameState**: Central state object shared by all systems. Includes `player`, `combat`, `defense`, `selectedFruit`, and `modeController`. Future multiplayer: becomes the authoritative client state synced with server.
 - **World**: Voxel data stored in a Map keyed by `"x,y,z"` strings. Emits change events so WorldRenderer stays in sync.
+- **Mode Controller**: `gameState.modeController` holds the active game mode instance (e.g. `HomelandDefenseMode`). The main loop calls `modeController.update(dt)` each frame. Modes can override enemy targets, add scoring, and manage waves.
 - Fixed-timestep game loop (`FIXED_STEP_MS = 1000/60`)
 - First-person camera with pointer lock controls
-- **Fruit System**: 10 devil fruits (Blox Fruits inspired), each granting 3-4 combat skills with unique stats (damage, range, cooldown, knockback, effects). Players select a fruit before entering the world; skills replace the default hotbar.
+- **Fruit System**: 10 devil fruits (Blox Fruits inspired), each granting 3-4 combat skills with unique stats (damage, range, cooldown, knockback, swingMs, animStyle). Each fruit has an `animStyle` that drives per-fruit animation modifiers (stretchMul, fistScale, shake, flash, swordGlow, arcTilt, swirl, trail). Players select a fruit before entering the world; skills replace the default hotbar.
+- **Enemy Type System**: 11 enemy types defined in `enemyTypes.js` (zombie, skeleton, slime, giant, spider, ghost, creeper, wizard, golem, ninja, blaze). Each has unique stats, behavior AI, and model colors. Weighted spawn table for random variety.
+- **Enemy Behaviors**: 9 AI behaviors in `EnemyBehaviors.js`: chase, charge, circle, leap, teleport, ranged, explode, regen, flee. Behaviors support defense mode by targeting the tower instead of the player.
 - Default skills: Sword, Rubber Punch, Dirt Block (before fruit selection)
-- Multiple enemy types with health, knockback, respawn mechanics
-- AABB collision detection for player-world physics
+- AABB collision detection for player-world and enemy-world physics
 - Mobile virtual gamepad with dual touch pads
 
 ## Commands
@@ -97,9 +102,9 @@ vite.config.js             - Vite config with BASE_PATH env support
 All tuning constants live in `src/config/constants.js`. Key ones:
 - `WORLD_SIZE_X/Z = 56`, `WORLD_HEIGHT = 10` - World dimensions
 - `MOVE_SPEED = 5.2`, `JUMP_SPEED = 7.6`, `GRAVITY = 22` - Player physics
-- `SWORD_RANGE = 3`, `PUNCH_RANGE = 6.2` - Combat ranges
-- `ZOMBIE_SPEED = 1.12`, `ZOMBIE_MAX_HEALTH = 3` - Enemy tuning
-- `INITIAL_ZOMBIE_COUNT = 5` - Wave size
+- `SWORD_RANGE = 3`, `PUNCH_RANGE = 6.2` - Combat ranges (default skills)
+- `ZOMBIE_SPEED = 1.12`, `ZOMBIE_MAX_HEALTH = 3` - Base zombie tuning
+- `INITIAL_ZOMBIE_COUNT = 5` - Default wave size
 
 ## Testing
 - Automated tests use Playwright with JSON action scripts (`test-actions*.json`)
@@ -107,10 +112,9 @@ All tuning constants live in `src/config/constants.js`. Key ones:
 - Tests verify movement, building, combat, knockback, and skill switching
 
 ## Game Modes
-Players select a game mode from the start screen before entering the world. Currently available:
-- **測試模式 (Test)** — The default sandbox with zombies, combat, and building
-
-Future modes will be added as new buttons on the start screen.
+Players select a game mode from the start screen before entering the world:
+- **測試模式 (Test)** — Sandbox mode with zombies, combat, and building
+- **保衛家園 (Homeland Defense)** — Wave-based tower defense: protect the central fortress from escalating enemy waves. Features a shop system (heal, tower repair, turret purchase) funded by gold earned from kills. Waves scale enemy stats via `ENEMY_MULTIPLIER`.
 
 ## Workflow
 - All changes should be submitted as a PR via `gh` CLI and pushed to GitHub
@@ -123,10 +127,13 @@ Future modes will be added as new buttons on the start screen.
 ## Development Guidelines
 - Each system is a class in its own file under the appropriate directory
 - New features should be added as new modules, wired in `src/main.js`
+- New game modes go in `src/modes/` and are activated via `gameState.modeController`
 - Use the EventBus for cross-system communication instead of direct coupling
 - Use Kenney assets from `public/assets/kenney/` for visual consistency
 - Maintain the automation testing hooks when modifying game state
 - Block textures support per-face definitions (`side`, `top`, `bottom`) or `all`
+- New enemy types go in `src/config/enemyTypes.js` with a behavior from `EnemyBehaviors.js`
+- New fruit definitions go in `src/config/fruits.js` with an `animStyle` key matching `WeaponModels.ANIM_MODS`
 - Update `progress.md` after significant changes
 
 ## Multiplayer & Database Expansion Points

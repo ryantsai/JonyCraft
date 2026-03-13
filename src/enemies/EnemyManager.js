@@ -112,11 +112,17 @@ export class EnemyManager {
     this.respawnTimers = [];
   }
 
+  _resolveExternalEnemyY(enemyState) {
+    const surfaceY = this.world.getTerrainSurfaceY(enemyState.x, enemyState.z);
+    return Math.max(surfaceY, enemyState.y ?? surfaceY);
+  }
+
   syncExternalEnemies(enemyStates = []) {
     const keep = new Set();
     enemyStates.forEach((enemyState, index) => {
       const serverId = enemyState.id ?? `server-${index}`;
       keep.add(serverId);
+      const resolvedY = this._resolveExternalEnemyY(enemyState);
 
       let enemy = this.externalEnemies.get(serverId);
       if (!enemy || enemy.type !== enemyState.type) {
@@ -125,11 +131,11 @@ export class EnemyManager {
           this.textureManager,
           ENEMY_TYPES[enemyState.type],
           enemyState.type,
-          new THREE.Vector3(enemyState.x, enemyState.y, enemyState.z),
+          new THREE.Vector3(enemyState.x, resolvedY, enemyState.z),
           this.scene.enemyGroup,
         );
         enemy.serverId = serverId;
-        enemy.serverTargetPosition = new THREE.Vector3(enemyState.x, enemyState.y, enemyState.z);
+        enemy.serverTargetPosition = new THREE.Vector3(enemyState.x, resolvedY, enemyState.z);
         enemy.serverTargetYaw = enemyState.yaw ?? 0;
         this.externalEnemies.set(serverId, enemy);
         this.zombies.push(enemy);
@@ -138,7 +144,7 @@ export class EnemyManager {
       }
 
       enemy.alive = true;
-      enemy.serverTargetPosition.set(enemyState.x, enemyState.y, enemyState.z);
+      enemy.serverTargetPosition.set(enemyState.x, resolvedY, enemyState.z);
       enemy.serverTargetYaw = enemyState.yaw ?? 0;
       enemy.health = enemyState.health;
       enemy.maxHealth = enemyState.maxHealth;

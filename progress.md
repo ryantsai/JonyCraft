@@ -122,6 +122,12 @@ Original prompt: Create a web based minecraft cline with three.js, using assets 
   - A forced no-traffic simulation on the guest client verified:
     - the disconnect screen renders visually in `output/multiplayer-disconnect-flow/disconnect.png`
     - after the disconnect delay, the client returns to the multiplayer lobby with the message `20 秒內未收到伺服器資料，已返回多人大廳。` in `output/multiplayer-disconnect-flow/lobby-return.png`
+- Fixed multiplayer homeland enemy ground clipping:
+  - external/server enemies now clamp their rendered root `y` to at least the local terrain surface height during sync
+  - this prevents homeland enemies from spawning half-buried when the server's fixed `y` differs from the client terrain surface
+  - verification:
+    - `npm run build` still passes
+    - a fresh homeland multiplayer capture on `127.0.0.1:8772` shows synced enemy snapshot `y` values at local terrain height (`4.0+`) instead of the old buried baseline, captured in `output/multiplayer-groundfix/homeland.png`
 
 TODO
 - Optional polish: add chunk meshing or instancing if the world size grows beyond the current compact sandbox.

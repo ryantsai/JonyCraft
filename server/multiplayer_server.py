@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import threading
 import time
 import uuid
@@ -39,6 +40,27 @@ def clamp_text(value: str | None, fallback: str, limit: int = 48) -> str:
 
 def block_key(x: int, y: int, z: int) -> str:
     return f"{x},{y},{z}"
+
+
+def sanitize_log_text(value: Any, limit: int = 180) -> str:
+    raw = str(value)
+    chunks: list[str] = []
+    for char in raw:
+        code = ord(char)
+        if char in "\r\n\t":
+            chunks.append(" ")
+        elif 32 <= code <= 126:
+            chunks.append(char)
+        else:
+            chunks.append(f"\\x{code:02x}")
+    text = "".join(chunks).strip() or "<empty>"
+    if len(text) > limit:
+        return f"{text[:limit]}..."
+    return text
+
+
+def looks_like_tls_handshake(data: bytes) -> bool:
+    return len(data) >= 3 and data[0] == 0x16 and data[1] == 0x03
 
 
 class SessionStore:
@@ -246,6 +268,19 @@ def start_tick_loop(store: SessionStore, interval_seconds: float = 0.1) -> threa
 STORE: SessionStore | None = None
 
 
+class MultiplayerHTTPServer(ThreadingHTTPServer):
+    def handle_error(self, request: Any, client_address: tuple[str, int]) -> None:
+        _, exc, _ = sys.exc_info()
+        host = client_address[0] if client_address else "<unknown>"
+        if isinstance(exc, ConnectionResetError):
+            print(f"[multiplayer] {host} connection reset by peer")
+            return
+        if isinstance(exc, BrokenPipeError):
+            print(f"[multiplayer] {host} disconnected before the response completed")
+            return
+        print(f"[multiplayer] {host} unexpected server error: {exc}")
+
+
 class MultiplayerHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -298,8 +333,32 @@ class MultiplayerHandler(BaseHTTPRequestHandler):
 
         self._send_json(404, {"error": "not found"})
 
+    def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
+        if getattr(self, "_suppress_next_request_log", False) and str(code) == "400":
+            self._suppress_next_request_log = False
+            return
+        request_line = sanitize_log_text(getattr(self, "requestline", "<unknown request>"))
+        print(f"[multiplayer] {self.address_string()} {request_line} -> {code} ({size} bytes)")
+
+    def log_error(self, format: str, *args: Any) -> None:  # noqa: A003
+        if format == "code %d, message %s" and len(args) >= 2:
+            status_code = args[0]
+            message = str(args[1])
+            raw_requestline = getattr(self, "raw_requestline", b"") or b""
+            if looks_like_tls_handshake(raw_requestline):
+                detail = "received an HTTPS/TLS handshake on the plain HTTP port"
+            else:
+                detail = sanitize_log_text(message)
+            print(f"[multiplayer] {self.address_string()} bad request {status_code}: {detail}")
+            self._suppress_next_request_log = True
+            return
+
+        formatted = sanitize_log_text(format % args if args else format)
+        print(f"[multiplayer] {self.address_string()} error: {formatted}")
+
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
-        print(f"[multiplayer] {self.address_string()} - {format % args}")
+        formatted = sanitize_log_text(format % args if args else format)
+        print(f"[multiplayer] {self.address_string()} {formatted}")
 
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or 0)
@@ -337,7 +396,7 @@ def run_server(host: str, port: int, database_path: str | Path) -> None:
     STORE = SessionStore(repository)
     start_tick_loop(STORE)
 
-    server = ThreadingHTTPServer((host, port), MultiplayerHandler)
+    server = MultiplayerHTTPServer((host, port), MultiplayerHandler)
     print(f"JonyCraft multiplayer server running on http://{host}:{port}")
     print(f"SQLite persistence: {Path(database_path).resolve()}")
     print("Homeland multiplayer waves/tower/enemies are simulated authoritatively on the server.")

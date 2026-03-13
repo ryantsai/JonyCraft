@@ -164,6 +164,17 @@ body {
 .health-fill[data-high='true'] { background: linear-gradient(90deg, #40c040, #6bff6b); }
 .health-fill[data-mid='true'] { background: linear-gradient(90deg, #c0a030, #ffe060); }
 
+.homebase-hp {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: rgba(230, 239, 255, 0.9);
+  display: none;
+}
+
+.homebase-hp[data-visible='true'] {
+  display: block;
+}
+
 /* ── Hotbar ── */
 .hotbar {
   position: absolute;

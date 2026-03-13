@@ -14,7 +14,8 @@ function hash2D(x, z) {
   return raw - Math.floor(raw);
 }
 
-function sampleHeight(x, z) {
+function sampleHeight(x, z, isFlat = false) {
+  if (isFlat) return 3;
   const waveA = Math.sin((x + WORLD_SEED) * 0.08) * 0.22;
   const waveB = Math.cos((z - WORLD_SEED * 0.8) * 0.08) * 0.2;
   const jitter = (hash2D(x, z) - 0.5) * 0.18;
@@ -84,10 +85,13 @@ export class World {
     });
   }
 
-  generate() {
+  generate(options = {}) {
+    const { flatTerrain = false, treeChanceThreshold = 0.996 } = options;
+    this.blocks.clear();
+
     for (let x = 0; x < WORLD_SIZE_X; x += 1) {
       for (let z = 0; z < WORLD_SIZE_Z; z += 1) {
-        const height = sampleHeight(x, z);
+        const height = sampleHeight(x, z, flatTerrain);
         const surfaceType = hash2D(x * 5, z * 7) > 0.985 ? 'sand' : 'grass';
 
         for (let y = 0; y <= height; y += 1) {
@@ -100,7 +104,7 @@ export class World {
         const treeChance = hash2D(x + 11, z + 19);
         if (
           this.getBlock(x, height, z) === 'grass' &&
-          treeChance > 0.996 &&
+          treeChance > treeChanceThreshold &&
           x > 3 && z > 3 &&
           x < WORLD_SIZE_X - 4 && z < WORLD_SIZE_Z - 4
         ) {

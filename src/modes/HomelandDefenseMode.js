@@ -3,7 +3,7 @@ import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
 
-const WAVE_DURATION = 60;
+const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
 
 function randomSpawnType() {

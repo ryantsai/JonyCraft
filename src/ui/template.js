@@ -26,6 +26,7 @@ export const gameTemplate = `
         <div class="health-track">
           <div id="hp-fill" class="health-fill" style="width: 100%"></div>
         </div>
+        <div id="homebase-hp" class="homebase-hp" data-visible="false">🏰 基地塔 HP <span id="homebase-hp-text">240 / 240</span></div>
       </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">

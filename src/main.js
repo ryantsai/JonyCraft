@@ -53,6 +53,12 @@ const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, sce
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
 events.on('fruit:selected', () => {
+  if (gameState.gameMode === 'homeland') {
+    world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
+    worldRenderer.buildAll();
+    playerController.setSpawn();
+  }
+
   hud.onFruitSelected();
   if (gameState.gameMode === 'homeland') {
     gameState.modeController = homelandMode;

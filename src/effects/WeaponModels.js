@@ -31,9 +31,56 @@ const ANIM_MODS = {
 
 const DEFAULT_MOD = { stretchMul: 1.0, fistScale: 1.0, shake: 0, flashAlpha: 0, swordGlow: 0, arcTilt: 1.0, swirl: 0.08, trail: 0.12 };
 
+// Per-fruit VFX particle definitions
+// count: number of particles, geo: geometry type, size: base scale,
+// behavior: animation pattern, colors: [main, accent]
+const FRUIT_VFX = {
+  stretch: {
+    count: 6, geo: 'box', size: 0.03,
+    behavior: 'trail', colors: [0xffffff, 0xffcccc],
+  },
+  fire: {
+    count: 10, geo: 'box', size: 0.045,
+    behavior: 'rise', colors: [0xff6b35, 0xffdd44],
+  },
+  ice: {
+    count: 8, geo: 'diamond', size: 0.04,
+    behavior: 'orbit', colors: [0x88ddff, 0xffffff],
+  },
+  lightning: {
+    count: 8, geo: 'bolt', size: 0.025,
+    behavior: 'flicker', colors: [0xffee44, 0xffffff],
+  },
+  dark: {
+    count: 8, geo: 'sphere', size: 0.04,
+    behavior: 'vortex', colors: [0x6a3d99, 0x220044],
+  },
+  light: {
+    count: 8, geo: 'plane', size: 0.05,
+    behavior: 'radiate', colors: [0xffffa0, 0xffffff],
+  },
+  quake: {
+    count: 10, geo: 'box', size: 0.05,
+    behavior: 'shockwave', colors: [0xc0a030, 0xffdd66],
+  },
+  magma: {
+    count: 8, geo: 'sphere', size: 0.05,
+    behavior: 'drip', colors: [0xcc3300, 0xff8800],
+  },
+  sand: {
+    count: 10, geo: 'box', size: 0.03,
+    behavior: 'swirl', colors: [0xd4a843, 0xeedd88],
+  },
+  bomb: {
+    count: 10, geo: 'box', size: 0.04,
+    behavior: 'explode', colors: [0xff4444, 0xffaa22],
+  },
+};
+
 /**
  * Builds and animates held weapon/skill 3D models in first person.
  * Supports per-fruit color tinting, animation modifiers, screen shake, and flash.
+ * Includes per-fruit VFX particle system for distinct visual styles.
  *
  * Weapon types: sword, punch, cast, slam, uppercut, clap, dirt
  */
@@ -63,6 +110,12 @@ export class WeaponModels {
 
     // Track active fruit for tint changes
     this._lastFruitId = null;
+
+    // Fruit VFX particle system
+    this._vfxParticles = [];
+    this._vfxGroup = null;
+    this._vfxAnimStyle = null;
+    this._vfxTime = 0;
   }
 
   buildAll() {
@@ -73,6 +126,7 @@ export class WeaponModels {
     this._buildUppercutFist();
     this._buildClapFists();
     this._buildDirtSkill();
+    this._buildFruitVFX();
     this._createFlashOverlay();
 
     // Listen for attack events to trigger effects
@@ -117,6 +171,12 @@ export class WeaponModels {
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
       this.models.dirt.group.visible = gameState.mode === 'playing';
     }
+
+    // Update fruit-specific VFX particles
+    const attackPhase = wt === 'sword'
+      ? (combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / swingMs : 0)
+      : (combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0);
+    this._updateFruitVFX(dt, attackPhase, fruit, gameState);
 
     // Update screen shake
     this._updateShake();
@@ -405,6 +465,8 @@ export class WeaponModels {
     const fruitId = fruit?.id || null;
     if (fruitId === this._lastFruitId) return;
     this._lastFruitId = fruitId;
+    // Force VFX reconfiguration on fruit change
+    this._vfxAnimStyle = null;
 
     if (fruit) {
       const c = new THREE.Color(fruit.color);
@@ -809,6 +871,279 @@ export class WeaponModels {
     group.visible = false;
     this.scene.heldItemPivot.add(group);
     this.models.clap = { group, leftFist, rightFist, leftMat, rightMat, energyBurst };
+  }
+
+  // ── Fruit VFX particle system ──
+
+  _buildFruitVFX() {
+    this._vfxGroup = new THREE.Group();
+    this._vfxGroup.renderOrder = 55;
+    this.scene.heldItemPivot.add(this._vfxGroup);
+
+    // Pre-allocate max particle pool (largest count across all fruits)
+    const maxCount = 12;
+    for (let i = 0; i < maxCount; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+        side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+      mesh.visible = false;
+      mesh.renderOrder = 55;
+      this._vfxGroup.add(mesh);
+      this._vfxParticles.push({
+        mesh,
+        mat,
+        seed: Math.random() * Math.PI * 2,
+        active: false,
+      });
+    }
+  }
+
+  _configureVFXForFruit(animStyle) {
+    if (this._vfxAnimStyle === animStyle) return;
+    this._vfxAnimStyle = animStyle;
+
+    const cfg = FRUIT_VFX[animStyle];
+    if (!cfg) {
+      this._vfxParticles.forEach(p => { p.active = false; p.mesh.visible = false; });
+      return;
+    }
+
+    this._vfxParticles.forEach((p, i) => {
+      if (i < cfg.count) {
+        p.active = true;
+        p.seed = Math.random() * Math.PI * 2;
+
+        // Set geometry based on type
+        const oldGeo = p.mesh.geometry;
+        switch (cfg.geo) {
+          case 'sphere':
+            p.mesh.geometry = new THREE.SphereGeometry(cfg.size, 6, 4);
+            break;
+          case 'diamond': {
+            // Octahedron looks like a diamond/crystal
+            p.mesh.geometry = new THREE.OctahedronGeometry(cfg.size);
+            break;
+          }
+          case 'bolt': {
+            // Thin stretched box for lightning bolt segments
+            p.mesh.geometry = new THREE.BoxGeometry(cfg.size * 0.3, cfg.size * 0.3, cfg.size * 4);
+            break;
+          }
+          case 'plane':
+            p.mesh.geometry = new THREE.PlaneGeometry(cfg.size * 0.4, cfg.size * 3);
+            break;
+          default:
+            p.mesh.geometry = new THREE.BoxGeometry(cfg.size, cfg.size, cfg.size);
+        }
+        oldGeo.dispose();
+
+        // Alternate between main and accent colors
+        const color = i % 2 === 0 ? cfg.colors[0] : cfg.colors[1];
+        p.mat.color.setHex(color);
+        p.mat.opacity = 0;
+        p.mesh.visible = false;
+      } else {
+        p.active = false;
+        p.mesh.visible = false;
+        p.mat.opacity = 0;
+      }
+    });
+  }
+
+  _updateFruitVFX(dt, phase, fruit, gameState) {
+    if (!fruit || gameState.mode !== 'playing') {
+      this._vfxParticles.forEach(p => { p.mesh.visible = false; });
+      this._vfxAnimStyle = null;
+      return;
+    }
+
+    this._configureVFXForFruit(fruit.animStyle);
+    this._vfxTime += dt;
+    const t = this._vfxTime;
+    const attacking = phase > 0;
+    const cfg = FRUIT_VFX[fruit.animStyle];
+    if (!cfg) return;
+
+    // Base position near the active weapon
+    const baseX = 0, baseY = 0, baseZ = -0.6;
+
+    this._vfxParticles.forEach((p, i) => {
+      if (!p.active) return;
+
+      const s = p.seed;
+      const idx = i / cfg.count;
+
+      // Idle: gentle ambient motion; attacking: intense effect
+      const intensity = attacking ? (0.5 + phase * 0.5) : 0.15;
+      const alpha = attacking
+        ? Math.min(1, phase * 3) * (1 - Math.max(0, phase - 0.7) / 0.3) * 0.85
+        : 0.12 + Math.sin(t * 2 + s) * 0.08;
+
+      let x = baseX, y = baseY, z = baseZ;
+      let rx = 0, ry = 0, rz = 0;
+      let sc = cfg.size;
+
+      switch (cfg.behavior) {
+        case 'rise': {
+          // Fire: particles rise upward with flicker
+          const riseSpeed = attacking ? 3.0 : 1.2;
+          const wobble = Math.sin(t * 8 + s * 3) * 0.06;
+          x += Math.sin(s * 6 + t * 2) * 0.12 * intensity;
+          y += ((t * riseSpeed + idx) % 0.5) * intensity - 0.1;
+          z += Math.cos(s * 4 + t) * 0.08;
+          sc *= 0.6 + Math.sin(t * 12 + s) * 0.4;
+          rx = wobble;
+          rz = t * 3 + s;
+          break;
+        }
+        case 'orbit': {
+          // Ice: crystals orbit slowly around weapon, sparkling
+          const angle = s + t * (attacking ? 2.5 : 0.8);
+          const radius = 0.14 + idx * 0.08;
+          x += Math.cos(angle) * radius;
+          y += Math.sin(angle * 0.7) * radius * 0.6;
+          z += Math.sin(angle) * radius * 0.5 - 0.1;
+          rx = t * 0.5 + s;
+          ry = t * 0.8;
+          rz = t * 0.3 + s * 2;
+          sc *= attacking ? 1.2 : 0.7;
+          break;
+        }
+        case 'flicker': {
+          // Lightning: bolts flicker at random positions
+          const flickerOn = Math.sin(t * 20 + s * 10) > (attacking ? -0.3 : 0.5);
+          if (!flickerOn) { p.mesh.visible = false; p.mat.opacity = 0; return; }
+          const a2 = s + i * 0.8;
+          x += Math.sin(a2) * 0.15 + (Math.random() - 0.5) * 0.04;
+          y += Math.cos(a2 * 1.3) * 0.12 + (Math.random() - 0.5) * 0.03;
+          z += Math.sin(a2 * 0.7) * 0.1 - 0.1;
+          rx = Math.random() * Math.PI;
+          ry = Math.random() * Math.PI;
+          rz = Math.random() * Math.PI;
+          sc *= attacking ? 1.5 : 0.8;
+          break;
+        }
+        case 'vortex': {
+          // Dark: particles spiral inward
+          const vAngle = s + t * (attacking ? -3.0 : -1.0);
+          const vRadius = (attacking ? 0.2 - phase * 0.1 : 0.15) + idx * 0.05;
+          x += Math.cos(vAngle) * vRadius;
+          y += Math.sin(vAngle * 1.2) * vRadius * 0.5;
+          z += Math.sin(vAngle * 0.6) * vRadius * 0.4 - 0.1;
+          sc *= 0.5 + (1 - idx) * 0.8;
+          rx = t * 2;
+          ry = vAngle;
+          break;
+        }
+        case 'radiate': {
+          // Light: thin rays extend outward from center
+          const rayAngle = (i / cfg.count) * Math.PI * 2 + t * (attacking ? 1.5 : 0.3);
+          const rayLen = attacking ? 0.18 + phase * 0.12 : 0.1;
+          x += Math.cos(rayAngle) * rayLen;
+          y += Math.sin(rayAngle) * rayLen;
+          z += -0.05;
+          // Rotate plane to point outward
+          rz = rayAngle + Math.PI / 2;
+          sc *= attacking ? 1.4 : 0.6;
+          break;
+        }
+        case 'shockwave': {
+          // Quake: ring expands outward on impact
+          if (attacking && phase > 0.3) {
+            const shockPhase = (phase - 0.3) / 0.7;
+            const ringAngle = (i / cfg.count) * Math.PI * 2;
+            const ringR = shockPhase * 0.35;
+            x += Math.cos(ringAngle) * ringR;
+            y += -0.2 + Math.sin(ringAngle) * ringR * 0.3;
+            z += Math.sin(ringAngle) * ringR * 0.5;
+            sc *= 1.5 - shockPhase;
+          } else {
+            // Idle: subtle ground tremor
+            x += Math.sin(s + t * 4) * 0.04;
+            y += -0.15 + Math.abs(Math.sin(t * 6 + s * 3)) * 0.03;
+            z += Math.cos(s * 2 + t * 3) * 0.04;
+            sc *= 0.5;
+          }
+          break;
+        }
+        case 'drip': {
+          // Magma: blobs drip downward with glow
+          const dripCycle = (t * (attacking ? 2.0 : 0.8) + idx * 1.5) % 1.5;
+          x += Math.sin(s * 4) * 0.1;
+          y += 0.1 - dripCycle * 0.3;
+          z += Math.cos(s * 3) * 0.08 - 0.05;
+          sc *= 0.7 + (1 - dripCycle / 1.5) * 0.6;
+          // Glow pulsation
+          p.mat.color.setHex(
+            Math.sin(t * 4 + s) > 0 ? cfg.colors[0] : cfg.colors[1],
+          );
+          break;
+        }
+        case 'swirl': {
+          // Sand: tornado-like spiral
+          const sAngle = s + t * (attacking ? 4.0 : 1.5);
+          const sHeight = ((t * 1.5 + idx) % 1.0) - 0.3;
+          const sRadius = 0.08 + sHeight * 0.06;
+          x += Math.cos(sAngle) * sRadius;
+          y += sHeight * 0.3;
+          z += Math.sin(sAngle) * sRadius - 0.1;
+          rz = t * 5 + s;
+          sc *= 0.5 + intensity * 0.6;
+          break;
+        }
+        case 'explode': {
+          // Bomb: sparks fly outward from center on attack
+          if (attacking && phase > 0.2) {
+            const expPhase = (phase - 0.2) / 0.8;
+            const expAngle = s + (i / cfg.count) * Math.PI * 2;
+            const expR = expPhase * 0.4;
+            x += Math.cos(expAngle) * expR;
+            y += Math.sin(expAngle * 1.3) * expR - expPhase * 0.15;
+            z += Math.sin(expAngle * 0.8) * expR * 0.5;
+            sc *= 1.2 - expPhase * 0.8;
+            // Alternate spark colors rapidly
+            p.mat.color.setHex(
+              Math.sin(t * 15 + s) > 0 ? cfg.colors[0] : cfg.colors[1],
+            );
+          } else {
+            // Idle: faint smolder
+            x += Math.sin(s + t * 2) * 0.04;
+            y += Math.cos(s * 2 + t * 3) * 0.03;
+            z += -0.05;
+            sc *= 0.3;
+          }
+          break;
+        }
+        case 'trail':
+        default: {
+          // Stretch/rubber: speed lines trailing behind the fist
+          const trailOffset = idx * 0.12;
+          x += 0.02 + trailOffset * 0.3;
+          y += Math.sin(s + t * 3) * 0.03;
+          z += 0.15 + trailOffset * (attacking ? 0.6 : 0.2);
+          sc *= attacking ? (0.3 + (1 - idx) * 0.5) : 0.15;
+          // Stretch into lines
+          p.mesh.scale.set(sc * 0.3, sc * 0.3, sc * 3);
+          p.mesh.position.set(x, y, z);
+          p.mesh.rotation.set(0, 0, s);
+          p.mat.opacity = alpha * 0.7;
+          p.mesh.visible = alpha > 0.01;
+          return; // skip default scale/position set below
+        }
+      }
+
+      p.mesh.position.set(x, y, z);
+      p.mesh.rotation.set(rx, ry, rz);
+      p.mesh.scale.setScalar(sc);
+      p.mat.opacity = alpha;
+      p.mesh.visible = alpha > 0.01;
+    });
   }
 
   _buildDirtSkill() {

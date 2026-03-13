@@ -173,6 +173,8 @@ export class EnemyManager {
       if (blocked) {
         // Can we step up 1 block?
         if (enemy.onGround && !this._enemyCollides(pos.x, pos.y + 1, pos.z, r, h)) {
+          // Immediately move up so the vertical pass doesn't cancel the jump
+          pos.y += 1;
           enemy.velocityY = ENEMY_JUMP_SPEED;
           enemy.onGround = false;
         } else {

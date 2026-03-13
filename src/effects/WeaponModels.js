@@ -30,9 +30,12 @@ export class WeaponModels {
     Object.values(this.models).forEach((e) => { e.group.visible = false; });
 
     const skill = gameState.getSelectedSkill();
+    // Determine weapon type: fruit skills define weaponType, legacy skills use id
+    const wt = skill.weaponType || skill.id;
+    const swingMs = skill.swingMs || (wt === 'sword' ? SWORD_SWING_MS : PUNCH_SWING_MS);
 
-    if (skill.id === 'sword') {
-      const phase = combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / SWORD_SWING_MS : 0;
+    if (wt === 'sword') {
+      const phase = combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / swingMs : 0;
       const windup = THREE.MathUtils.smoothstep(phase, 0, 0.28);
       const release = THREE.MathUtils.smoothstep(phase, 0.18, 0.78);
       const recover = THREE.MathUtils.smoothstep(phase, 0.78, 1);
@@ -48,8 +51,8 @@ export class WeaponModels {
         THREE.MathUtils.lerp(-1.18, -0.02, slash) - windup * 0.14,
       );
       this.models.sword.group.visible = gameState.mode === 'playing';
-    } else if (skill.id === 'punch') {
-      const phase = combat.punchTime > 0 ? 1 - combat.punchTime / PUNCH_SWING_MS : 0;
+    } else if (wt === 'punch') {
+      const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
       const windup = THREE.MathUtils.smoothstep(phase, 0, 0.18);
       const release = THREE.MathUtils.smoothstep(phase, 0.12, 0.45);
       const recover = THREE.MathUtils.smoothstep(phase, 0.48, 1);
@@ -73,7 +76,7 @@ export class WeaponModels {
       this.models.punch.armAnchor.rotation.set(-0.08 - extend * 0.05, 0.1 - extend * 0.06, 0.04);
       this.models.punch.forearmPivot.rotation.set(-0.06 + extend * 0.04, 0.02, 0);
       this.models.punch.group.visible = gameState.mode === 'playing';
-    } else if (skill.id === 'dirt') {
+    } else if (wt === 'dirt') {
       this.models.dirt.group.position.set(0.58, -0.56, -0.72);
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
       this.models.dirt.group.visible = gameState.mode === 'playing';

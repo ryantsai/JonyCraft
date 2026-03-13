@@ -19,10 +19,13 @@ export class InputManager {
     window.addEventListener('keydown', (event) => {
       if (CONTROL_KEYS.includes(event.code)) this.keyState.add(event.code);
 
-      if (event.code === 'Digit1') this.state.selectedIndex = 0;
-      if (event.code === 'Digit2') this.state.selectedIndex = 1;
-      if (event.code === 'Digit3') this.state.selectedIndex = 2;
-      if (event.code.startsWith('Digit')) events.emit('hotbar:rebuild');
+      // Hotbar slots 1-4 (dynamic based on active skills count)
+      const digitMap = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 };
+      const slot = digitMap[event.code];
+      if (slot !== undefined && slot < this.state.activeSkills.length) {
+        this.state.selectedIndex = slot;
+        events.emit('hotbar:rebuild');
+      }
 
       if (event.code === 'KeyF') this._toggleFullscreen();
       if (event.code === 'Enter' && !this.state.started) events.emit('game:enter');
@@ -53,11 +56,20 @@ export class InputManager {
       if (this.state.mode !== 'playing') return;
       const skill = this.state.getSelectedSkill();
       if (event.button === 0) {
-        if (skill.id === 'sword') this.combat.swingSword();
-        else if (skill.id === 'punch') this.combat.punchAttack();
-        else if (skill.id === 'dirt') this.combat.handleBreak();
+        if (skill.kind === 'attack') {
+          // Fruit skill with full stats defined
+          if (skill.range !== undefined) {
+            this.combat.fruitAttack();
+          } else if (skill.id === 'sword') {
+            this.combat.swingSword();
+          } else if (skill.id === 'punch') {
+            this.combat.punchAttack();
+          }
+        } else if (skill.kind === 'block') {
+          this.combat.handleBreak();
+        }
       }
-      if (event.button === 2 && skill.id === 'dirt') this.combat.handlePlace();
+      if (event.button === 2 && skill.kind === 'block') this.combat.handlePlace();
     });
 
     window.addEventListener('contextmenu', (event) => event.preventDefault());

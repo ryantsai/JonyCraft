@@ -17,6 +17,7 @@ import { CombatSystem } from './combat/Combat.js';
 import { InputManager } from './input/InputManager.js';
 import { MobileControls } from './input/MobileControls.js';
 import { HUD } from './ui/HUD.js';
+import { FruitSelect } from './ui/FruitSelect.js';
 import { TestingHooks } from './testing/TestingHooks.js';
 import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
@@ -44,10 +45,12 @@ const combat = new CombatSystem(gameState, world, targeting, enemyManager, parti
 const inputManager = new InputManager(gameState, canvas, combat);
 const mobileControls = new MobileControls(inputManager, combat, gameState);
 const hud = new HUD(gameState, canvas, enemyManager);
+const fruitSelect = new FruitSelect(gameState);
 const soundManager = new SoundManager(gameState);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
+events.on('fruit:selected', () => hud.onFruitSelected());
 
 // --- Simulation step ---
 function stepSimulation(deltaMs) {
@@ -95,6 +98,7 @@ async function init() {
   playerController.setSpawn();
   enemyManager.spawnWave();
   hud.init();
+  fruitSelect.init();
   soundManager.init();
   inputManager.init();
   mobileControls.init();

@@ -24,6 +24,7 @@ export const FRUITS = [
     name: '橡膠果實',
     desc: '身體如橡膠般伸縮自如，擅長遠距拳擊',
     color: '#e04040',
+    animStyle: 'stretch',
     skills: [
       {
         id: 'rubber_pistol',
@@ -88,6 +89,7 @@ export const FRUITS = [
     name: '火焰果實',
     desc: '身體化為烈焰，操縱火焰攻擊敵人',
     color: '#ff6b35',
+    animStyle: 'fire',
     skills: [
       {
         id: 'fire_fist',
@@ -138,6 +140,7 @@ export const FRUITS = [
     name: '冰凍果實',
     desc: '將一切凍結的冰之力量',
     color: '#6ec6ff',
+    animStyle: 'ice',
     skills: [
       {
         id: 'ice_spear',
@@ -188,6 +191,7 @@ export const FRUITS = [
     name: '閃電果實',
     desc: '化身雷電，以電流摧毀一切',
     color: '#ffe060',
+    animStyle: 'lightning',
     skills: [
       {
         id: 'thunder_bolt',
@@ -238,6 +242,7 @@ export const FRUITS = [
     name: '暗暗果實',
     desc: '操縱黑暗與重力，吞噬一切',
     color: '#6a3d99',
+    animStyle: 'dark',
     skills: [
       {
         id: 'dark_pull',
@@ -288,6 +293,7 @@ export const FRUITS = [
     name: '光光果實',
     desc: '以光速移動與攻擊，無人能擋',
     color: '#fff4a0',
+    animStyle: 'light',
     skills: [
       {
         id: 'light_beam',
@@ -352,6 +358,7 @@ export const FRUITS = [
     name: '震震果實',
     desc: '引發地震的毀滅力量，撼動大地',
     color: '#c0a030',
+    animStyle: 'quake',
     skills: [
       {
         id: 'quake_punch',
@@ -402,6 +409,7 @@ export const FRUITS = [
     name: '岩漿果實',
     desc: '化身滾燙岩漿，燃燒一切',
     color: '#cc3300',
+    animStyle: 'magma',
     skills: [
       {
         id: 'magma_fist',
@@ -452,6 +460,7 @@ export const FRUITS = [
     name: '沙沙果實',
     desc: '化身為沙，侵蝕與風暴並用',
     color: '#d4a843',
+    animStyle: 'sand',
     skills: [
       {
         id: 'desert_sword',
@@ -502,6 +511,7 @@ export const FRUITS = [
     name: '爆爆果實',
     desc: '將一切化為爆炸，破壞力驚人',
     color: '#ff4444',
+    animStyle: 'bomb',
     skills: [
       {
         id: 'bomb_punch',

@@ -1,13 +1,71 @@
 import { events } from '../core/EventBus.js';
 
-function defaultServerUrl() {
-  const { protocol, hostname } = window.location;
-  const safeProtocol = protocol === 'https:' ? 'https:' : 'http:';
-  return `${safeProtocol}//${hostname || '127.0.0.1'}:8765`;
+function defaultServerEndpoint() {
+  const { hostname } = window.location;
+  return { host: hostname || '127.0.0.1', port: '8765' };
 }
 
-function trimUrl(url) {
-  return (url || '').trim().replace(/\/+$/, '');
+function trimText(value) {
+  return String(value ?? '').trim();
+}
+
+function normalizeEndpointParts(host, port) {
+  const fallback = defaultServerEndpoint();
+  const rawHost = trimText(host);
+  const rawPort = trimText(port);
+
+  if (!rawHost) {
+    return {
+      host: fallback.host,
+      port: rawPort || fallback.port,
+    };
+  }
+
+  try {
+    const parsed = new URL(rawHost.includes('://') ? rawHost : `http://${rawHost}`);
+    return {
+      host: parsed.hostname || fallback.host,
+      port: rawPort || parsed.port || fallback.port,
+    };
+  } catch {
+    const match = rawHost.match(/^\[?([^\]]+)\]?(?::(\d+))?$/);
+    if (!match) {
+      return {
+        host: rawHost,
+        port: rawPort || fallback.port,
+      };
+    }
+    return {
+      host: match[1] || fallback.host,
+      port: rawPort || match[2] || fallback.port,
+    };
+  }
+}
+
+function endpointToUrl(host, port) {
+  const normalized = normalizeEndpointParts(host, port);
+  const safeHost = normalized.host;
+  const safePort = normalized.port;
+  if (safeHost.startsWith('http://') || safeHost.startsWith('https://')) {
+    return `${safeHost.replace(/\/+$/, '')}:${safePort}`;
+  }
+  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  return `${protocol}//${safeHost}:${safePort}`;
+}
+
+function parseEndpoint(url) {
+  const fallback = defaultServerEndpoint();
+  const raw = trimText(url);
+  if (!raw) return fallback;
+  try {
+    const parsed = new URL(raw.includes('://') ? raw : `http://${raw}`);
+    return {
+      host: parsed.hostname || fallback.host,
+      port: parsed.port || fallback.port,
+    };
+  } catch {
+    return fallback;
+  }
 }
 
 export class MultiplayerClient {
@@ -15,12 +73,20 @@ export class MultiplayerClient {
     this.state = gameState;
     this.world = world;
     this.remotePlayers = null;
+    this.enemyManager = null;
+    this.homelandMode = null;
     this.syncAccumulatorMs = 0;
-    this.syncIntervalMs = 180;
+    this.syncIntervalMs = 150;
     this.syncInFlight = false;
     this.pendingBlockOps = [];
+    this.pendingHomelandAttacks = [];
+    this.pendingHomelandPurchases = [];
     this.suppressBlockSync = false;
-    this.state.multiplayer.serverUrl = defaultServerUrl();
+
+    const endpoint = defaultServerEndpoint();
+    this.state.multiplayer.serverHost = endpoint.host;
+    this.state.multiplayer.serverPort = endpoint.port;
+    this.state.multiplayer.serverUrl = endpointToUrl(endpoint.host, endpoint.port);
   }
 
   init() {
@@ -36,7 +102,6 @@ export class MultiplayerClient {
 
     window.addEventListener('beforeunload', () => {
       if (!this.state.multiplayer.enabled || !navigator.sendBeacon) return;
-
       const url = this._makeUrl(`/api/sessions/${this.state.multiplayer.sessionId}/leave`);
       const blob = new Blob([
         JSON.stringify({ playerName: this.state.playerName }),
@@ -49,12 +114,38 @@ export class MultiplayerClient {
     this.remotePlayers = remotePlayers;
   }
 
+  attachEnemyManager(enemyManager) {
+    this.enemyManager = enemyManager;
+  }
+
+  attachHomelandMode(homelandMode) {
+    this.homelandMode = homelandMode;
+  }
+
   setPlayerName(name) {
     this.state.playerName = name;
   }
 
+  setServerEndpoint(host, port) {
+    const endpoint = normalizeEndpointParts(host, port);
+    this.state.multiplayer.serverHost = endpoint.host;
+    this.state.multiplayer.serverPort = endpoint.port;
+    this.state.multiplayer.serverUrl = endpointToUrl(
+      this.state.multiplayer.serverHost,
+      this.state.multiplayer.serverPort,
+    );
+  }
+
   setServerUrl(url) {
-    this.state.multiplayer.serverUrl = trimUrl(url) || defaultServerUrl();
+    const endpoint = parseEndpoint(url);
+    this.setServerEndpoint(endpoint.host, endpoint.port);
+  }
+
+  getServerEndpoint() {
+    return {
+      host: this.state.multiplayer.serverHost,
+      port: this.state.multiplayer.serverPort,
+    };
   }
 
   async fetchSessions() {
@@ -93,17 +184,17 @@ export class MultiplayerClient {
         playerName: this.state.playerName,
       });
     } catch {
-      // Leaving is best-effort; the server will also clean up stale players.
+      // best-effort
     }
-    this.remotePlayers?.clear();
-    this.pendingBlockOps = [];
-    this.state.multiplayer.enabled = false;
-    this.state.multiplayer.sessionId = null;
-    this.state.multiplayer.sessionName = '';
-    this.state.multiplayer.sessionMode = 'test';
-    this.state.multiplayer.connectionStatus = 'offline';
-    this.state.multiplayer.latestBlockSeq = 0;
-    this.state.multiplayer.sessionPlayerCount = 1;
+    this._resetSessionState();
+  }
+
+  queueHomelandAttack(attack) {
+    this.pendingHomelandAttacks.push(attack);
+  }
+
+  queueHomelandPurchase(item) {
+    this.pendingHomelandPurchases.push(item);
   }
 
   update(dt) {
@@ -121,26 +212,27 @@ export class MultiplayerClient {
     this.syncInFlight = true;
     this.state.multiplayer.connectionStatus = 'syncing';
     const outboundBlockOps = this.pendingBlockOps.splice(0, this.pendingBlockOps.length);
+    const outboundHomelandAttacks = this.pendingHomelandAttacks.splice(0, this.pendingHomelandAttacks.length);
+    const outboundHomelandPurchases = this.pendingHomelandPurchases.splice(0, this.pendingHomelandPurchases.length);
     try {
       const payload = await this._post(`/api/sessions/${this.state.multiplayer.sessionId}/sync`, {
         playerName: this.state.playerName,
         player: this._snapshotPlayer(),
         sinceBlockSeq: this.state.multiplayer.latestBlockSeq,
         blockOps: outboundBlockOps,
+        homelandActions: {
+          attacks: outboundHomelandAttacks,
+          purchases: outboundHomelandPurchases,
+        },
       });
       this._applySync(payload);
     } catch (error) {
       this.pendingBlockOps.unshift(...outboundBlockOps);
+      this.pendingHomelandAttacks.unshift(...outboundHomelandAttacks);
+      this.pendingHomelandPurchases.unshift(...outboundHomelandPurchases);
       this.state.multiplayer.connectionStatus = 'error';
       if (String(error.message).includes('session not found')) {
-        this.remotePlayers?.clear();
-        this.state.multiplayer.enabled = false;
-        this.state.multiplayer.sessionId = null;
-        this.state.multiplayer.sessionName = '';
-        this.state.multiplayer.sessionMode = 'test';
-        this.state.multiplayer.latestBlockSeq = 0;
-        this.state.multiplayer.sessionPlayerCount = 1;
-        this.state.multiplayer.connectionStatus = 'offline';
+        this._resetSessionState();
         events.emit('status:message', '多人房間已不存在，請重新回到主選單建立或加入房間。');
       } else {
         events.emit('status:message', `${this.state.playerName} 的多人連線中斷，正在等待重新同步。`);
@@ -163,6 +255,8 @@ export class MultiplayerClient {
     this.state.multiplayer.connectionStatus = 'online';
     this.syncAccumulatorMs = 0;
     this.pendingBlockOps = [];
+    this.pendingHomelandAttacks = [];
+    this.pendingHomelandPurchases = [];
   }
 
   _applySync(payload) {
@@ -181,7 +275,22 @@ export class MultiplayerClient {
     this.state.multiplayer.latestBlockSeq = payload.latestBlockSeq ?? this.state.multiplayer.latestBlockSeq;
 
     const others = (payload.players ?? []).filter((player) => player.name !== this.state.playerName);
+    const selfPlayer = (payload.players ?? []).find((player) => player.name === this.state.playerName);
+    if (selfPlayer?.serverHp !== undefined) {
+      this.state.player.hp = Number(selfPlayer.serverHp);
+      this.state.player.maxHp = Number(selfPlayer.serverMaxHp ?? this.state.player.maxHp);
+    }
     this.remotePlayers?.updateRoster(others);
+
+    if (payload.homelandState && this.state.gameMode === 'homeland') {
+      this.homelandMode?.applyServerState(payload.homelandState);
+      this.enemyManager?.syncExternalEnemies(payload.homelandState.enemies ?? []);
+      if (payload.homelandState.status === 'defeated') {
+        this.state.mode = 'paused';
+        events.emit('status:message', '多人守護塔已被摧毀，本局結束。');
+      }
+    }
+
     events.emit('hud:update');
   }
 
@@ -209,6 +318,8 @@ export class MultiplayerClient {
       z: Number(player.position.z.toFixed(2)),
       yaw: Number(player.yaw.toFixed(3)),
       pitch: Number(player.pitch.toFixed(3)),
+      hp: Number(player.hp.toFixed(1)),
+      maxHp: Number(player.maxHp.toFixed(1)),
       mode: this.state.mode,
       fruitId: this.state.selectedFruit?.id ?? '',
       selectedSkillId: this.state.getSelectedSkill()?.id ?? '',
@@ -236,6 +347,25 @@ export class MultiplayerClient {
   }
 
   _makeUrl(path) {
-    return `${trimUrl(this.state.multiplayer.serverUrl) || defaultServerUrl()}${path}`;
+    return `${this.state.multiplayer.serverUrl}${path}`;
+  }
+
+  _resetSessionState() {
+    this.remotePlayers?.clear();
+    this.enemyManager?.clearAll();
+    this.state.defense.enabled = false;
+    this.state.defense.remoteAuthoritative = false;
+    this.state.defense.status = 'idle';
+    this.state.defense.turrets = [];
+    this.state.multiplayer.enabled = false;
+    this.state.multiplayer.sessionId = null;
+    this.state.multiplayer.sessionName = '';
+    this.state.multiplayer.sessionMode = 'test';
+    this.state.multiplayer.connectionStatus = 'offline';
+    this.state.multiplayer.latestBlockSeq = 0;
+    this.state.multiplayer.sessionPlayerCount = 1;
+    this.pendingBlockOps = [];
+    this.pendingHomelandAttacks = [];
+    this.pendingHomelandPurchases = [];
   }
 }

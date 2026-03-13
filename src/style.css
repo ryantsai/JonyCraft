@@ -742,6 +742,12 @@ body {
   margin-top: 18px;
 }
 
+.multiplayer-endpoint-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+}
+
 .multiplayer-field span {
   color: rgba(236, 244, 255, 0.82);
   font-size: 0.84rem;
@@ -1290,5 +1296,9 @@ body {
 
   .multiplayer-create-btn {
     width: 100%;
+  }
+
+  .multiplayer-endpoint-grid {
+    grid-template-columns: 1fr;
   }
 }

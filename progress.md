@@ -62,9 +62,38 @@ Original prompt: Create a web based minecraft cline with three.js, using assets 
   - A direct Playwright capture confirmed the multiplayer browser shows host-mode choices plus session cards labeled `測試模式` and `保衛家園` in `output/multiplayer-menu/lobby.png`.
   - A two-client Playwright run against the Python server confirmed shared-room sync in sandbox mode with both clients reporting `playersInSession: 2`, `remotePlayersVisible: 1`, and `zombiesAlive: 0`.
   - A dedicated homeland host check confirmed hosted multiplayer homeland rooms report `sessionMode: "homeland"` and show the defense scoreboard.
+- Replaced the in-memory multiplayer backend with a SQLite-backed persistence layer:
+  - added `server/storage.py` with `SessionRepository` abstraction plus `SQLiteSessionRepository`
+  - session/player state is stored in SQLite JSON blobs so future repositories can swap in without changing the game server logic
+  - enabled SQLite foreign keys and moved `SessionStore` to depend on the abstract repository interface instead of the SQLite concrete type
+- Added authoritative multiplayer homeland simulation on the server in `server/homeland_sim.py`:
+  - wave progression, tower HP, enemy spawn/movement, enemy attacks, player damage/respawn, turret logic, and shop purchases now run on the server
+  - clients send homeland actions (`attacks`, `purchases`) and render server-provided enemy/turret state instead of running local homeland waves
+- Updated the web client for authoritative homeland sync:
+  - `src/network/MultiplayerClient.js` now tracks `serverHost` and `serverPort` separately, sends homeland actions during sync, and applies server homeland snapshots
+  - `src/modes/MultiplayerHomelandMode.js` renders shared tower/turret visuals and queues shop purchases to the server
+  - `src/combat/Combat.js` routes multiplayer homeland attacks through the server instead of local enemy damage
+  - `src/enemies/EnemyManager.js` added external enemy syncing/rendering for server-owned enemies
+  - `src/main.js` now activates the multiplayer homeland mode and skips local homeland AI in multiplayer
+- Updated the multiplayer lobby UI to support custom endpoints more cleanly:
+  - separated server address and port fields in the lobby
+  - changing either field and pressing `Enter` or committing the input now refreshes the room list for that endpoint
+- Verification for the authoritative homeland + custom endpoint work:
+  - Python syntax check passes for `server/storage.py`, `server/homeland_sim.py`, and `server/multiplayer_server.py`
+  - `npm run build` passes after the authoritative homeland and endpoint changes
+  - Bundled `develop-web-game` Playwright client captured the updated multiplayer endpoint UI in `output/web-game-multiplayer-authoritative/shot-0.png`
+  - A two-context Playwright run against a fresh SQLite server on `127.0.0.1:8768` verified:
+    - both clients entered the same homeland room and reported `playersInSession: 2`
+    - both clients showed the same shared wave/tower/gold/turret state
+    - host-side queued attacks increased shared `totalKills`/`totalGold`
+    - clicking `自動砲塔` on one client reduced shared gold and propagated `turretCount: 1` to both clients
+  - A second fresh run against `127.0.0.1:8769` verified the custom host/port flow again, this time using the lobby endpoint fields plus `Enter` to refresh before join; the same authoritative sync results held (`totalKills: 7`, shared `totalGold`, shared `turretCount: 1`)
 
 TODO
 - Optional polish: add chunk meshing or instancing if the world size grows beyond the current compact sandbox.
 - Optional polish: expand the hotbar with more Kenney voxel block variants and a simple save/load layer.
 - Optional polish: make the fruit-select overlay fit fully within the Playwright client’s default 1280x720 viewport so the bundled regression script can complete fruit confirmation by coordinates alone.
-- Multiplayer homeland still uses each client's local enemy simulation; if true co-op wave combat is required, the next step is making the server authoritative for wave/enemy state instead of only room metadata, blocks, and player transforms.
+- Multiplayer homeland is now authoritative for wave/enemy/tower/shop state, but there are still follow-up opportunities:
+  - combat validation currently trusts client-reported attack payload shape plus client-reported position; if cheating resistance matters, validate attack origin/facing/cooldowns more strictly on the server
+  - session state is stored as JSON blobs in SQLite for flexibility; if querying/reporting grows, consider normalizing enemies/turrets/events into relational tables
+  - endpoint changes refresh on committed input (`change` / `Enter`), not every keystroke; that avoids noisy network calls but could be polished further with debouncing if desired

@@ -11,12 +11,13 @@ import { events } from '../core/EventBus.js';
  * Emits events so other systems (particles, HUD, networking) can react.
  */
 export class CombatSystem {
-  constructor(gameState, world, targeting, enemyManager, particles) {
+  constructor(gameState, world, targeting, enemyManager, particles, multiplayerClient = null) {
     this.state = gameState;
     this.world = world;
     this.targeting = targeting;
     this.enemies = enemyManager;
     this.particles = particles;
+    this.multiplayer = multiplayerClient;
   }
 
   /**
@@ -51,6 +52,15 @@ export class CombatSystem {
       });
     }
 
+    if (this._shouldUseServerHomelandAttack()) {
+      this._queueHomelandAttack({
+        range: skill.range,
+        damageMultiplier: skill.damage ?? 1,
+        cooldownMs: skill.cooldownMs,
+      });
+      return;
+    }
+
     this._attackZombie({
       range: skill.range,
       knockbackStrength: skill.knockback,
@@ -66,6 +76,14 @@ export class CombatSystem {
     combat.cooldown = SWORD_COOLDOWN_MS;
     combat.swordSwingTime = SWORD_SWING_MS;
     events.emit('sound:sword');
+    if (this._shouldUseServerHomelandAttack()) {
+      this._queueHomelandAttack({
+        range: SWORD_RANGE,
+        damageMultiplier: 1,
+        cooldownMs: SWORD_COOLDOWN_MS,
+      });
+      return;
+    }
     this._attackZombie({
       range: SWORD_RANGE, knockbackStrength: 4.6,
       particleColor: 'red', particleCount: 12,
@@ -78,6 +96,14 @@ export class CombatSystem {
     combat.cooldown = PUNCH_COOLDOWN_MS;
     combat.punchTime = PUNCH_SWING_MS;
     events.emit('sound:punch');
+    if (this._shouldUseServerHomelandAttack()) {
+      this._queueHomelandAttack({
+        range: PUNCH_RANGE,
+        damageMultiplier: 1,
+        cooldownMs: PUNCH_COOLDOWN_MS,
+      });
+      return;
+    }
     this._attackZombie({
       range: PUNCH_RANGE, knockbackStrength: 7.4,
       particleColor: 'white', particleCount: 14,
@@ -110,6 +136,22 @@ export class CombatSystem {
     this.targeting.updateTarget();
     events.emit('sound:place');
     events.emit('hud:update');
+  }
+
+  _shouldUseServerHomelandAttack() {
+    return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'homeland';
+  }
+
+  _queueHomelandAttack({ range, damageMultiplier, cooldownMs }) {
+    const enemy = this.targeting.updateEnemyTarget() ?? this.targeting.findMeleeCandidate();
+    if (!enemy?.serverId) return false;
+    this.multiplayer?.queueHomelandAttack({
+      enemyId: enemy.serverId,
+      range,
+      damageMultiplier,
+      cooldownMs,
+    });
+    return true;
   }
 
   _attackZombie({ range, knockbackStrength, particleColor, particleCount, damageMultiplier = 1 }) {

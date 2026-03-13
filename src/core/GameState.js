@@ -52,12 +52,15 @@ export class GameState {
 
     this.defense = {
       enabled: false,
+      remoteAuthoritative: false,
       wave: 0,
       timeLeft: 0,
       totalKills: 0,
       totalGold: 0,
       towerHp: 0,
       towerMaxHp: 240,
+      status: 'idle',
+      turrets: [],
     };
 
     this.multiplayer = {
@@ -67,6 +70,8 @@ export class GameState {
       sessionMode: 'test',
       sessionPlayerCount: 1,
       serverUrl: '',
+      serverHost: '127.0.0.1',
+      serverPort: '8765',
       sessions: [],
       latestBlockSeq: 0,
       connectionStatus: 'offline',

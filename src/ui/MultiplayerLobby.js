@@ -11,7 +11,8 @@ export class MultiplayerLobby {
     this.multiplayer = multiplayerClient;
     this.overlay = null;
     this.status = null;
-    this.serverInput = null;
+    this.serverHostInput = null;
+    this.serverPortInput = null;
     this.playerNameEl = null;
     this.sessionsEl = null;
     this.hostModeButtons = [];
@@ -26,7 +27,9 @@ export class MultiplayerLobby {
   async show() {
     this.state.playStyle = 'multiplayer';
     this.overlay.dataset.hidden = 'false';
-    this.serverInput.value = this.state.multiplayer.serverUrl;
+    const endpoint = this.multiplayer.getServerEndpoint();
+    this.serverHostInput.value = endpoint.host;
+    this.serverPortInput.value = endpoint.port;
     this._renderIdentity();
     this._renderHostMode();
     this._setStatus('正在載入房間列表...');
@@ -39,7 +42,7 @@ export class MultiplayerLobby {
 
   async refreshSessions() {
     try {
-      this.multiplayer.setServerUrl(this.serverInput.value);
+      this.multiplayer.setServerEndpoint(this.serverHostInput.value, this.serverPortInput.value);
       const sessions = await this.multiplayer.fetchSessions();
       this._renderSessions(sessions);
       this._setStatus(sessions.length > 0 ? '選擇一個房間加入，或直接建立新的房間。' : '目前沒有房間，來建立第一個吧。');
@@ -74,10 +77,16 @@ export class MultiplayerLobby {
           <button id="multiplayer-reroll" class="multiplayer-ghost-btn" type="button">重新隨機</button>
         </div>
 
-        <label class="multiplayer-field">
-          <span>伺服器位址</span>
-          <input id="multiplayer-server-url" type="text" spellcheck="false" />
-        </label>
+        <div class="multiplayer-endpoint-grid">
+          <label class="multiplayer-field">
+            <span>伺服器地址</span>
+            <input id="multiplayer-server-host" type="text" spellcheck="false" />
+          </label>
+          <label class="multiplayer-field">
+            <span>連接埠</span>
+            <input id="multiplayer-server-port" type="text" inputmode="numeric" />
+          </label>
+        </div>
 
         <div class="multiplayer-field">
           <span>建立新房間時的模式</span>
@@ -103,10 +112,28 @@ export class MultiplayerLobby {
     document.querySelector('.shell').appendChild(overlay);
     this.overlay = overlay;
     this.status = overlay.querySelector('#multiplayer-status');
-    this.serverInput = overlay.querySelector('#multiplayer-server-url');
+    this.serverHostInput = overlay.querySelector('#multiplayer-server-host');
+    this.serverPortInput = overlay.querySelector('#multiplayer-server-port');
     this.playerNameEl = overlay.querySelector('#multiplayer-player-name');
     this.sessionsEl = overlay.querySelector('#multiplayer-sessions');
     this.hostModeButtons = Array.from(overlay.querySelectorAll('.host-mode-btn'));
+
+    const refreshEndpoint = async () => {
+      if (this.busy) return;
+      this._setStatus('正在切換多人伺服器...');
+      await this.refreshSessions();
+    };
+
+    [this.serverHostInput, this.serverPortInput].forEach((input) => {
+      input.addEventListener('change', () => {
+        void refreshEndpoint();
+      });
+      input.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        void refreshEndpoint();
+      });
+    });
 
     overlay.querySelector('#multiplayer-close').addEventListener('click', () => {
       events.emit('sound:click');
@@ -142,7 +169,7 @@ export class MultiplayerLobby {
       await this._withBusy(async () => {
         events.emit('sound:click');
         this._setStatus('正在建立多人房間...');
-        this.multiplayer.setServerUrl(this.serverInput.value);
+        this.multiplayer.setServerEndpoint(this.serverHostInput.value, this.serverPortInput.value);
         await this.multiplayer.createSession(
           suggestedSessionName(this.state.playerName),
           this.state.multiplayer.sessionMode,
@@ -208,7 +235,7 @@ export class MultiplayerLobby {
         await this._withBusy(async () => {
           events.emit('sound:click');
           this._setStatus(`正在加入 ${session.name}...`);
-          this.multiplayer.setServerUrl(this.serverInput.value);
+          this.multiplayer.setServerEndpoint(this.serverHostInput.value, this.serverPortInput.value);
           await this.multiplayer.joinSession(session.id);
           this.hide();
           events.emit('multiplayer:session-ready');

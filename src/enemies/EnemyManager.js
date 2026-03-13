@@ -22,6 +22,11 @@ const _flatToPlayer = new THREE.Vector2();
 const _spawnTest = new THREE.Vector3();
 const _sep = new THREE.Vector3();
 
+function lerpAngle(from, to, alpha) {
+  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from));
+  return from + delta * alpha;
+}
+
 /**
  * Manages all enemy types: spawning, AI dispatch, projectiles, and cleanup.
  */
@@ -37,6 +42,7 @@ export class EnemyManager {
     this.hitboxes = [];
     this.respawnTimers = [];
     this.projectiles = [];
+    this.externalEnemies = new Map();
     this._aliveCache = [];
     this._aliveCacheDirty = true;
     this._ctx = { state: null, world: null, particles: null, enemies: this };
@@ -95,6 +101,7 @@ export class EnemyManager {
     enemy.hitbox.material.dispose();
     const zIdx = this.zombies.indexOf(enemy);
     if (zIdx >= 0) this.zombies.splice(zIdx, 1);
+    if (enemy.serverId) this.externalEnemies.delete(enemy.serverId);
     if (this.state.enemyTarget === enemy) this.state.enemyTarget = null;
     this._markDirty();
   }
@@ -103,6 +110,64 @@ export class EnemyManager {
   clearAll() {
     [...this.zombies].forEach((enemy) => this.remove(enemy));
     this.respawnTimers = [];
+  }
+
+  syncExternalEnemies(enemyStates = []) {
+    const keep = new Set();
+    enemyStates.forEach((enemyState, index) => {
+      const serverId = enemyState.id ?? `server-${index}`;
+      keep.add(serverId);
+
+      let enemy = this.externalEnemies.get(serverId);
+      if (!enemy || enemy.type !== enemyState.type) {
+        if (enemy) this.remove(enemy);
+        enemy = createEnemy(
+          this.textureManager,
+          ENEMY_TYPES[enemyState.type],
+          enemyState.type,
+          new THREE.Vector3(enemyState.x, enemyState.y, enemyState.z),
+          this.scene.enemyGroup,
+        );
+        enemy.serverId = serverId;
+        enemy.serverTargetPosition = new THREE.Vector3(enemyState.x, enemyState.y, enemyState.z);
+        enemy.serverTargetYaw = enemyState.yaw ?? 0;
+        this.externalEnemies.set(serverId, enemy);
+        this.zombies.push(enemy);
+        this.hitboxes.push(enemy.hitbox);
+        this._markDirty();
+      }
+
+      enemy.alive = true;
+      enemy.serverTargetPosition.set(enemyState.x, enemyState.y, enemyState.z);
+      enemy.serverTargetYaw = enemyState.yaw ?? 0;
+      enemy.health = enemyState.health;
+      enemy.maxHealth = enemyState.maxHealth;
+      enemy.baseAttack = enemyState.baseAttack ?? enemy.baseAttack;
+      enemy.baseDefense = enemyState.baseDefense ?? enemy.baseDefense;
+      enemy.speed = enemyState.speed ?? enemy.speed;
+      enemy.sizeMultiplier = enemyState.sizeMultiplier ?? enemy.sizeMultiplier;
+      updateHealthBarSprite(enemy);
+    });
+
+    Array.from(this.externalEnemies.entries()).forEach(([serverId, enemy]) => {
+      if (keep.has(serverId)) return;
+      this.remove(enemy);
+    });
+  }
+
+  updateExternalVisuals(dt) {
+    this.externalEnemies.forEach((enemy) => {
+      if (!enemy.serverTargetPosition) return;
+      const moved = enemy.root.position.distanceTo(enemy.serverTargetPosition);
+      enemy.root.position.lerp(enemy.serverTargetPosition, Math.min(1, dt * 10));
+      enemy.root.rotation.y = lerpAngle(enemy.root.rotation.y, enemy.serverTargetYaw ?? enemy.root.rotation.y, Math.min(1, dt * 10));
+      enemy.walkTime += dt * 8;
+      const sway = Math.sin(enemy.walkTime) * 0.12 * Math.min(1, moved * 2);
+      enemy.leftArm.position.x = -0.43 + sway;
+      enemy.rightArm.position.x = 0.43 - sway;
+      enemy.leftLeg.position.x = -0.16 - sway * 0.38;
+      enemy.rightLeg.position.x = 0.16 + sway * 0.38;
+    });
   }
 
   defeat(enemy, extra = {}) {

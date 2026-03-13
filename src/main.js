@@ -23,6 +23,7 @@ import { TestingHooks } from './testing/TestingHooks.js';
 import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
 import { HomelandDefenseMode } from './modes/HomelandDefenseMode.js';
+import { MultiplayerHomelandMode } from './modes/MultiplayerHomelandMode.js';
 import { ensurePlayerName } from './network/PlayerIdentity.js';
 import { MultiplayerClient } from './network/MultiplayerClient.js';
 import { RemotePlayers } from './network/RemotePlayers.js';
@@ -47,22 +48,32 @@ const targeting = new Targeting(gameState, world, scene, enemyManager);
 const particles = new ParticleSystem(scene, textureManager);
 enemyManager.setParticles(particles);
 const weaponModels = new WeaponModels(scene, textureManager, blockMaterials);
-const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles);
+const multiplayer = new MultiplayerClient(gameState, world);
+const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);
 const mobileControls = new MobileControls(inputManager, combat, gameState);
 const hud = new HUD(gameState, canvas, enemyManager);
 const fruitSelect = new FruitSelect(gameState);
-const multiplayer = new MultiplayerClient(gameState, world);
 multiplayer.setPlayerName(gameState.playerName);
 const remotePlayers = new RemotePlayers(scene);
 multiplayer.attachRemotePlayers(remotePlayers);
+multiplayer.attachEnemyManager(enemyManager);
 const multiplayerLobby = new MultiplayerLobby(gameState, multiplayer);
 const soundManager = new SoundManager(gameState);
 const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
+const multiplayerHomelandMode = new MultiplayerHomelandMode(
+  gameState, world, enemyManager, scene, multiplayer,
+);
+multiplayer.attachHomelandMode(multiplayerHomelandMode);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
 events.on('fruit:selected', () => {
+  gameState.defense.enabled = false;
+  gameState.defense.remoteAuthoritative = false;
+  gameState.defense.status = 'idle';
+  gameState.defense.turrets = [];
+
   if (gameState.gameMode === 'homeland') {
     world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
     worldRenderer.buildAll();
@@ -72,10 +83,13 @@ events.on('fruit:selected', () => {
 
   hud.onFruitSelected();
   if (gameState.gameMode === 'homeland') {
-    gameState.modeController = homelandMode;
-    homelandMode.activate();
     if (gameState.playStyle === 'multiplayer') {
+      gameState.modeController = multiplayerHomelandMode;
+      multiplayerHomelandMode.activate();
       events.emit('status:message', `多人房間 ${gameState.multiplayer.sessionName} 進入保衛家園。`);
+    } else {
+      gameState.modeController = homelandMode;
+      homelandMode.activate();
     }
   } else if (gameState.playStyle === 'multiplayer') {
     gameState.modeController = null;
@@ -104,8 +118,12 @@ function stepSimulation(deltaMs) {
       ));
       playerController.applyMovement(dt, inputManager.keyState, inputManager.virtualInput);
       soundManager.updateFootsteps(dt, inputManager.keyState, inputManager.virtualInput);
-      if (gameState.playStyle === 'multiplayer' && gameState.gameMode !== 'homeland') enemyManager.clearAll();
-      else enemyManager.update(dt);
+      if (gameState.playStyle === 'multiplayer') {
+        if (gameState.gameMode === 'homeland') enemyManager.updateExternalVisuals(dt);
+        else enemyManager.clearAll();
+      } else {
+        enemyManager.update(dt);
+      }
       gameState.modeController?.update?.(dt);
     }
     multiplayer.update(dt);

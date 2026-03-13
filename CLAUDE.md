@@ -21,7 +21,9 @@ src/
     constants.js           - All tuning constants (physics, world, combat, etc.)
     assets.js              - Asset URL helper
     blocks.js              - Block type definitions (faces, collision, transparency)
-    skills.js              - Skill/hotbar definitions
+    skills.js              - Default skill/hotbar definitions
+    fruits.js              - Fruit definitions with per-fruit combat skills
+    enemyTypes.js          - Enemy type definitions (stats, behavior, model)
 
   core/
     EventBus.js            - Pub/sub event system for decoupled communication
@@ -45,6 +47,8 @@ src/
 
   enemies/
     Zombie.js              - Zombie 3D model creation, tinting
+    EnemyModel.js          - Generic enemy 3D model builder
+    EnemyBehaviors.js      - Enemy AI behavior definitions
     EnemyManager.js        - Spawning, AI updates, respawn timers
 
   effects/
@@ -55,9 +59,13 @@ src/
     InputManager.js        - Keyboard, mouse, pointer lock
     MobileControls.js      - Virtual gamepad (touch pads + buttons)
 
+  audio/
+    SoundManager.js        - Sound effects loading and playback
+
   ui/
     template.js            - Game HTML shell template
     HUD.js                 - Hotbar, status bar, start screen
+    FruitSelect.js         - Fruit selection overlay UI
 
   testing/
     TestingHooks.js        - Automation hooks (render_game_to_text, advanceTime)
@@ -74,8 +82,9 @@ vite.config.js             - Vite config with BASE_PATH env support
 - **World**: Voxel data stored in a Map keyed by `"x,y,z"` strings. Emits change events so WorldRenderer stays in sync.
 - Fixed-timestep game loop (`FIXED_STEP_MS = 1000/60`)
 - First-person camera with pointer lock controls
-- Skills system: Sword, Rubber Punch, Dirt Block (selectable via hotbar 1/2/3)
-- Zombie enemies with health, knockback, respawn mechanics
+- **Fruit System**: 10 devil fruits (Blox Fruits inspired), each granting 3-4 combat skills with unique stats (damage, range, cooldown, knockback, effects). Players select a fruit before entering the world; skills replace the default hotbar.
+- Default skills: Sword, Rubber Punch, Dirt Block (before fruit selection)
+- Multiple enemy types with health, knockback, respawn mechanics
 - AABB collision detection for player-world physics
 - Mobile virtual gamepad with dual touch pads
 

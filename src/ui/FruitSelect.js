@@ -109,7 +109,8 @@ export class FruitSelect {
       <div class="fruit-skill-row">
         <span class="fruit-skill-slot">${i + 1}</span>
         <span class="fruit-skill-name">${s.name}</span>
-        <span class="fruit-skill-stats">ATK ×${s.damage} · 範圍 ${s.range} · 速度 ${s.swingMs}ms · CD ${s.cooldownMs}ms</span>
+        <span class="fruit-skill-stats">ATK ×${s.damage} · 範圍 ${s.range} · CD ${s.cooldownMs}ms</span>
+        ${s.desc ? `<span class="fruit-skill-desc">${s.desc}</span>` : ''}
       </div>
     `).join('');
 

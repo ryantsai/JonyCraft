@@ -38,13 +38,21 @@ export class MobileControls {
 
     this._bindHold(touchPrimary, () => {
       const skill = this.state.getSelectedSkill();
-      if (skill.id === 'sword') this.combat.swingSword();
-      else if (skill.id === 'punch') this.combat.punchAttack();
-      else this.combat.handleBreak();
+      if (skill.kind === 'attack') {
+        if (skill.range !== undefined) {
+          this.combat.fruitAttack();
+        } else if (skill.id === 'sword') {
+          this.combat.swingSword();
+        } else if (skill.id === 'punch') {
+          this.combat.punchAttack();
+        }
+      } else {
+        this.combat.handleBreak();
+      }
     });
 
     this._bindHold(touchSecondary, () => {
-      if (this.state.getSelectedSkill().id === 'dirt') this.combat.handlePlace();
+      if (this.state.getSelectedSkill().kind === 'block') this.combat.handlePlace();
     });
   }
 

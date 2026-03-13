@@ -19,6 +19,36 @@ export class CombatSystem {
     this.particles = particles;
   }
 
+  /**
+   * Generic fruit skill attack. Reads stats from the active skill definition.
+   */
+  fruitAttack() {
+    const combat = this.state.combat;
+    if (combat.cooldown > 0) return;
+
+    const skill = this.state.getSelectedSkill();
+    if (!skill || skill.kind !== 'attack') return;
+
+    combat.cooldown = skill.cooldownMs;
+
+    // Drive the correct weapon animation
+    if (skill.weaponType === 'sword') {
+      combat.swordSwingTime = skill.swingMs;
+      events.emit('sound:sword');
+    } else {
+      combat.punchTime = skill.swingMs;
+      events.emit('sound:punch');
+    }
+
+    this._attackZombie({
+      range: skill.range,
+      knockbackStrength: skill.knockback,
+      particleColor: skill.particleColor,
+      particleCount: skill.particleCount,
+      damageMultiplier: skill.damage ?? 1,
+    });
+  }
+
   swingSword() {
     const combat = this.state.combat;
     if (combat.cooldown > 0) return;
@@ -71,13 +101,13 @@ export class CombatSystem {
     events.emit('hud:update');
   }
 
-  _attackZombie({ range, knockbackStrength, particleColor, particleCount }) {
+  _attackZombie({ range, knockbackStrength, particleColor, particleCount, damageMultiplier = 1 }) {
     const zombie = this.targeting.updateEnemyTarget() ?? this.targeting.findMeleeCandidate();
     if (!zombie || !zombie.alive) return false;
     const distance = zombie.root.position.distanceTo(this.state.player.position);
     if (distance > range + 0.35) return false;
 
-    const damage = Math.max(1, this.state.player.baseAttack - zombie.baseDefense);
+    const damage = Math.max(1, this.state.player.baseAttack * damageMultiplier - zombie.baseDefense);
     zombie.health -= damage;
     zombie.hitFlash = 1;
     events.emit('sound:hit');
@@ -87,7 +117,11 @@ export class CombatSystem {
       away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
     }
     away.normalize();
-    zombie.knockback.copy(away.multiplyScalar(knockbackStrength));
+
+    // Negative knockback = pull toward player (dark fruit)
+    const kbDir = knockbackStrength < 0 ? -1 : 1;
+    const kbMag = Math.abs(knockbackStrength);
+    zombie.knockback.copy(away.multiplyScalar(kbMag * kbDir));
     zombie.knockbackTimer = 240;
     this.particles.spawn(
       zombie.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),

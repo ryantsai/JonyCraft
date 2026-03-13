@@ -1,4 +1,3 @@
-import { SKILLS } from '../config/skills.js';
 import { events } from '../core/EventBus.js';
 
 /**
@@ -42,8 +41,9 @@ export class HUD {
   }
 
   rebuildHotbar() {
+    const skills = this.state.activeSkills;
     this.hotbar.textContent = '';
-    SKILLS.forEach((skill, index) => {
+    skills.forEach((skill, index) => {
       const item = document.createElement('button');
       item.className = 'hotbar-item';
       item.type = 'button';
@@ -72,7 +72,7 @@ export class HUD {
   }
 
   moveSelection(delta) {
-    const total = SKILLS.length;
+    const total = this.state.activeSkills.length;
     this.state.selectedIndex = (this.state.selectedIndex + delta + total) % total;
     this.rebuildHotbar();
     this.update();
@@ -93,7 +93,8 @@ export class HUD {
         ? ` | 敵人存活 ${alive}`
         : ` | 已擊殺 ${this.state.combat.kills}`;
     const pointer = document.pointerLockElement === this.canvas ? '指標鎖定' : '滑鼠自由';
-    this.statusMessage.textContent = `已選：${selected} | 目標：${target}${zombieText} | ${pointer}`;
+    const fruitLabel = this.state.selectedFruit ? ` [${this.state.selectedFruit.name}]` : '';
+    this.statusMessage.textContent = `${fruitLabel} 已選：${selected} | 目標：${target}${zombieText} | ${pointer}`;
     this.statusCoords.textContent = `XYZ ${player.position.x.toFixed(1)} / ${player.position.y.toFixed(1)} / ${player.position.z.toFixed(1)}`;
 
     // Player health bar
@@ -105,9 +106,15 @@ export class HUD {
   }
 
   enterWorld() {
+    // Show fruit selection instead of going directly to playing
+    this.startScreen.dataset.hidden = 'true';
+    events.emit('fruit:show');
+  }
+
+  onFruitSelected() {
     this.state.started = true;
     this.state.mode = 'playing';
-    this.startScreen.dataset.hidden = 'true';
+    this.rebuildHotbar();
     this.update();
   }
 

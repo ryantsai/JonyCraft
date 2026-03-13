@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { PUNCH_RANGE, SWORD_RANGE } from '../config/constants.js';
 
+function getActiveRange(skill) {
+  if (skill.range !== undefined) return skill.range;
+  return skill.id === 'punch' ? PUNCH_RANGE : SWORD_RANGE;
+}
+
 /**
  * Handles voxel raycasting (DDA) and enemy target detection.
  */
@@ -99,11 +104,11 @@ export class Targeting {
   }
 
   updateEnemyTarget() {
-    this.raycaster.setFromCamera(this._screenCenter, this.scene.camera);
-    this.raycaster.far = PUNCH_RANGE + 0.6;
-    const hits = this.raycaster.intersectObjects(this.enemyManager.hitboxes, false);
     const skill = this.state.getSelectedSkill();
-    const activeRange = skill.id === 'punch' ? PUNCH_RANGE : SWORD_RANGE;
+    const activeRange = getActiveRange(skill);
+    this.raycaster.setFromCamera(this._screenCenter, this.scene.camera);
+    this.raycaster.far = activeRange + 0.6;
+    const hits = this.raycaster.intersectObjects(this.enemyManager.hitboxes, false);
     const zombieHit = hits.find((entry) => entry.distance <= activeRange + 0.6);
     return zombieHit ? zombieHit.object.userData.zombie : null;
   }
@@ -120,7 +125,9 @@ export class Targeting {
         zombie.root.position, this.state.player.position,
       );
       const distance = toZombie.length();
-      if (distance > PUNCH_RANGE + 0.45) return;
+      const skill = this.state.getSelectedSkill();
+      const meleeRange = getActiveRange(skill);
+      if (distance > meleeRange + 0.45) return;
       toZombie.y = 0;
       if (toZombie.lengthSq() === 0) {
         bestZombie = zombie;

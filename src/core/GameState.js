@@ -3,7 +3,7 @@ import {
   WORLD_SIZE_X, WORLD_SIZE_Z,
   PLAYER_MAX_HP, PLAYER_BASE_ATTACK, PLAYER_BASE_DEFENSE, MOVE_SPEED,
 } from '../config/constants.js';
-import { SKILLS } from '../config/skills.js';
+import { DEFAULT_SKILLS } from '../config/skills.js';
 
 /**
  * Central game state. All systems read/write from this shared object.
@@ -12,11 +12,15 @@ import { SKILLS } from '../config/skills.js';
  */
 export class GameState {
   constructor() {
-    this.mode = 'loading'; // loading | menu | playing | paused
+    this.mode = 'loading'; // loading | menu | fruit_select | playing | paused
     this.gameMode = 'test';
     this.started = false;
     this.useManualClock = false;
     this.selectedIndex = 0;
+
+    // Fruit system
+    this.selectedFruit = null;   // fruit definition object
+    this.activeSkills = DEFAULT_SKILLS;
 
     this.player = {
       position: new THREE.Vector3(WORLD_SIZE_X / 2, 8, WORLD_SIZE_Z / 2),
@@ -44,8 +48,14 @@ export class GameState {
     };
   }
 
+  selectFruit(fruit) {
+    this.selectedFruit = fruit;
+    this.activeSkills = fruit.skills;
+    this.selectedIndex = 0;
+  }
+
   getSelectedSkill() {
-    return SKILLS[this.selectedIndex];
+    return this.activeSkills[this.selectedIndex];
   }
 
   getSelectedBlockType() {

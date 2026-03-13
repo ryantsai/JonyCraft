@@ -91,7 +91,7 @@ export const gameTemplate = `
               <span>放置方塊</span>
             </div>
             <div class="control-item">
-              <kbd>1 2 3</kbd>
+              <kbd>1 2 3 4</kbd>
               <span>切換技能</span>
             </div>
           </div>

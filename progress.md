@@ -47,8 +47,24 @@ Original prompt: Create a web based minecraft cline with three.js, using assets 
   - `npm run build` still succeeds after the input-loop change.
   - The bundled `develop-web-game` Playwright client still runs and captures the fruit-select flow, but its default 1280x720 viewport leaves the confirm button partially off-screen once a fruit preview expands.
   - A direct Playwright verification at 1280x900 successfully entered the world, held left mouse for 1200ms via `window.advanceTime()`, and confirmed the held-repeat behavior with state output: `mode: "playing"`, `selectedSkill: "rubber_pistol"`, `punchActive: true`, and `cooldownMs: 260` after the hold, which indicates the skill re-triggered during the hold instead of firing only once.
+- Added a Python multiplayer session service at `server/multiplayer_server.py` using the standard library only.
+- Added cookie-backed random player names, a polling-based multiplayer client, shared block sync, and remote-player rendering hooks.
+- Reworked the menu flow into two stages:
+  - first screen chooses `單人遊戲` or `多人連線`
+  - singleplayer second screen chooses `測試模式` or `保衛家園`
+  - multiplayer second screen browses/hosts sessions and now shows each session's mode
+- Updated multiplayer hosting so new rooms carry a selected mode (`test` or `homeland`) and session cards show that mode in the browser.
+- Added a debug hook `window.__app` and expanded `window.render_game_to_text()` with multiplayer session mode and visible remote-player count to support deterministic testing.
+- Kept sandbox multiplayer enemy-free to avoid unsynced local waves, but allowed multiplayer homeland rooms to enter the homeland defense flow.
+- Verification for the multiplayer/menu work:
+  - `npm run build` passes after the menu/state/server changes.
+  - Bundled `develop-web-game` Playwright client captured the singleplayer second-step menu at `output/web-game-menu-flow/shot-0.png`.
+  - A direct Playwright capture confirmed the multiplayer browser shows host-mode choices plus session cards labeled `測試模式` and `保衛家園` in `output/multiplayer-menu/lobby.png`.
+  - A two-client Playwright run against the Python server confirmed shared-room sync in sandbox mode with both clients reporting `playersInSession: 2`, `remotePlayersVisible: 1`, and `zombiesAlive: 0`.
+  - A dedicated homeland host check confirmed hosted multiplayer homeland rooms report `sessionMode: "homeland"` and show the defense scoreboard.
 
 TODO
 - Optional polish: add chunk meshing or instancing if the world size grows beyond the current compact sandbox.
 - Optional polish: expand the hotbar with more Kenney voxel block variants and a simple save/load layer.
 - Optional polish: make the fruit-select overlay fit fully within the Playwright client’s default 1280x720 viewport so the bundled regression script can complete fruit confirmation by coordinates alone.
+- Multiplayer homeland still uses each client's local enemy simulation; if true co-op wave combat is required, the next step is making the server authoritative for wave/enemy state instead of only room metadata, blocks, and player transforms.

@@ -47,8 +47,80 @@ export const gameTemplate = `
     </div>
     <div id="start-screen" class="start-screen">
       <div class="menu-particles" aria-hidden="true"></div>
-      <div class="start-panel">
+      <div id="menu-home-screen" class="start-panel menu-page">
         <div class="panel-glow"></div>
+        <div class="title-block">
+          <div class="title-row">
+            <div class="title-icon">
+              <img src="assets/kenney/tiles/dirt_grass.png" alt="" class="title-block-img" />
+            </div>
+            <h1 class="game-title">
+              <span class="title-jony">Jony</span><span class="title-craft">Craft</span>
+            </h1>
+          </div>
+          <p class="subtitle">體素沙盒冒險</p>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <div class="play-style-section">
+          <p class="section-label">選擇遊玩方式</p>
+          <div class="play-style-list">
+            <button id="choose-singleplayer-btn" class="play-style-btn" type="button">
+              <img src="assets/kenney/items/singleplayer.png" alt="" class="mode-icon" />
+              <div class="mode-info">
+                <span class="mode-name">單人遊戲</span>
+                <span class="mode-desc">直接選擇測試模式或保衛家園</span>
+              </div>
+            </button>
+            <button id="choose-multiplayer-btn" class="play-style-btn" type="button">
+              <img src="assets/kenney/items/gamepad.png" alt="" class="mode-icon" />
+              <div class="mode-info">
+                <span class="mode-name">多人連線</span>
+                <span class="mode-desc">瀏覽房間、查看模式，或建立新的伺服器</span>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div class="menu-divider"></div>
+
+        <div class="controls-section">
+          <p class="section-label">操作說明</p>
+          <div class="control-grid">
+            <div class="control-item">
+              <kbd>W A S D</kbd>
+              <span>移動</span>
+            </div>
+            <div class="control-item">
+              <kbd>空白鍵</kbd>
+              <span>跳躍</span>
+            </div>
+            <div class="control-item">
+              <kbd>滑鼠</kbd>
+              <span>視角</span>
+            </div>
+            <div class="control-item">
+              <kbd>左鍵</kbd>
+              <span>攻擊</span>
+            </div>
+            <div class="control-item">
+              <kbd>右鍵</kbd>
+              <span>放置方塊</span>
+            </div>
+            <div class="control-item">
+              <kbd>1 2 3 4</kbd>
+              <span>切換技能</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="footer-credit">Kenney 體素素材 · Three.js 引擎</p>
+      </div>
+
+      <div id="singleplayer-screen" class="start-panel menu-page" data-hidden="true">
+        <div class="panel-glow"></div>
+        <button id="singleplayer-back-btn" class="menu-back-btn" type="button">← 返回</button>
         <div class="title-block">
           <div class="title-row">
             <div class="title-icon">

@@ -43,6 +43,8 @@ export class SceneSetup {
     this.scene.add(this.worldGroup);
     this.enemyGroup = new THREE.Group();
     this.scene.add(this.enemyGroup);
+    this.remotePlayerGroup = new THREE.Group();
+    this.scene.add(this.remotePlayerGroup);
     this.particleGroup = new THREE.Group();
     this.scene.add(this.particleGroup);
 

@@ -13,7 +13,10 @@ export class HUD {
     this.statusMessage = document.querySelector('#status-message');
     this.statusCoords = document.querySelector('#status-coords');
     this.startScreen = document.querySelector('#start-screen');
+    this.homeScreen = document.querySelector('#menu-home-screen');
+    this.singleplayerScreen = document.querySelector('#singleplayer-screen');
     this.startButton = document.querySelector('#start-btn');
+    this.startButtonText = document.querySelector('#start-btn .start-btn-text');
     this.hpText = document.querySelector('#hp-text');
     this.hpFill = document.querySelector('#hp-fill');
     this.defenseBoard = document.querySelector('#defense-scoreboard');
@@ -32,11 +35,29 @@ export class HUD {
       events.emit('game:enter');
     });
 
+    document.querySelector('#choose-singleplayer-btn').addEventListener('click', () => {
+      events.emit('sound:click');
+      this.state.playStyle = 'singleplayer';
+      this.showSingleplayerScreen();
+    });
+
+    document.querySelector('#choose-multiplayer-btn').addEventListener('click', () => {
+      events.emit('sound:click');
+      this.state.playStyle = 'multiplayer';
+      this.showMultiplayerScreen();
+    });
+
+    document.querySelector('#singleplayer-back-btn').addEventListener('click', () => {
+      events.emit('sound:click');
+      this.showHomeScreen();
+    });
+
     document.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('mode-btn-active'));
+        document.querySelectorAll('.mode-btn').forEach((node) => node.classList.remove('mode-btn-active'));
         btn.classList.add('mode-btn-active');
         this.state.gameMode = btn.dataset.mode;
+        this.updateStartAction();
       });
     });
 
@@ -45,8 +66,11 @@ export class HUD {
     events.on('hud:update', () => this.update());
     events.on('game:enter', () => this.enterWorld());
     events.on('status:message', (message) => { this.statusMessage.textContent = message; });
+    events.on('multiplayer:session-ready', () => this.enterJoinedSession());
+    events.on('multiplayer:lobby:closed', () => this.showHomeScreen());
 
     this.rebuildHotbar();
+    this.showHomeScreen();
 
     document.querySelectorAll('.defense-shop-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -74,7 +98,6 @@ export class HUD {
       slotName.className = 'slot-name';
       slotName.textContent = skill.name;
 
-      // Skill stats tooltip
       if (skill.kind === 'attack' && skill.damage !== undefined) {
         const stats = document.createElement('span');
         stats.className = 'skill-stats';
@@ -82,9 +105,7 @@ export class HUD {
         item.appendChild(stats);
       }
 
-      item.appendChild(slotNum);
-      item.appendChild(slotName);
-
+      item.append(slotNum, slotName);
       item.addEventListener('click', () => {
         this.state.selectedIndex = index;
         events.emit('sound:click');
@@ -118,10 +139,12 @@ export class HUD {
         : ` | 已擊殺 ${this.state.combat.kills}`;
     const pointer = document.pointerLockElement === this.canvas ? '指標鎖定' : '滑鼠自由';
     const fruitLabel = this.state.selectedFruit ? ` [${this.state.selectedFruit.name}]` : '';
-    this.statusMessage.textContent = `${fruitLabel} 已選：${selected} | 目標：${target}${zombieText} | ${pointer}`;
+    const multiplayerText = this.state.multiplayer.enabled
+      ? ` | 房間：${this.state.multiplayer.sessionName} (${this.state.multiplayer.sessionPlayerCount}人)`
+      : '';
+    this.statusMessage.textContent = `${fruitLabel} 已選：${selected} | 目標：${target}${zombieText}${multiplayerText} | ${pointer}`;
     this.statusCoords.textContent = `XYZ ${player.position.x.toFixed(1)} / ${player.position.y.toFixed(1)} / ${player.position.z.toFixed(1)}`;
 
-    // Player health bar
     const hpRatio = player.hp / player.maxHp;
     this.hpText.textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
     this.hpFill.style.width = `${Math.max(0, hpRatio * 100)}%`;
@@ -143,7 +166,12 @@ export class HUD {
   }
 
   enterWorld() {
-    // Show fruit selection instead of going directly to playing
+    this.state.playStyle = 'singleplayer';
+    this.startScreen.dataset.hidden = 'true';
+    events.emit('fruit:show');
+  }
+
+  enterJoinedSession() {
     this.startScreen.dataset.hidden = 'true';
     events.emit('fruit:show');
   }
@@ -156,7 +184,40 @@ export class HUD {
   }
 
   setReady() {
-    this.statusMessage.textContent = '按下「進入世界」開始探索。';
+    this.showHomeScreen();
+    this.statusMessage.textContent = '先選擇單人或多人，再進入下一步。';
     this.statusCoords.textContent = '準備就緒';
+  }
+
+  showHomeScreen() {
+    this.state.mode = 'menu';
+    this.state.playStyle = 'singleplayer';
+    this.homeScreen.dataset.hidden = 'false';
+    this.singleplayerScreen.dataset.hidden = 'true';
+    this.startScreen.dataset.hidden = 'false';
+    this.updateStartAction();
+  }
+
+  showSingleplayerScreen() {
+    this.state.mode = 'menu';
+    this.state.playStyle = 'singleplayer';
+    this.homeScreen.dataset.hidden = 'true';
+    this.singleplayerScreen.dataset.hidden = 'false';
+    this.startScreen.dataset.hidden = 'false';
+    this.updateStartAction();
+  }
+
+  showMultiplayerScreen() {
+    this.state.mode = 'menu';
+    this.state.playStyle = 'multiplayer';
+    this.homeScreen.dataset.hidden = 'true';
+    this.singleplayerScreen.dataset.hidden = 'true';
+    this.startScreen.dataset.hidden = 'false';
+    events.emit('multiplayer:lobby:show');
+  }
+
+  updateStartAction() {
+    if (!this.startButtonText) return;
+    this.startButtonText.textContent = this.state.gameMode === 'homeland' ? '保衛家園' : '進入世界';
   }
 }

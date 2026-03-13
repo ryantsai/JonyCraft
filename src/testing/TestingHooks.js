@@ -5,11 +5,12 @@ import { WORLD_HEIGHT } from '../config/constants.js';
  * window.render_game_to_text() and window.advanceTime(ms).
  */
 export class TestingHooks {
-  constructor(gameState, world, enemyManager, particles, stepFn, renderFn) {
+  constructor(gameState, world, enemyManager, particles, remotePlayers, stepFn, renderFn) {
     this.state = gameState;
     this.world = world;
     this.enemies = enemyManager;
     this.particles = particles;
+    this.remotePlayers = remotePlayers;
     this.stepFn = stepFn;
     this.renderFn = renderFn;
   }
@@ -82,6 +83,16 @@ export class TestingHooks {
         })),
         zombieTargeted: Boolean(this.state.enemyTarget),
         hitParticles: this.particles.count,
+      },
+      multiplayer: {
+        enabled: this.state.multiplayer.enabled,
+        playerName: this.state.playerName,
+        sessionId: this.state.multiplayer.sessionId,
+        sessionName: this.state.multiplayer.sessionName,
+        sessionMode: this.state.multiplayer.sessionMode,
+        playersInSession: this.state.multiplayer.sessionPlayerCount,
+        remotePlayersVisible: this.remotePlayers.avatars.size,
+        connectionStatus: this.state.multiplayer.connectionStatus,
       },
       target: this.state.target,
       nearbySurface: surface,

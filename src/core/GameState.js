@@ -13,11 +13,13 @@ import { DEFAULT_SKILLS } from '../config/skills.js';
 export class GameState {
   constructor() {
     this.mode = 'loading'; // loading | menu | fruit_select | playing | paused
+    this.playStyle = 'singleplayer';
     this.gameMode = 'test';
     this.modeController = null;
     this.started = false;
     this.useManualClock = false;
     this.selectedIndex = 0;
+    this.playerName = 'Player';
 
     // Fruit system
     this.selectedFruit = null;   // fruit definition object
@@ -56,6 +58,18 @@ export class GameState {
       totalGold: 0,
       towerHp: 0,
       towerMaxHp: 240,
+    };
+
+    this.multiplayer = {
+      enabled: false,
+      sessionId: null,
+      sessionName: '',
+      sessionMode: 'test',
+      sessionPlayerCount: 1,
+      serverUrl: '',
+      sessions: [],
+      latestBlockSeq: 0,
+      connectionStatus: 'offline',
     };
   }
 

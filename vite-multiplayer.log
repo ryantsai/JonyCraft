@@ -2,19 +2,12 @@
 > jonycraft@0.1.0 dev
 > vite --host 127.0.0.1 --port 4173
 
+Port 4173 is in use, trying another one...
 
-  [32m[1mVITE[22m v7.3.1[39m  [2mready in [0m[1m168[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v7.3.1[39m  [2mready in [0m[1m195[22m[2m[0m ms[22m
 
-  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4173[22m/[39m
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m4174[22m/[39m
 [2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
-[2m10:56:21 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/core/GameState.js[22m
-[2m10:56:29 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/renderer/SceneSetup.js[22m
-[2m10:56:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/ui/template.js[22m
-[2m10:56:50 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/ui/HUD.js[22m
-[2m10:57:08 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/main.js[22m
-[2m10:57:13 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/testing/TestingHooks.js[22m
-[2m10:58:45 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/style.css[22m
-[2m10:58:50 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/style.css[22m
 [2m11:05:00 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/testing/TestingHooks.js[22m
 [2m11:05:11 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/main.js[22m
 [2m11:07:50 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/main.js[22m
@@ -23,6 +16,8 @@
 [2m11:15:20 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/core/GameState.js[22m
 [2m11:15:33 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/ui/HUD.js[22m
 [2m11:16:22 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/ui/HUD.js[22m
+[2m11:16:59 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/ui/MultiplayerLobby.js[22m
+[2m11:17:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/network/MultiplayerClient.js[22m
 [2m11:17:32 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/main.js[22m
 [2m11:18:02 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/testing/TestingHooks.js[22m
 [2m11:18:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/input/InputManager.js[22m

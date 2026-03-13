@@ -29,7 +29,14 @@ export class InputManager {
       }
 
       if (event.code === 'KeyF') this._toggleFullscreen();
-      if (event.code === 'Enter' && !this.state.started) events.emit('game:enter');
+      if (
+        event.code === 'Enter' &&
+        !this.state.started &&
+        this.state.playStyle === 'singleplayer' &&
+        document.querySelector('#singleplayer-screen')?.dataset.hidden !== 'true'
+      ) {
+        events.emit('game:enter');
+      }
     });
 
     window.addEventListener('keyup', (event) => {

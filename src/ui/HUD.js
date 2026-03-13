@@ -16,6 +16,12 @@ export class HUD {
     this.startButton = document.querySelector('#start-btn');
     this.hpText = document.querySelector('#hp-text');
     this.hpFill = document.querySelector('#hp-fill');
+    this.defenseBoard = document.querySelector('#defense-scoreboard');
+    this.defWave = document.querySelector('#def-wave');
+    this.defTimer = document.querySelector('#def-timer');
+    this.defTower = document.querySelector('#def-tower');
+    this.defKills = document.querySelector('#def-kills');
+    this.defGold = document.querySelector('#def-gold');
   }
 
   init() {
@@ -36,8 +42,16 @@ export class HUD {
     events.on('hotbar:scroll', (delta) => this.moveSelection(delta));
     events.on('hud:update', () => this.update());
     events.on('game:enter', () => this.enterWorld());
+    events.on('status:message', (message) => { this.statusMessage.textContent = message; });
 
     this.rebuildHotbar();
+
+    document.querySelectorAll('.defense-shop-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        events.emit('sound:click');
+        events.emit('shop:purchase', { item: btn.dataset.shopItem });
+      });
+    });
   }
 
   rebuildHotbar() {
@@ -111,6 +125,16 @@ export class HUD {
     this.hpFill.style.width = `${Math.max(0, hpRatio * 100)}%`;
     this.hpFill.dataset.high = hpRatio > 0.5 ? 'true' : 'false';
     this.hpFill.dataset.mid = (hpRatio > 0.25 && hpRatio <= 0.5) ? 'true' : 'false';
+
+    const defense = this.state.defense;
+    this.defenseBoard.dataset.visible = defense.enabled ? 'true' : 'false';
+    if (defense.enabled) {
+      this.defWave.textContent = String(defense.wave);
+      this.defTimer.textContent = String(Math.ceil(defense.timeLeft));
+      this.defTower.textContent = `${Math.ceil(defense.towerHp)} / ${defense.towerMaxHp}`;
+      this.defKills.textContent = String(defense.totalKills);
+      this.defGold.textContent = String(defense.totalGold);
+    }
   }
 
   enterWorld() {

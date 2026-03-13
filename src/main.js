@@ -21,6 +21,7 @@ import { FruitSelect } from './ui/FruitSelect.js';
 import { TestingHooks } from './testing/TestingHooks.js';
 import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
+import { HomelandDefenseMode } from './modes/HomelandDefenseMode.js';
 
 // --- Bootstrap DOM ---
 // gameTemplate is a static trusted string (no user input) — safe to assign
@@ -47,10 +48,20 @@ const mobileControls = new MobileControls(inputManager, combat, gameState);
 const hud = new HUD(gameState, canvas, enemyManager);
 const fruitSelect = new FruitSelect(gameState);
 const soundManager = new SoundManager(gameState);
+const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
-events.on('fruit:selected', () => hud.onFruitSelected());
+events.on('fruit:selected', () => {
+  hud.onFruitSelected();
+  if (gameState.gameMode === 'homeland') {
+    gameState.modeController = homelandMode;
+    homelandMode.activate();
+  } else {
+    gameState.modeController = null;
+    enemyManager.spawnWave();
+  }
+});
 
 // --- Simulation step ---
 function stepSimulation(deltaMs) {
@@ -69,6 +80,7 @@ function stepSimulation(deltaMs) {
       playerController.applyMovement(dt, inputManager.keyState, inputManager.virtualInput);
       soundManager.updateFootsteps(dt, inputManager.keyState, inputManager.virtualInput);
       enemyManager.update(dt);
+      gameState.modeController?.update?.(dt);
     }
     remaining -= stepMs;
   }
@@ -96,7 +108,7 @@ async function init() {
   world.generate();
   worldRenderer.buildAll();
   playerController.setSpawn();
-  enemyManager.spawnWave();
+  // initial enemy spawn is game-mode specific and starts after mode entry
   hud.init();
   fruitSelect.init();
   soundManager.init();

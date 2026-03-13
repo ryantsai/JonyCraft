@@ -84,6 +84,51 @@ body {
 #status-message { font-size: 0.94rem; }
 #status-coords { color: rgba(236, 244, 255, 0.82); font-size: 0.84rem; }
 
+
+.defense-scoreboard {
+  position: absolute;
+  top: 92px;
+  right: 18px;
+  width: 280px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 217, 102, 0.35);
+  background: rgba(10, 17, 26, 0.75);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  display: none;
+  gap: 6px;
+}
+
+.defense-scoreboard[data-visible='true'] {
+  display: grid;
+}
+
+.defense-row {
+  font-size: 0.82rem;
+  color: rgba(244, 235, 212, 0.95);
+}
+
+.defense-shop {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.defense-shop-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 217, 102, 0.3);
+  background: rgba(255, 217, 102, 0.08);
+  color: #fff3cc;
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+
 .player-health-bar {
   position: absolute;
   top: 18px; right: 18px;
@@ -636,7 +681,52 @@ body {
 
   .start-panel { padding: 24px 20px 20px; }
 
-  .player-health-bar {
+  
+.defense-scoreboard {
+  position: absolute;
+  top: 92px;
+  right: 18px;
+  width: 280px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 217, 102, 0.35);
+  background: rgba(10, 17, 26, 0.75);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+  display: none;
+  gap: 6px;
+}
+
+.defense-scoreboard[data-visible='true'] {
+  display: grid;
+}
+
+.defense-row {
+  font-size: 0.82rem;
+  color: rgba(244, 235, 212, 0.95);
+}
+
+.defense-shop {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.defense-shop-btn {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 217, 102, 0.3);
+  background: rgba(255, 217, 102, 0.08);
+  color: #fff3cc;
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+
+.player-health-bar {
     top: 12px; right: 12px;
     width: 160px;
     padding: 8px 10px;

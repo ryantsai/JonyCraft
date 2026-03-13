@@ -58,14 +58,22 @@ export class EnemyManager {
     this._aliveCacheDirty = true;
   }
 
-  spawn(seedOffset = this.zombies.length * 3, typeKey) {
+  spawn(seedOffset = this.zombies.length * 3, typeKey, options = {}) {
     if (!typeKey) {
       typeKey = SPAWN_TABLE[Math.floor(Math.random() * SPAWN_TABLE.length)];
     }
     const typeDef = ENEMY_TYPES[typeKey];
     if (!typeDef) return null;
-    const position = this._findSpawnPoint(seedOffset);
+    const position = options.spawnAround
+      ? this._findSpawnPointAround(options.spawnAround, seedOffset)
+      : this._findSpawnPoint(seedOffset);
     const enemy = createEnemy(this.textureManager, typeDef, typeKey, position, this.scene.enemyGroup);
+    const multiplier = options.statMultiplier ?? 1;
+    enemy.maxHealth *= multiplier;
+    enemy.health = enemy.maxHealth;
+    enemy.baseAttack *= multiplier;
+    enemy.baseDefense *= multiplier;
+    enemy.speed *= Math.min(1.8, 1 + (multiplier - 1) * 0.3);
     this.zombies.push(enemy);
     this.hitboxes.push(enemy.hitbox);
     this._markDirty();
@@ -89,6 +97,21 @@ export class EnemyManager {
     if (zIdx >= 0) this.zombies.splice(zIdx, 1);
     if (this.state.enemyTarget === enemy) this.state.enemyTarget = null;
     this._markDirty();
+  }
+
+
+  clearAll() {
+    [...this.zombies].forEach((enemy) => this.remove(enemy));
+    this.respawnTimers = [];
+  }
+
+  defeat(enemy, extra = {}) {
+    if (!enemy || !enemy.alive) return;
+    enemy.alive = false;
+    this.state.combat.kills += 1;
+    events.emit('enemy:killed', { enemy, extra });
+    events.emit('sound:kill');
+    this.remove(enemy);
   }
 
   scheduleRespawn() {
@@ -116,7 +139,7 @@ export class EnemyManager {
     this.respawnTimers = this.respawnTimers
       .map((t) => Math.max(0, t - dt * 1000))
       .filter((t) => {
-        if (t === 0 && this.state.mode === 'playing') {
+        if (t === 0 && this.state.mode === 'playing' && !this.state.defense.enabled) {
           this.spawn(Math.floor(Math.random() * 100));
           return false;
         }
@@ -134,6 +157,7 @@ export class EnemyManager {
 
     while (
       this.state.mode === 'playing' &&
+      !this.state.defense.enabled &&
       this.getAlive().length + this.respawnTimers.length < ENEMY_COUNT
     ) {
       this.spawn(Math.floor(Math.random() * 100));
@@ -353,6 +377,27 @@ export class EnemyManager {
     this.scene.particleGroup.remove(proj.sprite);
     proj.sprite.material.dispose();
     this.projectiles.splice(index, 1);
+  }
+
+
+  _findSpawnPointAround(center, seedOffset = 0) {
+    let spawn = null;
+    for (let attempt = 0; attempt < 32; attempt += 1) {
+      const angle = ((attempt + seedOffset) / 32) * Math.PI * 2;
+      const distance = 10 + ((attempt + seedOffset) % 8) * 1.7;
+      const ax = center.x + Math.sin(angle) * distance;
+      const az = center.z + Math.cos(angle) * distance;
+      if (ax < 1 || ax > WORLD_SIZE_X - 2 || az < 1 || az > WORLD_SIZE_Z - 2) continue;
+      const surfaceY = this.world.getTerrainSurfaceY(ax, az);
+      const block = this.world.getBlock(Math.floor(ax), Math.floor(surfaceY - 1), Math.floor(az));
+      if (block === 'water') continue;
+      _spawnTest.set(ax, surfaceY, az);
+      const occupied = this.getAlive().some((z) => z.root.position.distanceToSquared(_spawnTest) < 9);
+      if (occupied) continue;
+      spawn = new THREE.Vector3(Math.floor(ax) + 0.5, surfaceY, Math.floor(az) + 0.5);
+      break;
+    }
+    return spawn || this._findSpawnPoint(seedOffset);
   }
 
   _findSpawnPoint(seedOffset = 0) {

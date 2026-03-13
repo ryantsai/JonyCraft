@@ -182,6 +182,16 @@ export class EnemyManager {
     return false;
   }
 
+  canAdvance(enemy, dirX, dirZ, distance) {
+    const s = enemy.sizeMultiplier;
+    const r = ENEMY_BASE_RADIUS * s;
+    const h = ENEMY_BASE_HEIGHT * s;
+    const pos = enemy.root.position;
+    const nx = pos.x + dirX * distance;
+    const nz = pos.z + dirZ * distance;
+    return !this._enemyCollides(nx, pos.y, nz, r, h);
+  }
+
   _applyEnemyPhysics(dt, enemy, preX, preZ) {
     const s = enemy.sizeMultiplier;
     const r = ENEMY_BASE_RADIUS * s;

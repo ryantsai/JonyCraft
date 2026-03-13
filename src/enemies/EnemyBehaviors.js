@@ -11,10 +11,86 @@ import { events } from '../core/EventBus.js';
 const _dir = new THREE.Vector2();
 const _toTarget = new THREE.Vector2();
 const _perp = new THREE.Vector2();
+const _vec2Origin = new THREE.Vector2();
 const _playerFwd = new THREE.Vector2();
 const _origin = new THREE.Vector3();
 const _projDir = new THREE.Vector3();
 const _pos = new THREE.Vector3();
+
+function canMoveDirection(enemy, dir, dt, ctx, speedOverride = null) {
+  if (!ctx.enemies?.canAdvance || dir.lengthSq() < 0.0001) return true;
+  const speed = speedOverride ?? enemy.speed;
+  const stepDistance = Math.max(0.08, speed * dt);
+  return ctx.enemies.canAdvance(enemy, dir.x, dir.y, stepDistance);
+}
+
+function moveWithSteering(enemy, desiredDir, speed, dt, ctx) {
+  if (desiredDir.lengthSq() < 0.0001 || enemy.knockbackTimer > 0) return;
+
+  _dir.copy(desiredDir).normalize();
+  if (canMoveDirection(enemy, _dir, dt, ctx, speed)) {
+    moveToward(enemy, _dir, speed, dt);
+    return;
+  }
+
+  const steerAngles = [
+    Math.PI / 8,
+    -Math.PI / 8,
+    Math.PI / 4,
+    -Math.PI / 4,
+    Math.PI / 2,
+    -Math.PI / 2,
+  ];
+
+  for (let i = 0; i < steerAngles.length; i += 1) {
+    const candidate = _perp.copy(_dir).rotateAround(_vec2Origin, steerAngles[i]);
+    if (canMoveDirection(enemy, candidate, dt, ctx, speed)) {
+      moveToward(enemy, candidate, speed, dt);
+      return;
+    }
+  }
+}
+
+function pickDefenseEntry(enemy, targetPos, dt, ctx) {
+  if (!ctx.state.defense.enabled || !ctx.state.modeController) return targetPos;
+  const center = ctx.state.modeController.getDefenseTarget?.();
+  if (!center) return targetPos;
+
+  if (!enemy.flankAnchor || enemy.flankAnchorTimer <= 0) {
+    const gateOffset = 6;
+    const gateChoices = [
+      [0, -gateOffset],
+      [0, gateOffset],
+      [-gateOffset, 0],
+      [gateOffset, 0],
+    ];
+    const chosen = gateChoices[Math.floor(Math.random() * gateChoices.length)];
+    enemy.flankAnchor = { x: center.x + chosen[0], z: center.z + chosen[1] };
+    enemy.flankAnchorTimer = 2 + Math.random() * 3;
+  }
+
+  enemy.flankAnchorTimer -= dt;
+  return enemy.flankAnchor;
+}
+
+function getTacticalTarget(enemy, playerPos, dt, ctx) {
+  const defenseTarget = getDefenseTarget(ctx);
+  if (!defenseTarget) return playerPos;
+
+  if (!enemy.strategyRole) {
+    enemy.strategyRole = Math.random() < 0.35 ? 'flank' : 'direct';
+  }
+
+  if (enemy.strategyRole === 'flank') {
+    if (enemy.flankAnchor) {
+      _toTarget.set(enemy.flankAnchor.x - enemy.root.position.x, enemy.flankAnchor.z - enemy.root.position.z);
+      if (_toTarget.lengthSq() < 2.2 * 2.2) enemy.strategyRole = 'direct';
+    }
+    return pickDefenseEntry(enemy, defenseTarget, dt, ctx);
+  }
+
+  return defenseTarget;
+}
 
 function getDefenseTarget(ctx) {
   if (!ctx.state.defense.enabled || !ctx.state.modeController) return null;
@@ -100,9 +176,8 @@ function applyFloat(enemy, dt) {
 
 // --- Chase ---
 function updateChase(dt, enemy, playerPos, distance, flat, ctx) {
-  if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    _dir.copy(flat).normalize();
-    moveToward(enemy, _dir, enemy.speed, dt);
+  if (distance > 1.7) {
+    moveWithSteering(enemy, flat, enemy.speed, dt, ctx);
   }
   tryMeleeAttack(enemy, distance, ctx);
   animateWalk(enemy, distance);
@@ -121,10 +196,10 @@ function updateCharge(dt, enemy, playerPos, distance, flat, ctx) {
 
   if (enemy.behaviorPhase === 'charging') {
     enemy.behaviorTimer -= dt;
-    moveToward(enemy, _dir, def.chargeSpeed || enemy.speed * 3, dt);
+    moveWithSteering(enemy, _dir, def.chargeSpeed || enemy.speed * 3, dt, ctx);
     if (enemy.behaviorTimer <= 0 || distance < 1.5) enemy.behaviorPhase = 'idle';
-  } else if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    moveToward(enemy, _dir, enemy.speed, dt);
+  } else if (distance > 1.7) {
+    moveWithSteering(enemy, _dir, enemy.speed, dt, ctx);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -145,7 +220,7 @@ function updateCircle(dt, enemy, playerPos, distance, flat, ctx) {
 
   if (enemy.behaviorPhase === 'dash' && enemy.knockbackTimer === 0) {
     _dir.copy(flat).normalize();
-    moveToward(enemy, _dir, def.dashSpeed || 6, dt);
+    moveWithSteering(enemy, _dir, def.dashSpeed || 6, dt, ctx);
   } else if (enemy.knockbackTimer === 0) {
     const r = def.circleRadius || 3.5;
     _toTarget.set(
@@ -154,7 +229,7 @@ function updateCircle(dt, enemy, playerPos, distance, flat, ctx) {
     );
     if (_toTarget.length() > 0.3) {
       _toTarget.normalize();
-      moveToward(enemy, _toTarget, enemy.speed, dt);
+      moveWithSteering(enemy, _toTarget, enemy.speed, dt, ctx);
     }
   }
 
@@ -223,9 +298,8 @@ function updateTeleport(dt, enemy, playerPos, distance, flat, ctx) {
     ctx.particles.spawn(_pos, 'white', 8);
   }
 
-  if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    _dir.copy(flat).normalize();
-    moveToward(enemy, _dir, enemy.speed, dt);
+  if (distance > 1.7) {
+    moveWithSteering(enemy, flat, enemy.speed, dt, ctx);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -254,8 +328,8 @@ function updateRanged(dt, enemy, playerPos, distance, flat, ctx) {
     ctx.particles.spawn(_pos, 'white', 6);
   } else if (distance < preferred - 2 && enemy.knockbackTimer === 0) {
     moveToward(enemy, _dir, -enemy.speed, dt);
-  } else if (distance > preferred + 2 && enemy.knockbackTimer === 0) {
-    moveToward(enemy, _dir, enemy.speed, dt);
+  } else if (distance > preferred + 2) {
+    moveWithSteering(enemy, _dir, enemy.speed, dt, ctx);
   }
 
   if (enemy.burstRemaining > 0) {
@@ -325,9 +399,8 @@ function updateExplode(dt, enemy, playerPos, distance, flat, ctx) {
     enemy.fuseTimer = def.fuseTime;
   }
 
-  if (!enemy.fusing && distance > 1.5 && enemy.knockbackTimer === 0) {
-    _dir.copy(flat).normalize();
-    moveToward(enemy, _dir, enemy.speed, dt);
+  if (!enemy.fusing && distance > 1.5) {
+    moveWithSteering(enemy, flat, enemy.speed, dt, ctx);
   }
 
   animateWalk(enemy, distance);
@@ -340,9 +413,8 @@ function updateRegen(dt, enemy, playerPos, distance, flat, ctx) {
     enemy.health = Math.min(enemy.maxHealth, enemy.health + (enemy.typeDef.regenPerSecond || 0.5) * dt);
   }
 
-  if (distance > 1.7 && enemy.knockbackTimer === 0) {
-    _dir.copy(flat).normalize();
-    moveToward(enemy, _dir, enemy.speed, dt);
+  if (distance > 1.7) {
+    moveWithSteering(enemy, flat, enemy.speed, dt, ctx);
   }
 
   tryMeleeAttack(enemy, distance, ctx);
@@ -383,7 +455,8 @@ const BEHAVIORS = {
 };
 
 export function updateEnemyBehavior(dt, enemy, playerPos, distance, flatToPlayer, ctx) {
-  const targetPos = getTargetPosition(playerPos, ctx);
+  const modeTarget = getTargetPosition(playerPos, ctx);
+  const targetPos = getTacticalTarget(enemy, modeTarget, dt, ctx);
   _toTarget.set(targetPos.x - enemy.root.position.x, targetPos.z - enemy.root.position.z);
   const adjustedDistance = _toTarget.length();
   const fn = BEHAVIORS[enemy.typeDef.behavior] || updateChase;

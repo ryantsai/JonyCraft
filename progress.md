@@ -40,7 +40,15 @@ Original prompt: Create a web based minecraft cline with three.js, using assets 
   - `output/rubber-punch-idle-3.png` shows the blocky arm idle in the lower-right when skill 2 is selected.
   - `output/rubber-punch-attack-3.png` shows the arm stretched across the view during a punch.
   - Browser state checks confirmed `selectedSkill: "punch"` and `punchActive: true` during attack.
+- Added held-primary attack support: keeping left mouse pressed now keeps retrying the selected attack skill each fixed step, so it re-fires automatically as soon as the shared cooldown reaches zero.
+- Reused the same held-primary path for mobile primary touch input so attack skills behave consistently across desktop and touch.
+- Added `test-actions-hold-attack.json` for a deterministic long-hold regression scenario.
+- Verified the feature in two passes:
+  - `npm run build` still succeeds after the input-loop change.
+  - The bundled `develop-web-game` Playwright client still runs and captures the fruit-select flow, but its default 1280x720 viewport leaves the confirm button partially off-screen once a fruit preview expands.
+  - A direct Playwright verification at 1280x900 successfully entered the world, held left mouse for 1200ms via `window.advanceTime()`, and confirmed the held-repeat behavior with state output: `mode: "playing"`, `selectedSkill: "rubber_pistol"`, `punchActive: true`, and `cooldownMs: 260` after the hold, which indicates the skill re-triggered during the hold instead of firing only once.
 
 TODO
 - Optional polish: add chunk meshing or instancing if the world size grows beyond the current compact sandbox.
 - Optional polish: expand the hotbar with more Kenney voxel block variants and a simple save/load layer.
+- Optional polish: make the fruit-select overlay fit fully within the Playwright client’s default 1280x720 viewport so the bundled regression script can complete fruit confirmation by coordinates alone.

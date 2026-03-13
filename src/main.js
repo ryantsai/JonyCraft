@@ -79,6 +79,7 @@ function stepSimulation(deltaMs) {
     weaponModels.update(dt, gameState);
     particles.update(dt);
     if (gameState.mode === 'playing') {
+      inputManager.update();
       gameState.player.yaw -= inputManager.virtualInput.lookX * LOOK_SPEED * 1.3;
       gameState.player.pitch = Math.max(-1.35, Math.min(1.35,
         gameState.player.pitch - inputManager.virtualInput.lookY * LOOK_SPEED * 1.3,

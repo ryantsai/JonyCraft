@@ -13,6 +13,7 @@ export class InputManager {
     this.combat = combatSystem;
     this.keyState = new Set();
     this.virtualInput = { moveX: 0, moveZ: 0, lookX: 0, lookY: 0 };
+    this.primaryHeld = false;
   }
 
   init() {
@@ -39,6 +40,14 @@ export class InputManager {
       events.emit('hotbar:scroll', event.deltaY > 0 ? 1 : -1);
     });
 
+    window.addEventListener('mouseup', (event) => {
+      if (event.button === 0) this.primaryHeld = false;
+    });
+
+    window.addEventListener('blur', () => {
+      this.primaryHeld = false;
+    });
+
     document.addEventListener('mousemove', (event) => {
       if (document.pointerLockElement !== this.canvas || this.state.mode !== 'playing') return;
       this.state.player.yaw -= event.movementX * LOOK_SPEED;
@@ -54,25 +63,44 @@ export class InputManager {
 
     this.canvas.addEventListener('mousedown', (event) => {
       if (this.state.mode !== 'playing') return;
-      const skill = this.state.getSelectedSkill();
       if (event.button === 0) {
-        if (skill.kind === 'attack') {
-          // Fruit skill with full stats defined
-          if (skill.range !== undefined) {
-            this.combat.fruitAttack();
-          } else if (skill.id === 'sword') {
-            this.combat.swingSword();
-          } else if (skill.id === 'punch') {
-            this.combat.punchAttack();
-          }
-        } else if (skill.kind === 'block') {
-          this.combat.handleBreak();
-        }
+        this.primaryHeld = true;
+        this.triggerPrimaryAction();
       }
+      const skill = this.state.getSelectedSkill();
       if (event.button === 2 && skill.kind === 'block') this.combat.handlePlace();
     });
 
     window.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
+
+  update() {
+    if (this.state.mode !== 'playing' || !this.primaryHeld) return;
+    const skill = this.state.getSelectedSkill();
+    if (skill?.kind === 'attack') this.triggerPrimaryAction();
+  }
+
+  triggerPrimaryAction() {
+    const skill = this.state.getSelectedSkill();
+    if (!skill) return;
+
+    if (skill.kind === 'attack') {
+      // Fruit skills define their full combat stats directly on the skill.
+      if (skill.range !== undefined) {
+        this.combat.fruitAttack();
+      } else if (skill.id === 'sword') {
+        this.combat.swingSword();
+      } else if (skill.id === 'punch') {
+        this.combat.punchAttack();
+      }
+      return;
+    }
+
+    if (skill.kind === 'block') this.combat.handleBreak();
+  }
+
+  setPrimaryHeld(isHeld) {
+    this.primaryHeld = isHeld;
   }
 
   _toggleFullscreen() {

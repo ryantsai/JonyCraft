@@ -202,7 +202,14 @@ body {
   z-index: 1;
   pointer-events: none;
   opacity: 0;
+  --burst: 0;
+  --burst-color: rgba(255, 255, 255, 0.8);
+  background:
+    radial-gradient(circle at 70% 68%, color-mix(in srgb, var(--burst-color) 70%, transparent), transparent 62%),
+    radial-gradient(circle at 56% 58%, color-mix(in srgb, var(--burst-color) 55%, transparent), transparent 76%);
+  filter: saturate(calc(1 + var(--burst) * 2.2)) blur(calc(var(--burst) * 4px));
   mix-blend-mode: screen;
+  transition: filter 70ms linear;
 }
 
 /* ══════════════════════════════════════════════════════════

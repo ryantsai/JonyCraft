@@ -12,21 +12,24 @@ import { events } from '../core/EventBus.js';
  * shake       – camera shake intensity on attack
  * flashAlpha  – screen flash opacity on attack
  * swordGlow   – emissive intensity for sword attacks
+ * arcTilt     – extra swing arc intensity
+ * swirl       – extra rotational swirl during attacks
+ * trail       – after-image trail opacity
  */
 const ANIM_MODS = {
-  stretch:   { stretchMul: 1.0,  fistScale: 1.0, shake: 0,    flashAlpha: 0,    swordGlow: 0 },
-  fire:      { stretchMul: 0.7,  fistScale: 1.4, shake: 0.02, flashAlpha: 0.15, swordGlow: 0.4 },
-  ice:       { stretchMul: 0.5,  fistScale: 1.2, shake: 0,    flashAlpha: 0.1,  swordGlow: 0.5 },
-  lightning: { stretchMul: 0.3,  fistScale: 1.1, shake: 0.01, flashAlpha: 0.2,  swordGlow: 0.6 },
-  dark:      { stretchMul: 0.6,  fistScale: 1.3, shake: 0,    flashAlpha: 0.12, swordGlow: 0.3 },
-  light:     { stretchMul: 0.4,  fistScale: 1.0, shake: 0.01, flashAlpha: 0.25, swordGlow: 0.7 },
-  quake:     { stretchMul: 0.5,  fistScale: 1.8, shake: 0.06, flashAlpha: 0.1,  swordGlow: 0.2 },
-  magma:     { stretchMul: 0.6,  fistScale: 1.6, shake: 0.03, flashAlpha: 0.15, swordGlow: 0.4 },
-  sand:      { stretchMul: 0.8,  fistScale: 1.1, shake: 0,    flashAlpha: 0.08, swordGlow: 0.2 },
-  bomb:      { stretchMul: 0.5,  fistScale: 1.5, shake: 0.05, flashAlpha: 0.3,  swordGlow: 0.3 },
+  stretch:   { stretchMul: 1.0,  fistScale: 1.0, shake: 0,    flashAlpha: 0,    swordGlow: 0,   arcTilt: 1.0, swirl: 0.08, trail: 0.10 },
+  fire:      { stretchMul: 0.7,  fistScale: 1.4, shake: 0.02, flashAlpha: 0.15, swordGlow: 0.4, arcTilt: 1.2, swirl: 0.18, trail: 0.24 },
+  ice:       { stretchMul: 0.5,  fistScale: 1.2, shake: 0,    flashAlpha: 0.1,  swordGlow: 0.5, arcTilt: 0.9, swirl: 0.10, trail: 0.16 },
+  lightning: { stretchMul: 0.3,  fistScale: 1.1, shake: 0.01, flashAlpha: 0.2,  swordGlow: 0.6, arcTilt: 1.4, swirl: 0.26, trail: 0.32 },
+  dark:      { stretchMul: 0.6,  fistScale: 1.3, shake: 0,    flashAlpha: 0.12, swordGlow: 0.3, arcTilt: 0.8, swirl: 0.22, trail: 0.28 },
+  light:     { stretchMul: 0.4,  fistScale: 1.0, shake: 0.01, flashAlpha: 0.25, swordGlow: 0.7, arcTilt: 1.5, swirl: 0.20, trail: 0.35 },
+  quake:     { stretchMul: 0.5,  fistScale: 1.8, shake: 0.06, flashAlpha: 0.1,  swordGlow: 0.2, arcTilt: 0.7, swirl: 0.06, trail: 0.12 },
+  magma:     { stretchMul: 0.6,  fistScale: 1.6, shake: 0.03, flashAlpha: 0.15, swordGlow: 0.4, arcTilt: 1.0, swirl: 0.12, trail: 0.22 },
+  sand:      { stretchMul: 0.8,  fistScale: 1.1, shake: 0,    flashAlpha: 0.08, swordGlow: 0.2, arcTilt: 0.95,swirl: 0.14, trail: 0.18 },
+  bomb:      { stretchMul: 0.5,  fistScale: 1.5, shake: 0.05, flashAlpha: 0.3,  swordGlow: 0.3, arcTilt: 1.1, swirl: 0.16, trail: 0.30 },
 };
 
-const DEFAULT_MOD = { stretchMul: 1.0, fistScale: 1.0, shake: 0, flashAlpha: 0, swordGlow: 0 };
+const DEFAULT_MOD = { stretchMul: 1.0, fistScale: 1.0, shake: 0, flashAlpha: 0, swordGlow: 0, arcTilt: 1.0, swirl: 0.08, trail: 0.12 };
 
 /**
  * Builds and animates held weapon/skill 3D models in first person.
@@ -49,6 +52,12 @@ export class WeaponModels {
     this.flashDuration = 0.12;
     this.flashColor = 'white';
     this.flashMaxAlpha = 0;
+
+    // Swing burst / after-image state
+    this.burstTime = 0;
+    this.burstDuration = 0.22;
+    this.burstColor = 'white';
+    this.burstStrength = 0;
 
     // Track active fruit for tint changes
     this._lastFruitId = null;
@@ -101,6 +110,9 @@ export class WeaponModels {
     // Update flash overlay
     this._updateFlash(dt);
 
+    // Update swing burst overlay
+    this._updateBurst(dt);
+
     // Update cooldown HUD
     this._updateCooldownHUD(gameState);
   }
@@ -125,10 +137,11 @@ export class WeaponModels {
       THREE.MathUtils.lerp(-0.54, -0.76, slash) + windup * 0.05,
       THREE.MathUtils.lerp(-0.56, -0.34, slash),
     );
+    const swirlWave = Math.sin(phase * Math.PI * 3.2) * mod.swirl * Math.max(0, 1 - phase);
     this.models.sword.group.rotation.set(
-      THREE.MathUtils.lerp(0.34, -0.88, slash) + windup * 0.1,
-      THREE.MathUtils.lerp(-0.12, -0.28, slash),
-      THREE.MathUtils.lerp(-1.18, -0.02, slash) - windup * 0.14,
+      THREE.MathUtils.lerp(0.34, -0.88, slash) + windup * 0.1 + swirlWave,
+      THREE.MathUtils.lerp(-0.12, -0.28, slash) - slash * 0.08 * mod.arcTilt,
+      THREE.MathUtils.lerp(-1.18, -0.02, slash) - windup * 0.14 - slash * 0.12 * mod.arcTilt,
     );
     this.models.sword.sword.scale.set(-1.22 * scaleBoost, 1.22 * scaleBoost, 1);
 
@@ -165,10 +178,11 @@ export class WeaponModels {
       -0.74 + extend * 0.18 + windup * 0.05,
       -0.98 - extend * 0.24,
     );
+    const swirlWave = Math.sin(phase * Math.PI * 4.0) * mod.swirl * (0.35 + extend);
     this.models.punch.group.rotation.set(
-      0.56 - extend * 0.12 - windup * 0.1,
-      -0.52 + extend * 0.18,
-      -0.46 + extend * 0.08,
+      0.56 - extend * 0.12 - windup * 0.1 + swirlWave,
+      -0.52 + extend * 0.18 + extend * 0.12 * mod.arcTilt,
+      -0.46 + extend * 0.08 - extend * 0.1 * mod.arcTilt,
     );
     this.models.punch.armAnchor.rotation.set(-0.08 - extend * 0.05, 0.1 - extend * 0.06, 0.04);
     this.models.punch.forearmPivot.rotation.set(-0.06 + extend * 0.04, 0.02, 0);
@@ -222,6 +236,9 @@ export class WeaponModels {
       this.flashColor = color;
       this.flashMaxAlpha = mod.flashAlpha;
     }
+    this.burstTime = this.burstDuration;
+    this.burstColor = color;
+    this.burstStrength = mod.trail;
   }
 
   // ── Screen shake ──
@@ -257,6 +274,22 @@ export class WeaponModels {
     } else if (this.flashOverlay) {
       this.flashOverlay.style.opacity = '0';
     }
+  }
+
+
+  _updateBurst(dt) {
+    if (!this.flashOverlay) return;
+    if (this.burstTime <= 0) {
+      this.flashOverlay.style.setProperty('--burst', '0');
+      return;
+    }
+
+    this.burstTime = Math.max(0, this.burstTime - dt);
+    const t = this.burstTime / this.burstDuration;
+    const eased = t * t * (3 - 2 * t);
+    const burstAlpha = this.burstStrength * eased;
+    this.flashOverlay.style.setProperty('--burst', burstAlpha.toFixed(3));
+    this.flashOverlay.style.setProperty('--burst-color', this.burstColor);
   }
 
   // ── Cooldown HUD overlay ──

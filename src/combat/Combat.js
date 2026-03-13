@@ -46,6 +46,7 @@ export class CombatSystem {
       events.emit('combat:fruit-attack', {
         animStyle: fruit.animStyle,
         color: skill.particleColor,
+        skillId: skill.id,
       });
     }
 

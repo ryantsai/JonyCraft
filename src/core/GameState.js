@@ -14,6 +14,7 @@ export class GameState {
   constructor() {
     this.mode = 'loading'; // loading | menu | fruit_select | playing | paused
     this.gameMode = 'test';
+    this.modeController = null;
     this.started = false;
     this.useManualClock = false;
     this.selectedIndex = 0;
@@ -45,6 +46,16 @@ export class GameState {
       punchTime: 0,
       cooldown: 0,
       kills: 0,
+    };
+
+    this.defense = {
+      enabled: false,
+      wave: 0,
+      timeLeft: 0,
+      totalKills: 0,
+      totalGold: 0,
+      towerHp: 0,
+      towerMaxHp: 240,
     };
   }
 

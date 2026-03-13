@@ -11,6 +11,16 @@ export const gameTemplate = `
         <div id="status-message">正在載入 Kenney 體素資源...</div>
         <div id="status-coords"></div>
       </div>
+      <div id="defense-scoreboard" class="defense-scoreboard" data-visible="false" aria-label="保衛家園記分板">
+        <div class="defense-row">波次 <span id="def-wave">1</span> · 倒數 <span id="def-timer">60</span>s</div>
+        <div class="defense-row">守護塔 HP <span id="def-tower">240/240</span></div>
+        <div class="defense-row">總擊殺 <span id="def-kills">0</span> · 金幣 <span id="def-gold">0</span></div>
+        <div class="defense-shop">
+          <button class="defense-shop-btn" data-shop-item="heal" type="button">+45 生命 (15金)</button>
+          <button class="defense-shop-btn" data-shop-item="tower" type="button">修復塔 (25金)</button>
+          <button class="defense-shop-btn" data-shop-item="turret" type="button">自動砲塔 (40金)</button>
+        </div>
+      </div>
       <div class="player-health-bar" aria-label="生命值">
         <div class="health-label">❤ <span id="hp-text">100 / 100</span></div>
         <div class="health-track">
@@ -60,6 +70,13 @@ export const gameTemplate = `
               <div class="mode-info">
                 <span class="mode-name">測試模式</span>
                 <span class="mode-desc">戰鬥、建造、探索</span>
+              </div>
+            </button>
+            <button class="mode-btn" data-mode="homeland" type="button">
+              <img src="assets/kenney/items/trophy.png" alt="" class="mode-icon" />
+              <div class="mode-info">
+                <span class="mode-name">保衛家園</span>
+                <span class="mode-desc">守住中心堡壘，迎戰無盡波次</span>
               </div>
             </button>
           </div>

@@ -16,7 +16,26 @@ const _origin = new THREE.Vector3();
 const _projDir = new THREE.Vector3();
 const _pos = new THREE.Vector3();
 
+function getDefenseTarget(ctx) {
+  if (!ctx.state.defense.enabled || !ctx.state.modeController) return null;
+  return ctx.state.modeController.getDefenseTarget?.() ?? null;
+}
+
+function getTargetPosition(playerPos, ctx) {
+  return getDefenseTarget(ctx) || playerPos;
+}
+
+
 function dealDamage(enemy, ctx) {
+  const defenseTarget = getDefenseTarget(ctx);
+  if (defenseTarget && ctx.state.modeController?.damageTower) {
+    const damage = Math.max(1, enemy.baseAttack * 0.8);
+    ctx.state.modeController.damageTower(damage);
+    events.emit('sound:hit');
+    events.emit('hud:update');
+    return;
+  }
+
   const damage = Math.max(1, enemy.baseAttack - ctx.state.player.baseDefense);
   ctx.state.player.hp = Math.max(0, ctx.state.player.hp - damage);
   events.emit('player:hit', { damage });
@@ -296,11 +315,8 @@ function updateExplode(dt, enemy, playerPos, distance, flat, ctx) {
       }
 
       enemy.health = 0;
-      enemy.alive = false;
-      ctx.state.combat.kills += 1;
-      events.emit('sound:kill');
-      ctx.enemies.remove(enemy);
-      ctx.enemies.scheduleRespawn();
+      ctx.enemies.defeat(enemy, { source: 'explode' });
+      if (!ctx.state.defense.enabled) ctx.enemies.scheduleRespawn();
       events.emit('hud:update');
       return;
     }
@@ -367,6 +383,9 @@ const BEHAVIORS = {
 };
 
 export function updateEnemyBehavior(dt, enemy, playerPos, distance, flatToPlayer, ctx) {
+  const targetPos = getTargetPosition(playerPos, ctx);
+  _toTarget.set(targetPos.x - enemy.root.position.x, targetPos.z - enemy.root.position.z);
+  const adjustedDistance = _toTarget.length();
   const fn = BEHAVIORS[enemy.typeDef.behavior] || updateChase;
-  fn(dt, enemy, playerPos, distance, flatToPlayer, ctx);
+  fn(dt, enemy, targetPos, adjustedDistance, _toTarget, ctx);
 }

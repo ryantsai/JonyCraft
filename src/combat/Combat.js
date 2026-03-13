@@ -143,11 +143,8 @@ export class CombatSystem {
         zombie.root.position.clone().add(new THREE.Vector3(0, 1, 0)),
         'white', 16,
       );
-      zombie.alive = false;
-      this.state.combat.kills += 1;
-      events.emit('sound:kill');
-      this.enemies.remove(zombie);
-      this.enemies.scheduleRespawn();
+      this.enemies.defeat(zombie, { source: 'player' });
+      if (!this.state.defense.enabled) this.enemies.scheduleRespawn();
     }
 
     events.emit('hud:update');

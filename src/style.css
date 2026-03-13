@@ -157,8 +157,53 @@ body {
   box-shadow: 0 18px 32px rgba(0, 0, 0, 0.28);
 }
 
-.slot-number { font-size: 0.72rem; color: rgba(255, 246, 214, 0.86); }
-.slot-name { align-self: end; font-size: 0.8rem; }
+.hotbar-item { position: relative; overflow: hidden; }
+
+.slot-number { font-size: 0.72rem; color: rgba(255, 246, 214, 0.86); position: relative; z-index: 1; }
+.slot-name { align-self: end; font-size: 0.8rem; position: relative; z-index: 1; }
+
+/* Cooldown sweep overlay */
+.cooldown-overlay {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 0%;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 0 0 15px 15px;
+  pointer-events: none;
+  transition: height 40ms linear;
+  z-index: 0;
+}
+
+/* Skill stats tooltip on hotbar */
+.hotbar-item .skill-stats {
+  position: absolute;
+  top: -32px; left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.72);
+  padding: 3px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 10;
+}
+
+.hotbar-item[data-selected='true'] .skill-stats {
+  opacity: 1;
+}
+
+/* Attack flash overlay */
+.attack-flash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
 
 /* ══════════════════════════════════════════════════════════
    START SCREEN

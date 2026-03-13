@@ -40,6 +40,15 @@ export class CombatSystem {
       events.emit('sound:punch');
     }
 
+    // Trigger fruit-specific visual effects (shake, flash)
+    const fruit = this.state.selectedFruit;
+    if (fruit) {
+      events.emit('combat:fruit-attack', {
+        animStyle: fruit.animStyle,
+        color: skill.particleColor,
+      });
+    }
+
     this._attackZombie({
       range: skill.range,
       knockbackStrength: skill.knockback,

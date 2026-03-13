@@ -58,6 +58,14 @@ export class HUD {
       slotName.className = 'slot-name';
       slotName.textContent = skill.name;
 
+      // Skill stats tooltip
+      if (skill.kind === 'attack' && skill.damage !== undefined) {
+        const stats = document.createElement('span');
+        stats.className = 'skill-stats';
+        stats.textContent = `ATK ${skill.damage} · 範圍 ${skill.range} · CD ${skill.cooldownMs}ms`;
+        item.appendChild(stats);
+      }
+
       item.appendChild(slotNum);
       item.appendChild(slotName);
 

@@ -29,6 +29,7 @@ export const FRUITS = [
       {
         id: 'rubber_pistol',
         name: '橡膠槍',
+        desc: '伸長手臂直拳攻擊，範圍6.2，攻擊力×1，CD 0.36秒。遠距單體打擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 6.2,
@@ -43,6 +44,7 @@ export const FRUITS = [
       {
         id: 'rubber_shotgun',
         name: '橡膠散彈槍',
+        desc: '近距離連續重拳，範圍3.0，攻擊力×2，CD 0.28秒。快速近戰連擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 3.0,
@@ -57,6 +59,7 @@ export const FRUITS = [
       {
         id: 'rubber_bazooka',
         name: '橡膠火箭砲',
+        desc: '雙手合掌發射強力衝擊，範圍5.0，攻擊力×3，CD 0.6秒。強力擊退效果',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 5.0,
@@ -71,6 +74,7 @@ export const FRUITS = [
       {
         id: 'rubber_bell',
         name: '橡膠鐘',
+        desc: '頭部猛力撞擊，範圍2.5，攻擊力×4，CD 0.5秒。近距離高傷害擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 2.5,
@@ -94,6 +98,7 @@ export const FRUITS = [
       {
         id: 'fire_fist',
         name: '火拳',
+        desc: '拳頭化為烈焰揮出，範圍4.5，攻擊力×2，CD 0.34秒。中距火焰打擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 4.5,
@@ -108,6 +113,7 @@ export const FRUITS = [
       {
         id: 'fire_pillar',
         name: '火柱',
+        desc: '召喚火焰柱噴發，範圍3.5，攻擊力×3，CD 0.5秒。近距範圍燃燒',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 3.5,
@@ -122,6 +128,7 @@ export const FRUITS = [
       {
         id: 'flame_emperor',
         name: '炎帝',
+        desc: '釋放巨大火球轟炸，範圍7.0，攻擊力×5，CD 0.8秒。遠距高傷害擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 7.0,
@@ -145,6 +152,7 @@ export const FRUITS = [
       {
         id: 'ice_spear',
         name: '冰槍',
+        desc: '凝結冰矛刺擊敵人，範圍6.5，攻擊力×2，CD 0.4秒。遠距劍系冰凍攻擊',
         icon: assetUrl('assets/kenney/items/sword_diamond.png'),
         kind: 'attack',
         range: 6.5,
@@ -159,6 +167,7 @@ export const FRUITS = [
       {
         id: 'ice_age',
         name: '冰河時代',
+        desc: '釋放極寒凍氣覆蓋範圍，範圍4.0，攻擊力×4，CD 0.7秒。範圍凍結高傷害',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 4.0,
@@ -173,6 +182,7 @@ export const FRUITS = [
       {
         id: 'ice_saber',
         name: '冰劍',
+        desc: '凝結冰刃快速斬擊，範圍3.0，攻擊力×1，CD 0.25秒。極速近戰連斬',
         icon: assetUrl('assets/kenney/items/sword_diamond.png'),
         kind: 'attack',
         range: 3.0,
@@ -196,6 +206,7 @@ export const FRUITS = [
       {
         id: 'thunder_bolt',
         name: '萬雷',
+        desc: '召喚雷電劈擊敵人，範圍7.0，攻擊力×2，CD 0.35秒。遠距快速雷擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 7.0,
@@ -210,6 +221,7 @@ export const FRUITS = [
       {
         id: 'lightning_rush',
         name: '閃電衝擊',
+        desc: '化為雷電衝撞敵人，範圍3.0，攻擊力×2，CD 0.28秒。近距強力擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 3.0,
@@ -224,6 +236,7 @@ export const FRUITS = [
       {
         id: 'thunder_dragon',
         name: '雷龍',
+        desc: '召喚雷龍形態轟擊，範圍8.0，攻擊力×5，CD 0.75秒。超遠距高傷害擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 8.0,
@@ -247,6 +260,7 @@ export const FRUITS = [
       {
         id: 'dark_pull',
         name: '闇水',
+        desc: '釋放黑暗引力吸引敵人，範圍7.0，攻擊力×1，CD 0.45秒。遠距吸引效果',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 7.0,
@@ -261,6 +275,7 @@ export const FRUITS = [
       {
         id: 'black_hole',
         name: '黑洞',
+        desc: '產生黑洞吞噬敵人，範圍5.0，攻擊力×4，CD 0.65秒。高傷害重力壓制',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 5.0,
@@ -275,6 +290,7 @@ export const FRUITS = [
       {
         id: 'liberation',
         name: '解放',
+        desc: '釋放吸收的黑暗能量，範圍4.0，攻擊力×3，CD 0.5秒。中距強力擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 4.0,
@@ -298,6 +314,7 @@ export const FRUITS = [
       {
         id: 'light_beam',
         name: '光束',
+        desc: '發射高速光束貫穿敵人，範圍8.0，攻擊力×2，CD 0.3秒。超遠距快速射擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 8.0,
@@ -312,6 +329,7 @@ export const FRUITS = [
       {
         id: 'flash_step',
         name: '閃光',
+        desc: '以光速瞬移攻擊，範圍3.5，攻擊力×1，CD 0.25秒。極速近戰連擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 3.5,
@@ -326,6 +344,7 @@ export const FRUITS = [
       {
         id: 'light_sword',
         name: '天叢雲劍',
+        desc: '凝聚光之劍刃斬擊，範圍3.5，攻擊力×2，CD 0.22秒。極速劍系連斬',
         icon: assetUrl('assets/kenney/items/sword_diamond.png'),
         kind: 'attack',
         range: 3.5,
@@ -340,6 +359,7 @@ export const FRUITS = [
       {
         id: 'laser_rain',
         name: '八尺瓊勾玉',
+        desc: '從空中降下大量光彈，範圍6.0，攻擊力×5，CD 0.9秒。遠距範圍高傷害',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 6.0,
@@ -363,6 +383,7 @@ export const FRUITS = [
       {
         id: 'quake_punch',
         name: '震動拳',
+        desc: '以震動力衝擊敵人，範圍4.0，攻擊力×3，CD 0.4秒。中距強力擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 4.0,
@@ -377,6 +398,7 @@ export const FRUITS = [
       {
         id: 'seismic_wave',
         name: '海震',
+        desc: '製造地震波向前擴散，範圍6.0，攻擊力×3，CD 0.6秒。遠距範圍擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 6.0,
@@ -391,6 +413,7 @@ export const FRUITS = [
       {
         id: 'space_shatter',
         name: '空間粉碎',
+        desc: '粉碎空間製造毀滅衝擊，範圍5.0，攻擊力×5，CD 0.8秒。超強擊退終極技',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 5.0,
@@ -414,6 +437,7 @@ export const FRUITS = [
       {
         id: 'magma_fist',
         name: '大噴火',
+        desc: '揮出滾燙岩漿之拳，範圍5.0，攻擊力×3，CD 0.45秒。中距灼燒打擊',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 5.0,
@@ -428,6 +452,7 @@ export const FRUITS = [
       {
         id: 'meteor_volcano',
         name: '流星火山',
+        desc: '噴射岩漿流星群，範圍7.0，攻擊力×5，CD 0.85秒。遠距範圍高傷害',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 7.0,
@@ -442,6 +467,7 @@ export const FRUITS = [
       {
         id: 'magma_hound',
         name: '犬噛紅蓮',
+        desc: '釋放岩漿犬追擊敵人，範圍4.5，攻擊力×2，CD 0.4秒。中距擊退追蹤',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 4.5,
@@ -465,6 +491,7 @@ export const FRUITS = [
       {
         id: 'desert_sword',
         name: '砂漠寶刀',
+        desc: '以沙之劍刃斬擊敵人，範圍5.5，攻擊力×2，CD 0.35秒。遠距劍系快速斬',
         icon: assetUrl('assets/kenney/items/sword_diamond.png'),
         kind: 'attack',
         range: 5.5,
@@ -479,6 +506,7 @@ export const FRUITS = [
       {
         id: 'sand_trap',
         name: '流砂',
+        desc: '製造流沙陷阱困住敵人，範圍4.0，攻擊力×3，CD 0.5秒。減速控制效果',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 4.0,
@@ -493,6 +521,7 @@ export const FRUITS = [
       {
         id: 'sandstorm',
         name: '砂嵐',
+        desc: '召喚沙暴席捲敵人，範圍6.0，攻擊力×4，CD 0.7秒。遠距範圍擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 6.0,
@@ -516,6 +545,7 @@ export const FRUITS = [
       {
         id: 'bomb_punch',
         name: '爆拳',
+        desc: '拳頭附帶爆炸衝擊，範圍3.5，攻擊力×2，CD 0.32秒。近距爆破擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 3.5,
@@ -530,6 +560,7 @@ export const FRUITS = [
       {
         id: 'land_mine',
         name: '地雷',
+        desc: '設置爆炸地雷引爆，範圍3.0，攻擊力×3，CD 0.45秒。近距強力擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 3.0,
@@ -544,6 +575,7 @@ export const FRUITS = [
       {
         id: 'big_explosion',
         name: '大爆炸',
+        desc: '引發毀滅性大爆炸，範圍5.0，攻擊力×6，CD 0.9秒。超高傷害範圍擊退',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
         range: 5.0,

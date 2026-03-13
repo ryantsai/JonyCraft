@@ -15,10 +15,15 @@ export class HUD {
     this.startScreen = document.querySelector('#start-screen');
     this.homeScreen = document.querySelector('#menu-home-screen');
     this.singleplayerScreen = document.querySelector('#singleplayer-screen');
+    this.disconnectScreen = document.querySelector('#disconnect-screen');
+    this.disconnectMessage = document.querySelector('#disconnect-message');
     this.startButton = document.querySelector('#start-btn');
     this.startButtonText = document.querySelector('#start-btn .start-btn-text');
     this.hpText = document.querySelector('#hp-text');
     this.hpFill = document.querySelector('#hp-fill');
+    this.multiplayerScoreboard = document.querySelector('#multiplayer-scoreboard');
+    this.multiplayerPingLabel = document.querySelector('#multiplayer-ping-label');
+    this.multiplayerRows = document.querySelector('#multiplayer-scoreboard-rows');
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
@@ -27,6 +32,7 @@ export class HUD {
     this.defGold = document.querySelector('#def-gold');
     this.homebaseHp = document.querySelector('#homebase-hp');
     this.homebaseHpText = document.querySelector('#homebase-hp-text');
+    this.disconnectTimer = null;
   }
 
   init() {
@@ -68,6 +74,7 @@ export class HUD {
     events.on('status:message', (message) => { this.statusMessage.textContent = message; });
     events.on('multiplayer:session-ready', () => this.enterJoinedSession());
     events.on('multiplayer:lobby:closed', () => this.showHomeScreen());
+    events.on('multiplayer:disconnected', ({ message }) => this.showDisconnectedScreen(message));
 
     this.rebuildHotbar();
     this.showHomeScreen();
@@ -151,6 +158,17 @@ export class HUD {
     this.hpFill.dataset.high = hpRatio > 0.5 ? 'true' : 'false';
     this.hpFill.dataset.mid = (hpRatio > 0.25 && hpRatio <= 0.5) ? 'true' : 'false';
 
+    const multiplayer = this.state.multiplayer;
+    const showScoreboard = multiplayer.enabled && multiplayer.playerStats.length > 0;
+    this.multiplayerScoreboard.dataset.visible = showScoreboard ? 'true' : 'false';
+    if (showScoreboard) {
+      this.multiplayerPingLabel.textContent = `Ping ${Math.round(multiplayer.pingMs || 0)} ms`;
+      this._renderMultiplayerStats(multiplayer.playerStats);
+    } else {
+      this.multiplayerRows.textContent = '';
+      this.multiplayerPingLabel.textContent = 'Ping -- ms';
+    }
+
     const defense = this.state.defense;
     this.defenseBoard.dataset.visible = defense.enabled ? 'true' : 'false';
     this.homebaseHp.dataset.visible = defense.enabled ? 'true' : 'false';
@@ -190,34 +208,88 @@ export class HUD {
   }
 
   showHomeScreen() {
+    this._clearDisconnectTimer();
     this.state.mode = 'menu';
     this.state.playStyle = 'singleplayer';
     this.homeScreen.dataset.hidden = 'false';
     this.singleplayerScreen.dataset.hidden = 'true';
+    this.disconnectScreen.dataset.hidden = 'true';
     this.startScreen.dataset.hidden = 'false';
     this.updateStartAction();
   }
 
   showSingleplayerScreen() {
+    this._clearDisconnectTimer();
     this.state.mode = 'menu';
     this.state.playStyle = 'singleplayer';
     this.homeScreen.dataset.hidden = 'true';
     this.singleplayerScreen.dataset.hidden = 'false';
+    this.disconnectScreen.dataset.hidden = 'true';
     this.startScreen.dataset.hidden = 'false';
     this.updateStartAction();
   }
 
-  showMultiplayerScreen() {
+  showMultiplayerScreen(options = {}) {
+    this._clearDisconnectTimer();
     this.state.mode = 'menu';
     this.state.playStyle = 'multiplayer';
     this.homeScreen.dataset.hidden = 'true';
     this.singleplayerScreen.dataset.hidden = 'true';
+    this.disconnectScreen.dataset.hidden = 'true';
     this.startScreen.dataset.hidden = 'false';
-    events.emit('multiplayer:lobby:show');
+    events.emit('multiplayer:lobby:show', options);
   }
 
   updateStartAction() {
     if (!this.startButtonText) return;
     this.startButtonText.textContent = this.state.gameMode === 'homeland' ? '保衛家園' : '進入世界';
+  }
+
+  showDisconnectedScreen(message) {
+    this._clearDisconnectTimer();
+    document.exitPointerLock?.();
+    this.state.mode = 'menu';
+    this.startScreen.dataset.hidden = 'false';
+    this.homeScreen.dataset.hidden = 'true';
+    this.singleplayerScreen.dataset.hidden = 'true';
+    this.disconnectScreen.dataset.hidden = 'false';
+    this.disconnectMessage.textContent = message || '多人伺服器已中斷，正在返回房間列表...';
+    this.disconnectTimer = window.setTimeout(() => {
+      this.showMultiplayerScreen({ statusMessage: message });
+    }, 1200);
+  }
+
+  _clearDisconnectTimer() {
+    if (!this.disconnectTimer) return;
+    window.clearTimeout(this.disconnectTimer);
+    this.disconnectTimer = null;
+  }
+
+  _renderMultiplayerStats(players) {
+    this.multiplayerRows.textContent = '';
+    players.forEach((player) => {
+      const row = document.createElement('div');
+      row.className = 'multiplayer-scoreboard-row';
+      row.dataset.self = String(player.name === this.state.playerName);
+
+      const name = document.createElement('span');
+      name.className = 'score-player';
+      name.textContent = player.name;
+
+      const kills = document.createElement('span');
+      kills.className = 'score-value';
+      kills.textContent = String(player.kills ?? 0);
+
+      const gold = document.createElement('span');
+      gold.className = 'score-value';
+      gold.textContent = String(player.gold ?? 0);
+
+      const ping = document.createElement('span');
+      ping.className = 'score-value';
+      ping.textContent = `${Math.round(player.pingMs ?? 0)} ms`;
+
+      row.append(name, kills, gold, ping);
+      this.multiplayerRows.appendChild(row);
+    });
   }
 }

@@ -36,7 +36,26 @@ def _center() -> dict[str, float]:
 
 
 def _default_player_meta() -> dict[str, float]:
-    return {"serverHp": 100.0, "serverMaxHp": 100.0, "attackReadyAt": 0.0, "respawnUntil": 0.0}
+    return {
+        "serverHp": 100.0,
+        "serverMaxHp": 100.0,
+        "attackReadyAt": 0.0,
+        "respawnUntil": 0.0,
+        "scoreKills": 0.0,
+        "scoreGold": 0.0,
+    }
+
+
+def _award_enemy_defeat(player_state: dict[str, Any] | None, defense: dict[str, Any], enemy: dict[str, Any]) -> None:
+    reward = max(1, math.ceil(_compute_toughness(enemy) * 0.8))
+    defense["totalKills"] += 1
+    defense["totalGold"] += reward
+    if player_state is None:
+        return
+    player_state.setdefault("scoreKills", 0)
+    player_state.setdefault("scoreGold", 0)
+    player_state["scoreKills"] += 1
+    player_state["scoreGold"] += reward
 
 
 def _compute_toughness(enemy: dict[str, Any]) -> float:
@@ -178,17 +197,20 @@ def process_attack(session: SessionRecord, player_name: str, attack: dict[str, A
 
     if enemy["health"] <= 0:
         defense["enemies"] = [item for item in defense["enemies"] if item["id"] != enemy["id"]]
-        defense["totalKills"] += 1
-        defense["totalGold"] += max(1, math.ceil(_compute_toughness(enemy) * 0.8))
+        _award_enemy_defeat(player.state, defense, enemy)
 
 
-def process_purchase(session: SessionRecord, purchase: str) -> None:
+def process_purchase(session: SessionRecord, player_name: str, purchase: str) -> None:
     defense = ensure_homeland_state(session)
     costs = {"heal": 15, "tower": 25, "turret": 40}
     cost = costs.get(purchase)
     if cost is None or defense["totalGold"] < cost:
         return
     defense["totalGold"] -= cost
+    buyer = session.players.get(player_name)
+    if buyer is not None:
+        buyer.state.setdefault("scoreGold", 0)
+        buyer.state["scoreGold"] = max(0, float(buyer.state["scoreGold"]) - cost)
 
     if purchase == "tower":
         defense["towerHp"] = min(defense["towerMaxHp"], defense["towerHp"] + 80)
@@ -203,6 +225,7 @@ def process_purchase(session: SessionRecord, purchase: str) -> None:
                 "y": round(ARENA_Y + 0.6, 2),
                 "z": round(ARENA_CENTER_Z + math.sin(angle) * 3.4, 2),
                 "cooldown": 0.0,
+                "ownerName": player_name,
             }
         )
         defense["nextTurretId"] += 1
@@ -224,7 +247,7 @@ def process_actions(session: SessionRecord, player_name: str, actions: dict[str,
             process_attack(session, player_name, attack, server_time)
     for purchase in actions.get("purchases") or []:
         if isinstance(purchase, str):
-            process_purchase(session, purchase)
+            process_purchase(session, player_name, purchase)
 
 
 def tick_homeland_session(session: SessionRecord, dt: float, server_time: float) -> None:
@@ -309,8 +332,8 @@ def tick_homeland_session(session: SessionRecord, dt: float, server_time: float)
         turret["cooldown"] = 0.65
         if enemy["health"] <= 0.0:
             defense["enemies"] = [item for item in defense["enemies"] if item["id"] != enemy["id"]]
-            defense["totalKills"] += 1
-            defense["totalGold"] += max(1, math.ceil(_compute_toughness(enemy) * 0.8))
+            owner_state = session.players.get(str(turret.get("ownerName") or "")) if turret.get("ownerName") else None
+            _award_enemy_defeat(owner_state.state if owner_state is not None else None, defense, enemy)
 
     if float(defense["towerHp"]) <= 0.0:
         defense["status"] = "defeated"

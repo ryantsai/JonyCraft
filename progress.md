@@ -88,6 +88,40 @@ Original prompt: Create a web based minecraft cline with three.js, using assets 
     - host-side queued attacks increased shared `totalKills`/`totalGold`
     - clicking `自動砲塔` on one client reduced shared gold and propagated `turretCount: 1` to both clients
   - A second fresh run against `127.0.0.1:8769` verified the custom host/port flow again, this time using the lobby endpoint fields plus `Enter` to refresh before join; the same authoritative sync results held (`totalKills: 7`, shared `totalGold`, shared `turretCount: 1`)
+- Smoothed multiplayer transform sync for remote players:
+  - lowered client transform sync cadence from `150ms` to `60ms`
+  - added queued immediate resync behavior so updates that arrive while a poll is already in flight are sent on the next turn instead of being silently dropped
+  - player snapshots now include velocity components (`vx`, `vy`, `vz`)
+  - remote avatars now use server-time-adjusted velocity prediction plus stronger catch-up smoothing instead of only lerping between sparse position targets
+- Reduced SQLite persistence pressure for movement-heavy multiplayer sessions:
+  - movement-only syncs now persist at most once per second instead of every poll
+  - homeland tick persistence is throttled to `0.75s` instead of saving every simulation tick
+  - block edits / homeland actions still trigger immediate persistence during sync
+- Verification for the movement smoothing pass:
+  - `npm run build` still passes
+  - Python syntax check for `server/multiplayer_server.py` passes
+  - Bundled `develop-web-game` Playwright client still captures the multiplayer lobby successfully at `output/web-game-multiplayer-smoothing/shot-0.png`
+  - A two-context Playwright run against a fresh server on `127.0.0.1:8770` confirmed:
+    - two players can still create/join a test-mode room successfully
+    - remote-player snapshots now carry non-zero velocity data during motion
+    - the guest client's remote avatar position advances through multiple intermediate samples during a host movement burst instead of staying pinned to infrequent static targets
+- Added multiplayer ping/stats scorecard plus disconnect fallback UX:
+  - client now measures round-trip time from server responses and includes ping in the multiplayer HUD
+  - multiplayer sync snapshots now carry `combatKills` and `pingMs`
+  - server now exposes per-player `scoreKills`, `scoreGold`, and `pingMs` in player exports
+  - homeland kill/gold rewards are attributed per player; turret kills attribute back to the turret owner
+  - HUD now renders a multiplayer scorecard with all players' kills, gold, and ping while connected
+  - if a connected client receives no server traffic for 20 seconds, it shows a disconnect screen and then returns to the multiplayer lobby automatically
+- Verification for the scorecard/timeout pass:
+  - `npm run build` passes after the HUD/network/server changes
+  - Python syntax checks pass for `server/multiplayer_server.py` and `server/homeland_sim.py`
+  - Bundled `develop-web-game` Playwright client still captures the multiplayer lobby at `output/web-game-multiplayer-scorecard/shot-0.png`
+  - A two-context homeland run against a fresh server on `127.0.0.1:8771` verified:
+    - the guest client score snapshot reports `playerStats` with both players, live ping values, and the host's homeland kills/gold after combat
+    - the in-game scorecard renders visually in `output/multiplayer-scorecard-timeout/scorecard.png`
+  - A forced no-traffic simulation on the guest client verified:
+    - the disconnect screen renders visually in `output/multiplayer-disconnect-flow/disconnect.png`
+    - after the disconnect delay, the client returns to the multiplayer lobby with the message `20 秒內未收到伺服器資料，已返回多人大廳。` in `output/multiplayer-disconnect-flow/lobby-return.png`
 
 TODO
 - Optional polish: add chunk meshing or instancing if the world size grows beyond the current compact sandbox.
@@ -97,3 +131,5 @@ TODO
   - combat validation currently trusts client-reported attack payload shape plus client-reported position; if cheating resistance matters, validate attack origin/facing/cooldowns more strictly on the server
   - session state is stored as JSON blobs in SQLite for flexibility; if querying/reporting grows, consider normalizing enemies/turrets/events into relational tables
   - endpoint changes refresh on committed input (`change` / `Enter`), not every keystroke; that avoids noisy network calls but could be polished further with debouncing if desired
+  - if movement still needs to feel better after the current polling improvements, the next major step is switching transform traffic from request/response polling to WebSockets so the server can push snapshots at a steadier cadence
+  - scorecard ping is based on application-level request/response RTT, not ICMP; it is the most relevant number for gameplay sync, but it will differ from OS `ping`

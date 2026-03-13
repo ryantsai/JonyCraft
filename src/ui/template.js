@@ -11,6 +11,19 @@ export const gameTemplate = `
         <div id="status-message">正在載入 Kenney 體素資源...</div>
         <div id="status-coords"></div>
       </div>
+      <div id="multiplayer-scoreboard" class="multiplayer-scoreboard" data-visible="false" aria-label="多人分數板">
+        <div class="multiplayer-scoreboard-header">
+          <span>多人分數板</span>
+          <span id="multiplayer-ping-label">Ping -- ms</span>
+        </div>
+        <div class="multiplayer-scoreboard-columns">
+          <span>玩家</span>
+          <span>K</span>
+          <span>G</span>
+          <span>Ping</span>
+        </div>
+        <div id="multiplayer-scoreboard-rows" class="multiplayer-scoreboard-rows"></div>
+      </div>
       <div id="defense-scoreboard" class="defense-scoreboard" data-visible="false" aria-label="保衛家園記分板">
         <div class="defense-row">波次 <span id="def-wave">1</span> · 倒數 <span id="def-timer">60</span>s</div>
         <div class="defense-row">守護塔 HP <span id="def-tower">240/240</span></div>
@@ -193,6 +206,24 @@ export const gameTemplate = `
         </button>
 
         <p class="footer-credit">Kenney 體素素材 · Three.js 引擎</p>
+      </div>
+
+      <div id="disconnect-screen" class="start-panel menu-page disconnect-screen" data-hidden="true">
+        <div class="panel-glow"></div>
+        <div class="title-block">
+          <div class="title-row">
+            <div class="title-icon">
+              <img src="assets/kenney/items/gamepad.png" alt="" class="title-block-img" />
+            </div>
+            <h1 class="game-title">
+              <span class="title-jony">連線</span><span class="title-craft">中斷</span>
+            </h1>
+          </div>
+          <p class="subtitle">多人伺服器暫時沒有回應</p>
+        </div>
+        <div class="menu-divider"></div>
+        <p id="disconnect-message" class="disconnect-message">20 秒內未收到伺服器資料，正在返回多人大廳...</p>
+        <p class="footer-credit">稍後會自動回到多人房間列表</p>
       </div>
     </div>
   </div>

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 
+const _predicted = new THREE.Vector3();
+
 function colorFromName(name) {
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) hash = ((hash << 5) - hash) + name.charCodeAt(i);
@@ -65,9 +67,12 @@ function createAvatar(name) {
   root.add(body, head, leftArm, rightArm, leftLeg, rightLeg, tag);
   return {
     root,
+    snapshotPosition: new THREE.Vector3(),
+    snapshotVelocity: new THREE.Vector3(),
     targetPosition: new THREE.Vector3(),
     targetYaw: 0,
     walkTime: Math.random() * Math.PI * 2,
+    snapshotLocalTime: 0,
     leftArm,
     rightArm,
     leftLeg,
@@ -84,10 +89,19 @@ export class RemotePlayers {
   constructor(sceneSetup) {
     this.scene = sceneSetup;
     this.avatars = new Map();
+    this.serverTimeOffset = 0;
   }
 
-  updateRoster(players) {
+  updateRoster(players, { serverTime } = {}) {
     const keep = new Set();
+    const receivedAt = performance.now() / 1000;
+    if (Number.isFinite(serverTime)) {
+      const nextOffset = receivedAt - serverTime;
+      this.serverTimeOffset = this.serverTimeOffset === 0
+        ? nextOffset
+        : (this.serverTimeOffset * 0.7) + (nextOffset * 0.3);
+    }
+
     players.forEach((player) => {
       if (!player?.name) return;
       keep.add(player.name);
@@ -95,12 +109,19 @@ export class RemotePlayers {
       if (!avatar) {
         avatar = createAvatar(player.name);
         avatar.root.position.set(player.x ?? 0, player.y ?? 0, player.z ?? 0);
+        avatar.snapshotPosition.copy(avatar.root.position);
         avatar.targetPosition.copy(avatar.root.position);
+        avatar.snapshotLocalTime = receivedAt;
         this.scene.remotePlayerGroup.add(avatar.root);
         this.avatars.set(player.name, avatar);
       }
 
-      avatar.targetPosition.set(player.x ?? 0, player.y ?? 0, player.z ?? 0);
+      avatar.snapshotPosition.set(player.x ?? 0, player.y ?? 0, player.z ?? 0);
+      avatar.snapshotVelocity.set(player.vx ?? 0, player.vy ?? 0, player.vz ?? 0);
+      avatar.snapshotLocalTime = Number.isFinite(player.lastSeen)
+        ? player.lastSeen + this.serverTimeOffset
+        : receivedAt;
+      avatar.targetPosition.copy(avatar.snapshotPosition);
       avatar.targetYaw = player.yaw ?? 0;
     });
 
@@ -114,11 +135,22 @@ export class RemotePlayers {
   }
 
   update(dt) {
+    const now = performance.now() / 1000;
     this.avatars.forEach((avatar) => {
-      avatar.root.position.lerp(avatar.targetPosition, Math.min(1, dt * 8));
-      avatar.root.rotation.y = lerpAngle(avatar.root.rotation.y, avatar.targetYaw, Math.min(1, dt * 8));
-      avatar.walkTime += dt * 8;
-      const stride = Math.sin(avatar.walkTime) * 0.35;
+      const predictionLead = Math.max(0, Math.min(0.22, now - avatar.snapshotLocalTime));
+      _predicted.copy(avatar.snapshotPosition).addScaledVector(avatar.snapshotVelocity, predictionLead);
+      const error = avatar.root.position.distanceTo(_predicted);
+      if (error > 3) {
+        avatar.root.position.copy(_predicted);
+      } else {
+        const followSpeed = error > 1.2 ? 14 : 10;
+        avatar.root.position.lerp(_predicted, Math.min(1, dt * followSpeed));
+      }
+      avatar.root.rotation.y = lerpAngle(avatar.root.rotation.y, avatar.targetYaw, Math.min(1, dt * 10));
+
+      const moveAmount = avatar.snapshotVelocity.length();
+      avatar.walkTime += dt * Math.max(2.5, moveAmount * 6);
+      const stride = Math.sin(avatar.walkTime) * Math.min(0.35, moveAmount * 0.18);
       avatar.leftArm.rotation.x = -stride;
       avatar.rightArm.rotation.x = stride;
       avatar.leftLeg.rotation.x = stride;

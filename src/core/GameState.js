@@ -69,6 +69,8 @@ export class GameState {
       sessionName: '',
       sessionMode: 'test',
       sessionPlayerCount: 1,
+      playerStats: [],
+      pingMs: 0,
       serverUrl: '',
       serverHost: '127.0.0.1',
       serverPort: '8765',

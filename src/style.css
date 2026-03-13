@@ -84,6 +84,76 @@ body {
 #status-message { font-size: 0.94rem; }
 #status-coords { color: rgba(236, 244, 255, 0.82); font-size: 0.84rem; }
 
+.multiplayer-scoreboard {
+  position: absolute;
+  top: 108px;
+  left: 18px;
+  width: min(360px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(110, 198, 255, 0.28);
+  background: rgba(9, 16, 24, 0.62);
+  backdrop-filter: blur(12px);
+  display: none;
+  gap: 8px;
+}
+
+.multiplayer-scoreboard[data-visible='true'] {
+  display: grid;
+}
+
+.multiplayer-scoreboard-header,
+.multiplayer-scoreboard-columns,
+.multiplayer-scoreboard-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 56px 64px;
+  align-items: center;
+  gap: 10px;
+}
+
+.multiplayer-scoreboard-header {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(240, 247, 255, 0.94);
+}
+
+.multiplayer-scoreboard-columns {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.multiplayer-scoreboard-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.multiplayer-scoreboard-row {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(240, 247, 255, 0.94);
+  font-size: 0.78rem;
+}
+
+.multiplayer-scoreboard-row[data-self='true'] {
+  border: 1px solid rgba(255, 217, 102, 0.4);
+  background: rgba(255, 217, 102, 0.08);
+}
+
+.score-player {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 
 .defense-scoreboard {
   position: absolute;
@@ -657,6 +727,17 @@ body {
   font-size: 0.7rem;
   color: rgba(200, 210, 230, 0.3);
   letter-spacing: 0.05em;
+}
+
+.disconnect-screen {
+  text-align: center;
+}
+
+.disconnect-message {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(240, 247, 255, 0.9);
 }
 
 /* ── Multiplayer Lobby ── */
@@ -1282,6 +1363,12 @@ body {
 }
 
 @media (max-width: 720px) {
+  .multiplayer-scoreboard {
+    top: 118px;
+    left: 12px;
+    width: calc(100vw - 24px);
+  }
+
   .multiplayer-header,
   .multiplayer-identity,
   .multiplayer-actions,

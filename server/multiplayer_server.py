@@ -24,6 +24,8 @@ from storage import (
 IDLE_PLAYER_SECONDS = 15
 EMPTY_SESSION_SECONDS = 45
 MAX_EVENT_LOG = 800
+MOVEMENT_PERSIST_INTERVAL_SECONDS = 1.0
+HOMELAND_PERSIST_INTERVAL_SECONDS = 0.75
 DEFAULT_DATABASE = Path(__file__).with_name("multiplayer_state.sqlite3")
 
 
@@ -152,11 +154,21 @@ class SessionStore:
 
             player.last_seen = now_ts()
             player.state = self._sanitize_player_state(player.state, payload.get("player") or {})
+            player.state.setdefault("scoreKills", 0)
+            player.state.setdefault("scoreGold", 0)
+            if session.mode != "homeland":
+                player.state["scoreKills"] = max(
+                    int(player.state.get("scoreKills") or 0),
+                    int(player.state.get("combatKills") or 0),
+                )
+                player.state["scoreGold"] = 0
 
+            had_block_changes = False
             for op in payload.get("blockOps") or []:
                 normalized = self._normalize_block_op(op, player_name)
                 if normalized is None:
                     continue
+                had_block_changes = True
                 session.block_seq += 1
                 event = {"seq": session.block_seq, **normalized}
                 session.block_log.append(event)
@@ -167,15 +179,23 @@ class SessionStore:
                     "type": event["type"],
                 }
 
+            homeland_actions = payload.get("homelandActions") or {}
+            had_homeland_actions = bool(homeland_actions.get("attacks")) or bool(homeland_actions.get("purchases"))
             if session.mode == "homeland":
                 process_actions(
                     session,
                     player_name,
-                    payload.get("homelandActions") or {},
+                    homeland_actions,
                     player.last_seen,
                 )
 
-            self._save_locked(session)
+            should_persist = (
+                had_block_changes
+                or had_homeland_actions
+                or (player.last_seen - session.updated_at) >= MOVEMENT_PERSIST_INTERVAL_SECONDS
+            )
+            if should_persist:
+                self._save_locked(session)
 
             since_seq = int(payload.get("sinceBlockSeq") or 0)
             world_state = list(session.world_overrides.values()) if since_seq <= 0 else []
@@ -202,7 +222,8 @@ class SessionStore:
                     player.state["_serverTime"] = current
                 if session.mode == "homeland":
                     tick_homeland_session(session, dt, current)
-                    self._save_locked(session)
+                    if (current - session.updated_at) >= HOMELAND_PERSIST_INTERVAL_SECONDS:
+                        self._save_locked(session)
 
     def _require_locked(self, session_id: str) -> SessionRecord:
         session = self._sessions.get(session_id)
@@ -218,8 +239,13 @@ class SessionStore:
                 "x": float(incoming.get("x") or 0.0),
                 "y": float(incoming.get("y") or 0.0),
                 "z": float(incoming.get("z") or 0.0),
+                "vx": float(incoming.get("vx") or 0.0),
+                "vy": float(incoming.get("vy") or 0.0),
+                "vz": float(incoming.get("vz") or 0.0),
                 "yaw": float(incoming.get("yaw") or 0.0),
                 "pitch": float(incoming.get("pitch") or 0.0),
+                "combatKills": max(0, int(incoming.get("combatKills") or state.get("combatKills") or 0)),
+                "pingMs": max(0.0, float(incoming.get("pingMs") or state.get("pingMs") or 0.0)),
                 "mode": clamp_text(incoming.get("mode"), "menu", 20),
                 "fruitId": clamp_text(incoming.get("fruitId"), "", 24),
                 "selectedSkillId": clamp_text(incoming.get("selectedSkillId"), "", 32),

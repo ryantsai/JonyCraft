@@ -21,10 +21,10 @@ export class MultiplayerLobby {
 
   init() {
     this._buildDOM();
-    events.on('multiplayer:lobby:show', () => this.show());
+    events.on('multiplayer:lobby:show', (payload) => this.show(payload));
   }
 
-  async show() {
+  async show(options = {}) {
     this.state.playStyle = 'multiplayer';
     this.overlay.dataset.hidden = 'false';
     const endpoint = this.multiplayer.getServerEndpoint();
@@ -34,6 +34,7 @@ export class MultiplayerLobby {
     this._renderHostMode();
     this._setStatus('正在載入房間列表...');
     await this.refreshSessions();
+    if (options.statusMessage) this._setStatus(options.statusMessage);
   }
 
   hide() {

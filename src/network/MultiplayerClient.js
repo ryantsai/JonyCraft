@@ -76,8 +76,12 @@ export class MultiplayerClient {
     this.enemyManager = null;
     this.homelandMode = null;
     this.syncAccumulatorMs = 0;
-    this.syncIntervalMs = 150;
+    this.syncIntervalMs = 60;
     this.syncInFlight = false;
+    this.pendingImmediateSync = false;
+    this.disconnectTimeoutMs = 20_000;
+    this.lastServerTrafficAt = performance.now();
+    this.hasTimedOut = false;
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
@@ -149,7 +153,9 @@ export class MultiplayerClient {
   }
 
   async fetchSessions() {
+    const startedAt = performance.now();
     const response = await fetch(this._makeUrl('/api/sessions'));
+    this._recordServerTraffic(startedAt);
     if (!response.ok) throw new Error('無法讀取多人連線房間列表。');
     const payload = await response.json();
     this.state.multiplayer.sessions = payload.sessions ?? [];
@@ -199,15 +205,22 @@ export class MultiplayerClient {
 
   update(dt) {
     if (!this.state.multiplayer.enabled || !this.state.multiplayer.sessionId) return;
+    if (!this.hasTimedOut && (performance.now() - this.lastServerTrafficAt) >= this.disconnectTimeoutMs) {
+      this._handleTrafficTimeout();
+      return;
+    }
     this.syncAccumulatorMs += dt * 1000;
     if (this.syncAccumulatorMs < this.syncIntervalMs) return;
-    this.syncAccumulatorMs = 0;
+    this.syncAccumulatorMs %= this.syncIntervalMs;
     void this.syncNow();
   }
 
   async syncNow(force = false) {
     if (!this.state.multiplayer.enabled || !this.state.multiplayer.sessionId) return;
-    if (!force && this.syncInFlight) return;
+    if (!force && this.syncInFlight) {
+      this.pendingImmediateSync = true;
+      return;
+    }
 
     this.syncInFlight = true;
     this.state.multiplayer.connectionStatus = 'syncing';
@@ -240,6 +253,12 @@ export class MultiplayerClient {
       console.error(error);
     } finally {
       this.syncInFlight = false;
+      const shouldResync = this.pendingImmediateSync || this.syncAccumulatorMs >= this.syncIntervalMs;
+      this.pendingImmediateSync = false;
+      if (shouldResync) {
+        this.syncAccumulatorMs = 0;
+        void this.syncNow();
+      }
     }
   }
 
@@ -253,13 +272,19 @@ export class MultiplayerClient {
     this.state.multiplayer.sessionPlayerCount = session.playerCount ?? 1;
     this.state.multiplayer.latestBlockSeq = 0;
     this.state.multiplayer.connectionStatus = 'online';
+    this.state.multiplayer.playerStats = [];
+    this.state.multiplayer.pingMs = 0;
     this.syncAccumulatorMs = 0;
+    this.lastServerTrafficAt = performance.now();
+    this.hasTimedOut = false;
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingImmediateSync = false;
   }
 
   _applySync(payload) {
+    if (!this.state.multiplayer.enabled) return;
     this.state.multiplayer.connectionStatus = 'online';
     this.state.multiplayer.sessionName = payload.session?.name ?? this.state.multiplayer.sessionName;
     this.state.multiplayer.sessionMode = payload.session?.mode ?? this.state.multiplayer.sessionMode;
@@ -280,7 +305,21 @@ export class MultiplayerClient {
       this.state.player.hp = Number(selfPlayer.serverHp);
       this.state.player.maxHp = Number(selfPlayer.serverMaxHp ?? this.state.player.maxHp);
     }
-    this.remotePlayers?.updateRoster(others);
+    this.state.multiplayer.playerStats = (payload.players ?? [])
+      .map((player) => ({
+        name: player.name,
+        kills: Math.max(0, Math.round(player.scoreKills ?? player.combatKills ?? 0)),
+        gold: Math.max(0, Math.round(player.scoreGold ?? 0)),
+        pingMs: Math.max(0, Math.round(player.pingMs ?? (player.name === this.state.playerName
+          ? this.state.multiplayer.pingMs
+          : 0))),
+      }))
+      .sort((left, right) => {
+        if (left.name === this.state.playerName) return -1;
+        if (right.name === this.state.playerName) return 1;
+        return (right.kills - left.kills) || left.name.localeCompare(right.name);
+      });
+    this.remotePlayers?.updateRoster(others, { serverTime: payload.serverTime });
 
     if (payload.homelandState && this.state.gameMode === 'homeland') {
       this.homelandMode?.applyServerState(payload.homelandState);
@@ -316,10 +355,15 @@ export class MultiplayerClient {
       x: Number(player.position.x.toFixed(2)),
       y: Number(player.position.y.toFixed(2)),
       z: Number(player.position.z.toFixed(2)),
+      vx: Number(player.velocity.x.toFixed(2)),
+      vy: Number(player.velocity.y.toFixed(2)),
+      vz: Number(player.velocity.z.toFixed(2)),
       yaw: Number(player.yaw.toFixed(3)),
       pitch: Number(player.pitch.toFixed(3)),
       hp: Number(player.hp.toFixed(1)),
       maxHp: Number(player.maxHp.toFixed(1)),
+      combatKills: Math.round(this.state.combat.kills),
+      pingMs: Math.round(this.state.multiplayer.pingMs || 0),
       mode: this.state.mode,
       fruitId: this.state.selectedFruit?.id ?? '',
       selectedSkillId: this.state.getSelectedSkill()?.id ?? '',
@@ -327,11 +371,13 @@ export class MultiplayerClient {
   }
 
   async _post(path, payload) {
+    const startedAt = performance.now();
     const response = await fetch(this._makeUrl(path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    this._recordServerTraffic(startedAt);
 
     let data = {};
     try {
@@ -362,10 +408,27 @@ export class MultiplayerClient {
     this.state.multiplayer.sessionName = '';
     this.state.multiplayer.sessionMode = 'test';
     this.state.multiplayer.connectionStatus = 'offline';
+    this.state.multiplayer.playerStats = [];
+    this.state.multiplayer.pingMs = 0;
     this.state.multiplayer.latestBlockSeq = 0;
     this.state.multiplayer.sessionPlayerCount = 1;
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingImmediateSync = false;
+  }
+
+  _recordServerTraffic(startedAt) {
+    this.lastServerTrafficAt = performance.now();
+    this.hasTimedOut = false;
+    const elapsed = Math.max(0, this.lastServerTrafficAt - startedAt);
+    this.state.multiplayer.pingMs = elapsed;
+  }
+
+  _handleTrafficTimeout() {
+    this.hasTimedOut = true;
+    const message = '20 秒內未收到伺服器資料，已返回多人大廳。';
+    this._resetSessionState();
+    events.emit('multiplayer:disconnected', { message });
   }
 }

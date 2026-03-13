@@ -1,6 +1,16 @@
 node_modules/
 dist/
 output/
-vite.log
-vite.err
-vite.pid
+
+# Local runtime artifacts
+*.log
+*.err
+*.pid
+
+# Python cache files
+__pycache__/
+*.pyc
+
+# Local multiplayer persistence
+*.sqlite3
+*.db

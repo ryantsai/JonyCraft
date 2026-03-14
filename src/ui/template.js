@@ -51,6 +51,7 @@ export const gameTemplate = `
           <button id="touch-primary" type="button">使用</button>
           <button id="touch-secondary" type="button">放置</button>
         </div>
+        <button id="touch-fullscreen" class="mobile-fullscreen-btn" type="button">⛶</button>
       </div>
     </div>
     <div id="start-screen" class="start-screen">

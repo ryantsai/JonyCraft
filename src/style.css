@@ -1013,15 +1013,26 @@ body {
   padding: 10px 12px;
 }
 
+.mobile-fullscreen-btn {
+  position: absolute;
+  bottom: 14px; right: 14px;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(11, 17, 23, 0.65);
+  color: #f4f7ff;
+  font-size: 1.4rem;
+  line-height: 1;
+  pointer-events: auto;
+  display: none;
+}
+
+.mobile-controls[data-visible='true'] .mobile-fullscreen-btn { display: block; }
+
 /* ── Responsive ── */
 @media (max-width: 720px) {
   .defense-scoreboard { display: none !important; }
-
-  .status-bar {
-    max-width: calc(100vw - 24px);
-    top: 12px; left: 12px;
-    padding: 10px 12px;
-  }
+  .status-bar { display: none !important; }
 
   .hotbar {
     width: calc(100vw - 16px);

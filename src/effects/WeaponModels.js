@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { assetUrl } from '../config/assets.js';
 import {
   SWORD_SWING_MS, PUNCH_SWING_MS,
@@ -125,6 +126,7 @@ export class WeaponModels {
     this._buildSlamFist();
     this._buildUppercutFist();
     this._buildClapFists();
+    this._buildFireFist();
     this._buildDirtSkill();
     this._buildFruitVFX();
     this._createFlashOverlay();
@@ -166,6 +168,8 @@ export class WeaponModels {
       this._animateUppercut(combat, swingMs, mod, gameState);
     } else if (wt === 'clap') {
       this._animateClap(combat, swingMs, mod, gameState);
+    } else if (wt === 'fire_fist') {
+      this._animateFireFist(combat, swingMs, mod, gameState);
     } else if (wt === 'dirt') {
       this.models.dirt.group.position.set(0.58, -0.56, -0.72);
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
@@ -871,6 +875,170 @@ export class WeaponModels {
     group.visible = false;
     this.scene.heldItemPivot.add(group);
     this.models.clap = { group, leftFist, rightFist, leftMat, rightMat, energyBurst };
+  }
+
+  // ── Fire Fist: GLB model with flying punch + fire particles ──
+
+  _buildFireFist() {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+
+    // Fire trail particles (pre-allocated pool)
+    const fireParticles = [];
+    for (let i = 0; i < 20; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: i % 2 === 0 ? 0xff6b35 : 0xffdd44,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+      });
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), mat);
+      mesh.visible = false;
+      mesh.renderOrder = 56;
+      group.add(mesh);
+      fireParticles.push({
+        mesh, mat,
+        vel: new THREE.Vector3(),
+        life: 0, maxLife: 0,
+      });
+    }
+
+    this.models.fire_fist = {
+      group,
+      glbModel: null,
+      glbLoaded: false,
+      fireParticles,
+      idleTime: 0,
+    };
+
+    // Load the GLB model
+    const loader = new GLTFLoader();
+    loader.load('assets/firstperson/skills/firefruit/fire_fist.glb', (gltf) => {
+      const model = gltf.scene;
+      // Auto-scale to fit weapon view
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const s = 0.5 / maxDim;
+      model.scale.set(s, s, s);
+      // Center the model
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+
+      group.add(model);
+      this.models.fire_fist.glbModel = model;
+      this.models.fire_fist.glbLoaded = true;
+    });
+  }
+
+  _animateFireFist(combat, swingMs, mod, gameState) {
+    const m = this.models.fire_fist;
+    if (!m) return;
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+    const attacking = phase > 0;
+
+    m.idleTime += 0.016;
+    const t = m.idleTime;
+
+    // Idle: bottom-right with gentle wavering
+    const idleX = 0.55;
+    const idleY = -0.55;
+    const idleZ = -0.7;
+    const waveX = Math.sin(t * 1.8) * 0.015;
+    const waveY = Math.cos(t * 1.3) * 0.02;
+    const waveRot = Math.sin(t * 1.1) * 0.03;
+
+    if (attacking) {
+      // Attack phases
+      const windup = THREE.MathUtils.smoothstep(phase, 0, 0.15);
+      const launch = THREE.MathUtils.smoothstep(phase, 0.1, 0.45);
+      const recover = THREE.MathUtils.smoothstep(phase, 0.55, 1);
+      const fly = Math.max(0, launch - recover * 0.9);
+
+      // Pull back then fly forward toward center
+      m.group.position.set(
+        THREE.MathUtils.lerp(idleX, -0.05, fly) + windup * 0.08,
+        THREE.MathUtils.lerp(idleY, 0.05, fly) + windup * 0.06,
+        THREE.MathUtils.lerp(idleZ, -2.2, fly),
+      );
+
+      // Rotate to face forward during punch
+      m.group.rotation.set(
+        THREE.MathUtils.lerp(0.15, -0.1, fly) + windup * 0.2,
+        THREE.MathUtils.lerp(-0.2, 0, fly),
+        THREE.MathUtils.lerp(-0.15, 0, fly),
+      );
+
+      // Scale up slightly during impact
+      const impactScale = 1 + fly * 0.3 * mod.fistScale;
+      if (m.glbModel) m.glbModel.scale.multiplyScalar(impactScale / (m.glbModel.userData._lastImpact || 1));
+      if (m.glbModel) m.glbModel.userData._lastImpact = impactScale;
+
+      // Spawn fire trail particles during flight
+      this._updateFireTrail(m, phase, fly, true);
+    } else {
+      // Idle position with wavering
+      m.group.position.set(idleX + waveX, idleY + waveY, idleZ);
+      m.group.rotation.set(0.15 + waveRot, -0.2, -0.15 + waveRot * 0.5);
+
+      if (m.glbModel) {
+        m.glbModel.userData._lastImpact = 1;
+      }
+
+      this._updateFireTrail(m, 0, 0, false);
+    }
+
+    m.group.visible = gameState.mode === 'playing';
+  }
+
+  _updateFireTrail(m, phase, fly, attacking) {
+    const particles = m.fireParticles;
+    const dt = 0.016;
+
+    particles.forEach((p, i) => {
+      if (attacking && fly > 0.05) {
+        // Spawn new particles from fist position
+        if (p.life <= 0 && Math.random() < 0.4) {
+          const pos = m.group.position;
+          p.mesh.position.set(
+            pos.x + (Math.random() - 0.5) * 0.15,
+            pos.y + (Math.random() - 0.5) * 0.15,
+            pos.z + Math.random() * 0.3,
+          );
+          p.vel.set(
+            (Math.random() - 0.5) * 1.5,
+            (Math.random() - 0.3) * 2.0,
+            (Math.random() + 0.5) * 1.5,
+          );
+          p.life = 0.3 + Math.random() * 0.25;
+          p.maxLife = p.life;
+          p.mat.color.setHex(Math.random() > 0.5 ? 0xff6b35 : 0xffdd44);
+        }
+      }
+
+      if (p.life > 0) {
+        p.life -= dt;
+        p.mesh.position.x += p.vel.x * dt;
+        p.mesh.position.y += p.vel.y * dt;
+        p.mesh.position.z += p.vel.z * dt;
+        p.vel.y -= 2.0 * dt; // gravity
+        const ratio = Math.max(0, p.life / p.maxLife);
+        p.mat.opacity = ratio * 0.8;
+        const sc = 0.03 + ratio * 0.05;
+        p.mesh.scale.setScalar(sc / 0.04);
+        p.mesh.rotation.set(
+          p.mesh.rotation.x + dt * 5,
+          p.mesh.rotation.y + dt * 3,
+          p.mesh.rotation.z + dt * 4,
+        );
+        p.mesh.visible = true;
+      } else {
+        p.mesh.visible = false;
+        p.mat.opacity = 0;
+      }
+    });
   }
 
   // ── Fruit VFX particle system ──

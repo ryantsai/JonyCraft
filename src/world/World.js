@@ -64,7 +64,7 @@ export class World {
     const cellZ = THREE.MathUtils.clamp(Math.floor(z), 0, WORLD_SIZE_Z - 1);
     for (let y = WORLD_HEIGHT - 1; y >= 0; y -= 1) {
       const block = this.getBlock(cellX, y, cellZ);
-      if (block && BLOCK_DEFS[block].collides && block !== 'leaves') {
+      if (block && BLOCK_DEFS[block].collides && block !== 'leaves' && block !== 'barrier') {
         return y + 1;
       }
     }

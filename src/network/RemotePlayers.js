@@ -109,8 +109,8 @@ async function upgradeAvatarToSkin(avatar, skin, name) {
     const scale = targetHeight / Math.max(size.y, 0.01);
     model.scale.setScalar(scale);
 
-    const center = box.getCenter(new THREE.Vector3());
-    model.position.y = -center.y * scale;
+    // Align model bottom to y=0 (root is placed at feet position)
+    model.position.y = -box.min.y * scale;
 
     // Apply skin texture by replacing image on existing GLB texture
     if (skin.id !== 'a') {

@@ -367,6 +367,7 @@ export class MultiplayerClient {
       mode: this.state.mode,
       fruitId: this.state.selectedFruit?.id ?? '',
       selectedSkillId: this.state.getSelectedSkill()?.id ?? '',
+      skinId: this.state.selectedSkin?.id ?? '',
     };
   }
 

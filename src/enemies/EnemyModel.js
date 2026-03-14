@@ -47,13 +47,13 @@ export function tintPart(part, hex) {
 
 function createHealthBarSprite(scale) {
   const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 8;
+  canvas.width = 128;
+  canvas.height = 16;
   const texture = new THREE.CanvasTexture(canvas);
   texture.minFilter = THREE.LinearFilter;
   const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set(1.2 * scale, 0.15 * scale, 1);
+  sprite.scale.set(1.6 * scale, 0.22 * scale, 1);
   sprite.userData.canvas = canvas;
   sprite.userData.texture = texture;
   return sprite;
@@ -65,17 +65,38 @@ export function updateHealthBarSprite(enemy) {
   const canvas = sprite.userData.canvas;
   const ctx = canvas.getContext('2d');
   const ratio = Math.max(0, enemy.health / enemy.maxHealth);
+  const w = canvas.width;
+  const h = canvas.height;
+  const barW = 88;
+  const barH = 12;
+  const barX = 2;
+  const barY = 2;
 
-  ctx.clearRect(0, 0, 64, 8);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.roundRect(0, 0, 64, 8, 3);
+  ctx.clearRect(0, 0, w, h);
+
+  // Background track
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.roundRect(barX, barY, barW, barH, 4);
   ctx.fill();
 
+  // Filled portion (shortens as HP drops)
   if (ratio > 0) {
+    ctx.beginPath();
+    const fillW = Math.round((barW - 2) * ratio);
     ctx.fillStyle = ratio > 0.5 ? '#4ae04a' : ratio > 0.25 ? '#e0c030' : '#e04040';
-    ctx.roundRect(1, 1, Math.round(62 * ratio), 6, 2);
+    ctx.roundRect(barX + 1, barY + 1, fillW, barH - 2, 3);
     ctx.fill();
   }
+
+  // HP text
+  const hp = Math.max(0, Math.round(enemy.health));
+  const maxHp = Math.round(enemy.maxHealth);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${hp}/${maxHp}`, barX + barW + 3, barY + barH / 2);
 
   sprite.userData.texture.needsUpdate = true;
   sprite.visible = enemy.health < enemy.maxHealth;

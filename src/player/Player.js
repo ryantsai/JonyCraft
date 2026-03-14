@@ -15,6 +15,7 @@ export class PlayerController {
     this.state = gameState;
     this.world = world;
     this.scene = sceneSetup;
+    this.enemyManager = null;
 
     this.reusable = {
       forward: new THREE.Vector3(),
@@ -22,6 +23,10 @@ export class PlayerController {
       wishMove: new THREE.Vector3(),
       desiredVelocity: new THREE.Vector3(),
     };
+  }
+
+  setEnemyManager(em) {
+    this.enemyManager = em;
   }
 
   moveAlongAxis(player, axis, delta) {
@@ -37,7 +42,7 @@ export class PlayerController {
       const testX = axis === 'x' ? next : player.position.x;
       const testY = axis === 'y' ? next : player.position.y;
       const testZ = axis === 'z' ? next : player.position.z;
-      if (this.playerCollides(testX, testY, testZ)) {
+      if (this.playerCollides(testX, testY, testZ) || this.entityCollides(testX, testY, testZ)) {
         collided = true;
         break;
       }
@@ -48,14 +53,31 @@ export class PlayerController {
   }
 
   resolvePenetration(player) {
-    if (!this.playerCollides(player.position.x, player.position.y, player.position.z)) return;
+    const collides = (x, y, z) => this.playerCollides(x, y, z) || this.entityCollides(x, y, z);
 
+    if (!collides(player.position.x, player.position.y, player.position.z)) return;
+
+    // Try nudging upward first (for block penetration)
     const originalY = player.position.y;
     for (let i = 1; i <= 30; i += 1) {
       const nudgeY = originalY + i * 0.05;
-      if (!this.playerCollides(player.position.x, nudgeY, player.position.z)) {
+      if (!collides(player.position.x, nudgeY, player.position.z)) {
         player.position.y = nudgeY;
         return;
+      }
+    }
+
+    // Try pushing outward horizontally (for entity penetration)
+    for (let dist = 1; dist <= 8; dist += 1) {
+      for (let angle = 0; angle < 8; angle += 1) {
+        const a = (angle / 8) * Math.PI * 2;
+        const nx = player.position.x + Math.cos(a) * dist * 0.25;
+        const nz = player.position.z + Math.sin(a) * dist * 0.25;
+        if (!collides(nx, player.position.y, nz)) {
+          player.position.x = nx;
+          player.position.z = nz;
+          return;
+        }
       }
     }
 
@@ -78,6 +100,44 @@ export class PlayerController {
         }
       }
     }
+    return false;
+  }
+
+  entityCollides(x, y, z) {
+    const py = y;
+    const pTop = y + PLAYER_HEIGHT;
+
+    // Tower collision (cylinder: bottom radius 1.6, top radius 1.2, height 5.5)
+    const mc = this.state.modeController;
+    if (mc?.towerMesh) {
+      const tp = mc.towerMesh.position;
+      const tBottom = tp.y - 2.75;
+      const tTop = tp.y + 2.75;
+      if (py < tTop && pTop > tBottom) {
+        const dx = x - tp.x;
+        const dz = z - tp.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < PLAYER_RADIUS + 1.6) return true;
+      }
+    }
+
+    // Enemy collision
+    if (this.enemyManager) {
+      const alive = this.enemyManager.getAlive();
+      for (let i = 0; i < alive.length; i += 1) {
+        const enemy = alive[i];
+        const ep = enemy.root.position;
+        const eRadius = 0.4 * (enemy.sizeMultiplier || 1);
+        const eHeight = 1.75 * (enemy.sizeMultiplier || 1);
+        if (py < ep.y + eHeight && pTop > ep.y) {
+          const dx = x - ep.x;
+          const dz = z - ep.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist < PLAYER_RADIUS + eRadius) return true;
+        }
+      }
+    }
+
     return false;
   }
 

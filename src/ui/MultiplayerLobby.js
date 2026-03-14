@@ -1,5 +1,6 @@
 import { events } from '../core/EventBus.js';
 import { rerollPlayerName } from '../network/PlayerIdentity.js';
+import { SkinSelect } from './SkinSelect.js';
 
 function suggestedSessionName(playerName) {
   return `${playerName}'s Realm`;
@@ -16,6 +17,7 @@ export class MultiplayerLobby {
     this.playerNameEl = null;
     this.sessionsEl = null;
     this.hostModeButtons = [];
+    this.skinSelect = null;
     this.busy = false;
   }
 
@@ -55,69 +57,119 @@ export class MultiplayerLobby {
   }
 
   _buildDOM() {
-    const overlay = document.createElement('div');
+    const el = (tag, cls, text) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text) e.textContent = text;
+      return e;
+    };
+    const btn = (cls, text, type = 'button') => {
+      const b = el('button', cls, text);
+      b.type = type;
+      return b;
+    };
+
+    const overlay = el('div', 'multiplayer-lobby');
     overlay.id = 'multiplayer-lobby';
-    overlay.className = 'multiplayer-lobby';
     overlay.dataset.hidden = 'true';
-    overlay.innerHTML = `
-      <div class="multiplayer-panel">
-        <div class="panel-glow"></div>
-        <div class="multiplayer-header">
-          <div>
-            <h2 class="multiplayer-title">多人連線</h2>
-            <p class="multiplayer-subtitle">瀏覽房間模式，或建立新的多人伺服器</p>
-          </div>
-          <button id="multiplayer-close" class="multiplayer-ghost-btn" type="button">返回主選單</button>
-        </div>
 
-        <div class="multiplayer-identity">
-          <div class="multiplayer-pill">
-            <span class="pill-label">玩家名稱</span>
-            <strong id="multiplayer-player-name">Player</strong>
-          </div>
-          <button id="multiplayer-reroll" class="multiplayer-ghost-btn" type="button">重新隨機</button>
-        </div>
+    const panel = el('div', 'multiplayer-panel');
+    panel.appendChild(el('div', 'panel-glow'));
 
-        <div class="multiplayer-endpoint-grid">
-          <label class="multiplayer-field">
-            <span>伺服器地址</span>
-            <input id="multiplayer-server-host" type="text" spellcheck="false" />
-          </label>
-          <label class="multiplayer-field">
-            <span>連接埠</span>
-            <input id="multiplayer-server-port" type="text" inputmode="numeric" />
-          </label>
-        </div>
+    // Header
+    const header = el('div', 'multiplayer-header');
+    const headerInfo = el('div');
+    const title = el('h2', 'multiplayer-title', '多人連線');
+    const subtitle = el('p', 'multiplayer-subtitle', '瀏覽房間模式，或建立新的多人伺服器');
+    headerInfo.append(title, subtitle);
+    const closeBtn = btn('multiplayer-ghost-btn', '返回主選單');
+    closeBtn.id = 'multiplayer-close';
+    header.append(headerInfo, closeBtn);
+    panel.appendChild(header);
 
-        <div class="multiplayer-field">
-          <span>建立新房間時的模式</span>
-          <div class="host-mode-list">
-            <button class="host-mode-btn host-mode-btn-active" data-host-mode="test" type="button">測試模式</button>
-            <button class="host-mode-btn" data-host-mode="homeland" type="button">保衛家園</button>
-          </div>
-        </div>
+    // Two-column layout
+    const columns = el('div', 'multiplayer-columns');
 
-        <div class="multiplayer-actions">
-          <button id="multiplayer-refresh" class="multiplayer-ghost-btn" type="button">重新整理</button>
-          <button id="multiplayer-create" class="start-btn multiplayer-create-btn" type="button">
-            <span class="start-btn-text">建立房間</span>
-            <span class="start-btn-arrow">+</span>
-          </button>
-        </div>
+    // Left column: skin select
+    const skinCol = el('div', 'multiplayer-col-skin');
+    this.skinSelect = new SkinSelect(this.state);
+    this.skinSelect.buildDOM(skinCol);
 
-        <div id="multiplayer-status" class="multiplayer-status">正在準備多人資料...</div>
-        <div id="multiplayer-sessions" class="multiplayer-sessions"></div>
-      </div>
-    `;
+    // Right column: server settings, rooms
+    const mainCol = el('div', 'multiplayer-col-main');
+
+    // Identity
+    const identity = el('div', 'multiplayer-identity');
+    const pill = el('div', 'multiplayer-pill');
+    pill.append(el('span', 'pill-label', '玩家名稱'));
+    const playerName = el('strong', null, 'Player');
+    playerName.id = 'multiplayer-player-name';
+    pill.appendChild(playerName);
+    const rerollBtn = btn('multiplayer-ghost-btn', '重新隨機');
+    rerollBtn.id = 'multiplayer-reroll';
+    identity.append(pill, rerollBtn);
+    mainCol.appendChild(identity);
+
+    // Endpoint
+    const endpointGrid = el('div', 'multiplayer-endpoint-grid');
+    const hostField = el('label', 'multiplayer-field');
+    hostField.append(el('span', null, '伺服器地址'));
+    const hostInput = el('input');
+    hostInput.id = 'multiplayer-server-host';
+    hostInput.type = 'text';
+    hostInput.spellcheck = false;
+    hostField.appendChild(hostInput);
+    const portField = el('label', 'multiplayer-field');
+    portField.append(el('span', null, '連接埠'));
+    const portInput = el('input');
+    portInput.id = 'multiplayer-server-port';
+    portInput.type = 'text';
+    portInput.inputMode = 'numeric';
+    portField.appendChild(portInput);
+    endpointGrid.append(hostField, portField);
+    mainCol.appendChild(endpointGrid);
+
+    // Host mode
+    const modeField = el('div', 'multiplayer-field');
+    modeField.append(el('span', null, '建立新房間時的模式'));
+    const modeList = el('div', 'host-mode-list');
+    const testModeBtn = btn('host-mode-btn host-mode-btn-active', '測試模式');
+    testModeBtn.dataset.hostMode = 'test';
+    const homelandModeBtn = btn('host-mode-btn', '保衛家園');
+    homelandModeBtn.dataset.hostMode = 'homeland';
+    modeList.append(testModeBtn, homelandModeBtn);
+    modeField.appendChild(modeList);
+    mainCol.appendChild(modeField);
+
+    // Actions
+    const actions = el('div', 'multiplayer-actions');
+    const refreshBtn = btn('multiplayer-ghost-btn', '重新整理');
+    refreshBtn.id = 'multiplayer-refresh';
+    const createBtn = btn('start-btn multiplayer-create-btn');
+    createBtn.id = 'multiplayer-create';
+    createBtn.append(el('span', 'start-btn-text', '建立房間'), el('span', 'start-btn-arrow', '+'));
+    actions.append(refreshBtn, createBtn);
+    mainCol.appendChild(actions);
+
+    // Status + sessions
+    const status = el('div', 'multiplayer-status', '正在準備多人資料...');
+    status.id = 'multiplayer-status';
+    const sessions = el('div', 'multiplayer-sessions');
+    sessions.id = 'multiplayer-sessions';
+    mainCol.append(status, sessions);
+
+    columns.append(skinCol, mainCol);
+    panel.appendChild(columns);
+    overlay.appendChild(panel);
 
     document.querySelector('.shell').appendChild(overlay);
     this.overlay = overlay;
-    this.status = overlay.querySelector('#multiplayer-status');
-    this.serverHostInput = overlay.querySelector('#multiplayer-server-host');
-    this.serverPortInput = overlay.querySelector('#multiplayer-server-port');
-    this.playerNameEl = overlay.querySelector('#multiplayer-player-name');
-    this.sessionsEl = overlay.querySelector('#multiplayer-sessions');
-    this.hostModeButtons = Array.from(overlay.querySelectorAll('.host-mode-btn'));
+    this.status = status;
+    this.serverHostInput = hostInput;
+    this.serverPortInput = portInput;
+    this.playerNameEl = playerName;
+    this.sessionsEl = sessions;
+    this.hostModeButtons = [testModeBtn, homelandModeBtn];
 
     const refreshEndpoint = async () => {
       if (this.busy) return;

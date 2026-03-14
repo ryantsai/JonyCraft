@@ -27,11 +27,8 @@ export class HUD {
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
-    this.defTower = document.querySelector('#def-tower');
     this.defKills = document.querySelector('#def-kills');
     this.defGold = document.querySelector('#def-gold');
-    this.homebaseHp = document.querySelector('#homebase-hp');
-    this.homebaseHpText = document.querySelector('#homebase-hp-text');
     this.disconnectTimer = null;
   }
 
@@ -171,15 +168,11 @@ export class HUD {
 
     const defense = this.state.defense;
     this.defenseBoard.dataset.visible = defense.enabled ? 'true' : 'false';
-    this.homebaseHp.dataset.visible = defense.enabled ? 'true' : 'false';
     if (defense.enabled) {
-      const towerHpText = `${Math.ceil(defense.towerHp)} / ${defense.towerMaxHp}`;
       this.defWave.textContent = String(defense.wave);
       this.defTimer.textContent = String(Math.ceil(defense.timeLeft));
-      this.defTower.textContent = towerHpText;
       this.defKills.textContent = String(defense.totalKills);
       this.defGold.textContent = String(defense.totalGold);
-      this.homebaseHpText.textContent = towerHpText;
     }
   }
 

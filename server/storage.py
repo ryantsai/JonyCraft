@@ -76,17 +76,14 @@ class SQLiteSessionRepository(SessionRepository):
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = Path(database_path)
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        self._conn = sqlite3.connect(self.database_path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        self._conn.execute("PRAGMA foreign_keys = ON")
+        self._conn.execute("PRAGMA journal_mode = WAL")
         self._init_schema()
 
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.database_path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        return connection
-
     def _init_schema(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
+        self._conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id TEXT PRIMARY KEY,
@@ -112,9 +109,8 @@ class SQLiteSessionRepository(SessionRepository):
             )
 
     def load_all_sessions(self) -> dict[str, SessionRecord]:
-        with self._connect() as connection:
-            session_rows = connection.execute("SELECT * FROM sessions").fetchall()
-            player_rows = connection.execute("SELECT * FROM players").fetchall()
+        session_rows = self._conn.execute("SELECT * FROM sessions").fetchall()
+        player_rows = self._conn.execute("SELECT * FROM players").fetchall()
 
         players_by_session: dict[str, dict[str, PlayerRecord]] = {}
         for row in player_rows:
@@ -153,53 +149,51 @@ class SQLiteSessionRepository(SessionRepository):
                 "defense_state": session.defense_state,
             }
         )
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO sessions (
-                    session_id, name, owner_name, mode, created_at, updated_at, block_seq, session_state_json
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(session_id) DO UPDATE SET
-                    name=excluded.name,
-                    owner_name=excluded.owner_name,
-                    mode=excluded.mode,
-                    updated_at=excluded.updated_at,
-                    block_seq=excluded.block_seq,
-                    session_state_json=excluded.session_state_json
-                """,
+        self._conn.execute(
+            """
+            INSERT INTO sessions (
+                session_id, name, owner_name, mode, created_at, updated_at, block_seq, session_state_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id) DO UPDATE SET
+                name=excluded.name,
+                owner_name=excluded.owner_name,
+                mode=excluded.mode,
+                updated_at=excluded.updated_at,
+                block_seq=excluded.block_seq,
+                session_state_json=excluded.session_state_json
+            """,
+            (
+                session.session_id,
+                session.name,
+                session.owner_name,
+                session.mode,
+                session.created_at,
+                session.updated_at,
+                session.block_seq,
+                session_state_json,
+            ),
+        )
+        self._conn.execute("DELETE FROM players WHERE session_id = ?", (session.session_id,))
+        self._conn.executemany(
+            """
+            INSERT INTO players (session_id, player_name, joined_at, last_seen, player_state_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            [
                 (
                     session.session_id,
-                    session.name,
-                    session.owner_name,
-                    session.mode,
-                    session.created_at,
-                    session.updated_at,
-                    session.block_seq,
-                    session_state_json,
-                ),
-            )
-            connection.execute("DELETE FROM players WHERE session_id = ?", (session.session_id,))
-            connection.executemany(
-                """
-                INSERT INTO players (session_id, player_name, joined_at, last_seen, player_state_json)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                [
-                    (
-                        session.session_id,
-                        player.name,
-                        player.joined_at,
-                        player.last_seen,
-                        json.dumps(player.state),
-                    )
-                    for player in session.players.values()
-                ],
-            )
-            connection.commit()
+                    player.name,
+                    player.joined_at,
+                    player.last_seen,
+                    json.dumps(player.state),
+                )
+                for player in session.players.values()
+            ],
+        )
+        self._conn.commit()
 
     def delete_session(self, session_id: str) -> None:
-        with self._connect() as connection:
-            connection.execute("DELETE FROM players WHERE session_id = ?", (session_id,))
-            connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
-            connection.commit()
+        self._conn.execute("DELETE FROM players WHERE session_id = ?", (session_id,))
+        self._conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+        self._conn.commit()

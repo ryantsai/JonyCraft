@@ -1008,17 +1008,17 @@ export class WeaponModels {
     projGroup.add(projModel);
     this.scene.particleGroup.add(projGroup);
 
-    // Fire trail particles attached to this projectile
+    // Fire trail particles — large pool to cover the back of the fist
     const trailParticles = [];
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 30; i++) {
       const tMat = new THREE.MeshBasicMaterial({
-        color: i % 2 === 0 ? 0xff6b35 : 0xffdd44,
+        color: i % 3 === 0 ? 0xff4400 : i % 3 === 1 ? 0xff6b35 : 0xffdd44,
         transparent: true,
         opacity: 0,
         blending: THREE.AdditiveBlending,
         depthTest: false,
       });
-      const tMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), tMat);
+      const tMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.18), tMat);
       tMesh.visible = false;
       tMesh.renderOrder = 56;
       this.scene.particleGroup.add(tMesh);
@@ -1112,32 +1112,40 @@ export class WeaponModels {
         continue;
       }
 
-      // Spawn trail particles behind projectile
+      // Spawn fire trail covering the back of the fist
+      const vel = proj.velocity;
+      const velDir = vel.clone().normalize();
       proj.trailParticles.forEach((tp) => {
-        if (tp.life <= 0 && Math.random() < 0.5) {
+        // High spawn rate — almost every particle respawns each frame
+        if (tp.life <= 0 && Math.random() < 0.85) {
+          // Spread across a wide area behind the fist
           tp.mesh.position.copy(proj.group.position);
-          tp.mesh.position.x += (Math.random() - 0.5) * 0.2;
-          tp.mesh.position.y += (Math.random() - 0.5) * 0.2;
-          tp.mesh.position.z += (Math.random() - 0.5) * 0.2;
+          tp.mesh.position.x += (Math.random() - 0.5) * 0.8;
+          tp.mesh.position.y += (Math.random() - 0.5) * 0.8;
+          tp.mesh.position.z += (Math.random() - 0.5) * 0.8;
+          // Push particles backward (opposite to travel direction)
           tp.vel.set(
-            (Math.random() - 0.5) * 1.2,
-            (Math.random() - 0.2) * 1.5,
-            (Math.random() - 0.5) * 1.2,
+            -velDir.x * 2.5 + (Math.random() - 0.5) * 2.0,
+            -velDir.y * 2.5 + (Math.random() - 0.3) * 2.5,
+            -velDir.z * 2.5 + (Math.random() - 0.5) * 2.0,
           );
-          tp.life = 0.2 + Math.random() * 0.15;
+          tp.life = 0.3 + Math.random() * 0.2;
           tp.maxLife = tp.life;
-          tp.mat.color.setHex(Math.random() > 0.5 ? 0xff6b35 : 0xffdd44);
+          const r = Math.random();
+          tp.mat.color.setHex(r > 0.6 ? 0xffdd44 : r > 0.3 ? 0xff6b35 : 0xff4400);
         }
 
         if (tp.life > 0) {
           tp.life -= dt;
           tp.mesh.position.addScaledVector(tp.vel, dt);
-          tp.vel.y -= 1.5 * dt;
+          tp.vel.y += 1.0 * dt; // fire rises
           const ratio = Math.max(0, tp.life / tp.maxLife);
-          tp.mat.opacity = ratio * 0.8;
-          tp.mesh.scale.setScalar(0.5 + ratio * 0.8);
-          tp.mesh.rotation.x += dt * 5;
-          tp.mesh.rotation.z += dt * 4;
+          tp.mat.opacity = ratio * 0.9;
+          // Start big, shrink as they fade
+          tp.mesh.scale.setScalar(1.0 + ratio * 1.5);
+          tp.mesh.rotation.x += dt * 6;
+          tp.mesh.rotation.y += dt * 4;
+          tp.mesh.rotation.z += dt * 5;
           tp.mesh.visible = true;
         } else {
           tp.mesh.visible = false;

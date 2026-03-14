@@ -979,9 +979,9 @@ export class WeaponModels {
 
     // Right vector (perpendicular to look direction, horizontal plane)
     const right = new THREE.Vector3(
-      -Math.cos(player.yaw),
+      Math.cos(player.yaw),
       0,
-      Math.sin(player.yaw),
+      -Math.sin(player.yaw),
     ).normalize();
 
     // Spawn from bottom-right of the player's view (where the held fist is)
@@ -1030,7 +1030,7 @@ export class WeaponModels {
     }
 
     const skill = gameState.getSelectedSkill();
-    const speed = 18;
+    const speed = 9;
     m.projectiles.push({
       group: projGroup,
       velocity: dir.clone().multiplyScalar(speed),

@@ -1,6 +1,19 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { CHARACTER_MODEL, SKINS } from '../config/skins.js';
 
 const _predicted = new THREE.Vector3();
+const glbLoader = new GLTFLoader();
+const textureLoader = new THREE.TextureLoader();
+let cachedGLTF = null;
+
+function loadCharacterModel() {
+  if (cachedGLTF) return cachedGLTF;
+  cachedGLTF = new Promise((resolve, reject) => {
+    glbLoader.load(CHARACTER_MODEL, (gltf) => resolve(gltf), undefined, reject);
+  });
+  return cachedGLTF;
+}
 
 function colorFromName(name) {
   let hash = 0;
@@ -40,7 +53,7 @@ function createNameTag(name, color) {
   return sprite;
 }
 
-function createAvatar(name) {
+function createFallbackAvatar(name) {
   const root = new THREE.Group();
   const color = colorFromName(name);
   const dark = color.clone().multiplyScalar(0.68);
@@ -65,8 +78,14 @@ function createAvatar(name) {
   const tag = createNameTag(name, color);
 
   root.add(body, head, leftArm, rightArm, leftLeg, rightLeg, tag);
+  return { root, leftArm, rightArm, leftLeg, rightLeg };
+}
+
+function createAvatar(name) {
+  const { root, leftArm, rightArm, leftLeg, rightLeg } = createFallbackAvatar(name);
   return {
     root,
+    skinId: null,
     snapshotPosition: new THREE.Vector3(),
     snapshotVelocity: new THREE.Vector3(),
     targetPosition: new THREE.Vector3(),
@@ -78,6 +97,60 @@ function createAvatar(name) {
     leftLeg,
     rightLeg,
   };
+}
+
+async function upgradeAvatarToSkin(avatar, skin, name) {
+  try {
+    const gltf = await loadCharacterModel();
+    const model = gltf.scene.clone(true);
+
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const targetHeight = 1.75;
+    const scale = targetHeight / Math.max(size.y, 0.01);
+    model.scale.setScalar(scale);
+
+    const center = box.getCenter(new THREE.Vector3());
+    model.position.y = -center.y * scale;
+
+    // Apply skin texture
+    const tex = textureLoader.load(skin.texture);
+    tex.flipY = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    model.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mat = child.material.clone();
+        mat.map = tex;
+        mat.needsUpdate = true;
+        child.material = mat;
+      }
+    });
+
+    const color = colorFromName(name);
+    const tag = createNameTag(name, color);
+
+    const pos = avatar.root.position.clone();
+    const rot = avatar.root.rotation.y;
+    const parent = avatar.root.parent;
+
+    if (parent) parent.remove(avatar.root);
+
+    const newRoot = new THREE.Group();
+    newRoot.add(model, tag);
+    newRoot.position.copy(pos);
+    newRoot.rotation.y = rot;
+
+    if (parent) parent.add(newRoot);
+
+    avatar.root = newRoot;
+    avatar.leftArm = null;
+    avatar.rightArm = null;
+    avatar.leftLeg = null;
+    avatar.rightLeg = null;
+    avatar.skinId = skin.id;
+  } catch (err) {
+    console.error('Failed to load skin for remote player:', err);
+  }
 }
 
 function lerpAngle(from, to, alpha) {
@@ -116,6 +189,15 @@ export class RemotePlayers {
         this.avatars.set(player.name, avatar);
       }
 
+      // Upgrade avatar to GLB skin if the remote player has a skin set
+      const remoteSkinId = player.skinId ?? null;
+      if (remoteSkinId && remoteSkinId !== avatar.skinId) {
+        const skin = SKINS.find((s) => s.id === remoteSkinId);
+        if (skin) {
+          void upgradeAvatarToSkin(avatar, skin, player.name);
+        }
+      }
+
       avatar.snapshotPosition.set(player.x ?? 0, player.y ?? 0, player.z ?? 0);
       avatar.snapshotVelocity.set(player.vx ?? 0, player.vy ?? 0, player.vz ?? 0);
       avatar.snapshotLocalTime = Number.isFinite(player.lastSeen)
@@ -148,13 +230,16 @@ export class RemotePlayers {
       }
       avatar.root.rotation.y = lerpAngle(avatar.root.rotation.y, avatar.targetYaw, Math.min(1, dt * 10));
 
-      const moveAmount = avatar.snapshotVelocity.length();
-      avatar.walkTime += dt * Math.max(2.5, moveAmount * 6);
-      const stride = Math.sin(avatar.walkTime) * Math.min(0.35, moveAmount * 0.18);
-      avatar.leftArm.rotation.x = -stride;
-      avatar.rightArm.rotation.x = stride;
-      avatar.leftLeg.rotation.x = stride;
-      avatar.rightLeg.rotation.x = -stride;
+      // Walk animation only for fallback avatars with limbs
+      if (avatar.leftArm) {
+        const moveAmount = avatar.snapshotVelocity.length();
+        avatar.walkTime += dt * Math.max(2.5, moveAmount * 6);
+        const stride = Math.sin(avatar.walkTime) * Math.min(0.35, moveAmount * 0.18);
+        avatar.leftArm.rotation.x = -stride;
+        avatar.rightArm.rotation.x = stride;
+        avatar.leftLeg.rotation.x = stride;
+        avatar.rightLeg.rotation.x = -stride;
+      }
     });
   }
 

@@ -4,6 +4,7 @@ import {
   PLAYER_MAX_HP, PLAYER_BASE_ATTACK, PLAYER_BASE_DEFENSE, MOVE_SPEED,
 } from '../config/constants.js';
 import { DEFAULT_SKILLS } from '../config/skills.js';
+import { DEFAULT_SKIN } from '../config/skins.js';
 
 /**
  * Central game state. All systems read/write from this shared object.
@@ -20,6 +21,9 @@ export class GameState {
     this.useManualClock = false;
     this.selectedIndex = 0;
     this.playerName = 'Player';
+
+    // Skin system
+    this.selectedSkin = DEFAULT_SKIN;
 
     // Fruit system
     this.selectedFruit = null;   // fruit definition object

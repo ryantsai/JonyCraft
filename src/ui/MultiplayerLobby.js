@@ -1,5 +1,6 @@
 import { events } from '../core/EventBus.js';
 import { rerollPlayerName } from '../network/PlayerIdentity.js';
+import { SkinSelect } from './SkinSelect.js';
 
 function suggestedSessionName(playerName) {
   return `${playerName}'s Realm`;
@@ -16,6 +17,7 @@ export class MultiplayerLobby {
     this.playerNameEl = null;
     this.sessionsEl = null;
     this.hostModeButtons = [];
+    this.skinSelect = null;
     this.busy = false;
   }
 
@@ -118,6 +120,14 @@ export class MultiplayerLobby {
     this.playerNameEl = overlay.querySelector('#multiplayer-player-name');
     this.sessionsEl = overlay.querySelector('#multiplayer-sessions');
     this.hostModeButtons = Array.from(overlay.querySelectorAll('.host-mode-btn'));
+
+    this.skinSelect = new SkinSelect(this.state);
+    const panel = overlay.querySelector('.multiplayer-panel');
+    const actionsEl = overlay.querySelector('.multiplayer-actions');
+    const skinContainer = document.createElement('div');
+    skinContainer.className = 'multiplayer-field';
+    panel.insertBefore(skinContainer, actionsEl);
+    this.skinSelect.buildDOM(skinContainer);
 
     const refreshEndpoint = async () => {
       if (this.busy) return;

@@ -355,7 +355,8 @@ body {
     rgba(4, 8, 14, 0.78);
   backdrop-filter: blur(4px);
   transition: opacity 400ms cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .start-screen[data-hidden='true'] {

@@ -94,38 +94,6 @@ export const gameTemplate = `
           </div>
         </div>
 
-        <div class="menu-divider"></div>
-
-        <div class="controls-section">
-          <p class="section-label">操作說明</p>
-          <div class="control-grid">
-            <div class="control-item">
-              <kbd>W A S D</kbd>
-              <span>移動</span>
-            </div>
-            <div class="control-item">
-              <kbd>空白鍵</kbd>
-              <span>跳躍</span>
-            </div>
-            <div class="control-item">
-              <kbd>滑鼠</kbd>
-              <span>視角</span>
-            </div>
-            <div class="control-item">
-              <kbd>左鍵</kbd>
-              <span>攻擊</span>
-            </div>
-            <div class="control-item">
-              <kbd>右鍵</kbd>
-              <span>放置方塊</span>
-            </div>
-            <div class="control-item">
-              <kbd>1 2 3 4</kbd>
-              <span>切換技能</span>
-            </div>
-          </div>
-        </div>
-
         <p class="footer-credit">Kenney 體素素材 · Three.js 引擎</p>
       </div>
 

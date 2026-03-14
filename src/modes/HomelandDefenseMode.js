@@ -146,6 +146,26 @@ export class HomelandDefenseMode extends GameMode {
       placeholder.add(model);
       const finalBox = new THREE.Box3().setFromObject(placeholder);
       this.towerHealthBar.position.y = finalBox.max.y + 1;
+
+      // Load Luffy mascot on top of the tower
+      loader.load('assets/npc/luffy.glb', (luffyGltf) => {
+        const luffy = luffyGltf.scene;
+        const lBox = new THREE.Box3().setFromObject(luffy);
+        const lSize = lBox.getSize(new THREE.Vector3());
+        const lMax = Math.max(lSize.x, lSize.y, lSize.z);
+        const ls = 2.5 / lMax;
+        luffy.scale.set(ls, ls, ls);
+        const lScaled = new THREE.Box3().setFromObject(luffy);
+        const lCenter = lScaled.getCenter(new THREE.Vector3());
+        luffy.position.x -= lCenter.x;
+        luffy.position.y = finalBox.max.y - placeholder.position.y - lScaled.min.y;
+        luffy.position.z -= lCenter.z;
+        placeholder.add(luffy);
+
+        // Raise health bar above mascot
+        const topBox = new THREE.Box3().setFromObject(placeholder);
+        this.towerHealthBar.position.y = topBox.max.y + 1;
+      });
     });
   }
 

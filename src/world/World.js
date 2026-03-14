@@ -72,6 +72,7 @@ export class World {
   }
 
   shouldRenderBlock(type, x, y, z) {
+    if (BLOCK_DEFS[type]?.invisible) return false;
     if (type === 'water') {
       return this.getBlock(x, y + 1, z) !== 'water';
     }

@@ -12,6 +12,7 @@ export class BlockMaterials {
 
   build() {
     Object.entries(BLOCK_DEFS).forEach(([type, def]) => {
+      if (def.invisible) return;
       const top = def.faces.top ?? def.faces.all ?? def.faces.side;
       const bottom = def.faces.bottom ?? def.faces.all ?? def.faces.side ?? top;
       const side = def.faces.side ?? def.faces.all ?? top;

@@ -72,7 +72,7 @@ export function buildTowerCollision(world, centerX, centerZ) {
       // Circular footprint
       if (x * x + z * z > towerRadius * towerRadius + 1) continue;
       for (let y = ground + 1; y <= ground + towerHeight; y += 1) {
-        world.setBlock(cx + x, y, cz + z, 'brick');
+        world.setBlock(cx + x, y, cz + z, 'barrier');
       }
     }
   }

@@ -63,6 +63,11 @@ export const BLOCK_DEFS = {
     },
     collides: true,
   },
+  barrier: {
+    name: '屏障',
+    collides: true,
+    invisible: true,
+  },
   water: {
     name: '水',
     icon: assetUrl('assets/kenney/tiles/water.png'),

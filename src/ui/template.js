@@ -4,11 +4,11 @@
  */
 export const gameTemplate = `
   <div class="shell">
-    <canvas class="game-canvas" aria-label="JonyCraft 體素沙盒"></canvas>
+    <canvas class="game-canvas" aria-label="JonyCraft 像素沙盒"></canvas>
     <div class="hud">
       <div class="crosshair" aria-hidden="true"></div>
       <div class="status-bar">
-        <div id="status-message">正在載入 Kenney 體素資源...</div>
+        <div id="status-message">正在載入 Kenney 像素資源...</div>
         <div id="status-coords"></div>
       </div>
       <div id="multiplayer-scoreboard" class="multiplayer-scoreboard" data-visible="false" aria-label="多人分數板">
@@ -67,7 +67,7 @@ export const gameTemplate = `
               <span class="title-jony">Jony</span><span class="title-craft">Craft</span>
             </h1>
           </div>
-          <p class="subtitle">體素沙盒冒險</p>
+          <p class="subtitle">像素沙盒冒險</p>
         </div>
 
         <div class="menu-divider"></div>
@@ -92,7 +92,7 @@ export const gameTemplate = `
           </div>
         </div>
 
-        <p class="footer-credit">Kenney 體素素材 · Three.js 引擎</p>
+        <p class="footer-credit">Kenney 像素素材 · Three.js 引擎</p>
       </div>
 
       <div id="singleplayer-screen" class="start-panel menu-page" data-hidden="true">
@@ -107,7 +107,7 @@ export const gameTemplate = `
               <span class="title-jony">Jony</span><span class="title-craft">Craft</span>
             </h1>
           </div>
-          <p class="subtitle">體素沙盒冒險</p>
+          <p class="subtitle">像素沙盒冒險</p>
         </div>
 
         <div class="menu-divider"></div>
@@ -115,14 +115,14 @@ export const gameTemplate = `
         <div id="mode-select" class="mode-select">
           <p class="section-label">選擇模式</p>
           <div class="mode-list">
-            <button class="mode-btn mode-btn-active" data-mode="test" type="button">
+            <button class="mode-btn" data-mode="test" type="button">
               <img src="assets/kenney/items/sword_diamond.png" alt="" class="mode-icon" />
               <div class="mode-info">
                 <span class="mode-name">測試模式</span>
                 <span class="mode-desc">戰鬥、建造、探索</span>
               </div>
             </button>
-            <button class="mode-btn" data-mode="homeland" type="button">
+            <button class="mode-btn mode-btn-active" data-mode="homeland" type="button">
               <img src="assets/kenney/items/trophy.png" alt="" class="mode-icon" />
               <div class="mode-info">
                 <span class="mode-name">保衛家園</span>
@@ -169,7 +169,7 @@ export const gameTemplate = `
           <span class="start-btn-arrow">▶</span>
         </button>
 
-        <p class="footer-credit">Kenney 體素素材 · Three.js 引擎</p>
+        <p class="footer-credit">Kenney 像素素材 · Three.js 引擎</p>
       </div>
 
       <div id="disconnect-screen" class="start-panel menu-page disconnect-screen" data-hidden="true">

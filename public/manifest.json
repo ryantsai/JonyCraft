@@ -1,7 +1,7 @@
 {
   "name": "JonyCraft",
   "short_name": "JonyCraft",
-  "description": "體素沙盒冒險",
+  "description": "像素沙盒冒險",
   "start_url": ".",
   "scope": ".",
   "display": "fullscreen",

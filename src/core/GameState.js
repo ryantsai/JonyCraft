@@ -15,7 +15,7 @@ export class GameState {
   constructor() {
     this.mode = 'loading'; // loading | menu | fruit_select | playing | paused
     this.playStyle = 'singleplayer';
-    this.gameMode = 'test';
+    this.gameMode = 'homeland';
     this.modeController = null;
     this.started = false;
     this.useManualClock = false;

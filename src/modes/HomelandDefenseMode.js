@@ -166,7 +166,7 @@ export class HomelandDefenseMode extends GameMode {
 
         // Raise health bar above mascot
         const topBox = new THREE.Box3().setFromObject(placeholder);
-        this.towerHealthBar.position.y = topBox.max.y + 1;
+        this.towerHealthBar.position.y = topBox.max.y + 2.5;
       });
     });
   }

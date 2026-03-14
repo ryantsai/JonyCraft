@@ -4,7 +4,6 @@ import { CHARACTER_MODEL, SKINS } from '../config/skins.js';
 import { events } from '../core/EventBus.js';
 
 const loader = new GLTFLoader();
-const textureLoader = new THREE.TextureLoader();
 let cachedGLTF = null;
 
 function loadModel() {
@@ -71,7 +70,12 @@ export class SkinSelect {
 
     this._initPreviewRenderer();
     this._buildGrid();
-    this._loadModel().then(() => this._applyTexture(this.state.selectedSkin));
+    // GLB already loads with texture-a; only swap if a different skin is selected
+    this._loadModel().then(() => {
+      if (this.state.selectedSkin.id !== 'a') {
+        this._applyTexture(this.state.selectedSkin);
+      }
+    });
   }
 
   dispose() {
@@ -166,17 +170,16 @@ export class SkinSelect {
 
   _applyTexture(skin) {
     if (!this.previewModel) return;
-    const tex = textureLoader.load(skin.texture);
-    tex.flipY = false;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    this.previewModel.traverse((child) => {
-      if (child.isMesh && child.material) {
-        const mat = child.material.clone();
-        mat.map = tex;
-        mat.needsUpdate = true;
-        child.material = mat;
-      }
-    });
+    const img = new Image();
+    img.src = skin.texture;
+    img.onload = () => {
+      this.previewModel.traverse((child) => {
+        if (child.isMesh && child.material?.map) {
+          child.material.map.image = img;
+          child.material.map.needsUpdate = true;
+        }
+      });
+    };
   }
 
   _startPreviewLoop() {

@@ -249,6 +249,7 @@ class SessionStore:
                 "mode": clamp_text(incoming.get("mode"), "menu", 20),
                 "fruitId": clamp_text(incoming.get("fruitId"), "", 24),
                 "selectedSkillId": clamp_text(incoming.get("selectedSkillId"), "", 32),
+                "skinId": clamp_text(incoming.get("skinId"), "", 24),
                 "hp": float(incoming.get("hp") or state.get("hp") or 100.0),
                 "maxHp": float(incoming.get("maxHp") or state.get("maxHp") or 100.0),
             }

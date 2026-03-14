@@ -4,7 +4,6 @@ import { CHARACTER_MODEL, SKINS } from '../config/skins.js';
 
 const _predicted = new THREE.Vector3();
 const glbLoader = new GLTFLoader();
-const textureLoader = new THREE.TextureLoader();
 let cachedGLTF = null;
 
 function loadCharacterModel() {
@@ -113,18 +112,23 @@ async function upgradeAvatarToSkin(avatar, skin, name) {
     const center = box.getCenter(new THREE.Vector3());
     model.position.y = -center.y * scale;
 
-    // Apply skin texture
-    const tex = textureLoader.load(skin.texture);
-    tex.flipY = false;
-    tex.colorSpace = THREE.SRGBColorSpace;
-    model.traverse((child) => {
-      if (child.isMesh && child.material) {
-        const mat = child.material.clone();
-        mat.map = tex;
-        mat.needsUpdate = true;
-        child.material = mat;
-      }
-    });
+    // Apply skin texture by replacing image on existing GLB texture
+    if (skin.id !== 'a') {
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.src = skin.texture;
+        img.onload = () => {
+          model.traverse((child) => {
+            if (child.isMesh && child.material?.map) {
+              child.material.map.image = img;
+              child.material.map.needsUpdate = true;
+            }
+          });
+          resolve();
+        };
+        img.onerror = resolve;
+      });
+    }
 
     const color = colorFromName(name);
     const tag = createNameTag(name, color);

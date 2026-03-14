@@ -52,6 +52,12 @@ export class CombatSystem {
       });
     }
 
+    // fire_fist uses projectile — damage is handled by the projectile on hit
+    if (skill.weaponType === 'fire_fist') {
+      events.emit('combat:fire-fist-shoot');
+      return;
+    }
+
     if (this._shouldUseServerHomelandAttack()) {
       this._queueHomelandAttack({
         range: skill.range,

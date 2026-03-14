@@ -49,6 +49,7 @@ const targeting = new Targeting(gameState, world, scene, enemyManager);
 const particles = new ParticleSystem(scene, textureManager);
 enemyManager.setParticles(particles);
 const weaponModels = new WeaponModels(scene, textureManager, blockMaterials);
+weaponModels.setRefs(enemyManager, particles);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);

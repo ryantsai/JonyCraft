@@ -112,11 +112,21 @@ export class WeaponModels {
     // Track active fruit for tint changes
     this._lastFruitId = null;
 
+    // References set externally
+    this._gameState = null;
+    this._enemyMgr = null;
+    this._particles = null;
+
     // Fruit VFX particle system
     this._vfxParticles = [];
     this._vfxGroup = null;
     this._vfxAnimStyle = null;
     this._vfxTime = 0;
+  }
+
+  setRefs(enemyManager, particles) {
+    this._enemyMgr = enemyManager;
+    this._particles = particles;
   }
 
   buildAll() {
@@ -135,9 +145,15 @@ export class WeaponModels {
     events.on('combat:fruit-attack', ({ animStyle, color }) => {
       this._triggerAttackEffect(animStyle, color);
     });
+
+    // Listen for fire fist projectile spawn
+    events.on('combat:fire-fist-shoot', () => {
+      if (this._gameState) this.spawnFireFistProjectile(this._gameState);
+    });
   }
 
   update(dt, gameState) {
+    this._gameState = gameState;
     const combat = gameState.combat;
     if (combat.cooldown > 0) combat.cooldown = Math.max(0, combat.cooldown - dt * 1000);
     combat.swordSwingTime = Math.max(0, combat.swordSwingTime - dt * 1000);
@@ -877,40 +893,23 @@ export class WeaponModels {
     this.models.clap = { group, leftFist, rightFist, leftMat, rightMat, energyBurst };
   }
 
-  // ── Fire Fist: GLB model with flying punch + fire particles ──
+  // ── Fire Fist: GLB projectile that shoots forward like an arrow ──
 
   _buildFireFist() {
+    // First-person held model (visible in camera space)
     const group = new THREE.Group();
     group.visible = false;
     this.scene.heldItemPivot.add(group);
-
-    // Fire trail particles (pre-allocated pool)
-    const fireParticles = [];
-    for (let i = 0; i < 20; i++) {
-      const mat = new THREE.MeshBasicMaterial({
-        color: i % 2 === 0 ? 0xff6b35 : 0xffdd44,
-        transparent: true,
-        opacity: 0,
-        blending: THREE.AdditiveBlending,
-        depthTest: false,
-      });
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.04), mat);
-      mesh.visible = false;
-      mesh.renderOrder = 56;
-      group.add(mesh);
-      fireParticles.push({
-        mesh, mat,
-        vel: new THREE.Vector3(),
-        life: 0, maxLife: 0,
-      });
-    }
 
     this.models.fire_fist = {
       group,
       glbModel: null,
       glbLoaded: false,
-      fireParticles,
+      glbBaseScale: new THREE.Vector3(1, 1, 1),
       idleTime: 0,
+      // World-space projectiles
+      projectiles: [],
+      projectileTemplate: null,
     };
 
     // Load the GLB model
@@ -923,123 +922,224 @@ export class WeaponModels {
       const maxDim = Math.max(size.x, size.y, size.z);
       const s = 0.5 / maxDim;
       model.scale.set(s, s, s);
-      // Center the model
       const center = box.getCenter(new THREE.Vector3());
       model.position.set(-center.x * s, -center.y * s, -center.z * s);
 
       group.add(model);
       this.models.fire_fist.glbModel = model;
+      this.models.fire_fist.glbBaseScale.copy(model.scale);
       this.models.fire_fist.glbLoaded = true;
+      // Keep a reference for cloning projectiles
+      this.models.fire_fist.projectileTemplate = model;
     });
   }
 
   _animateFireFist(combat, swingMs, mod, gameState) {
     const m = this.models.fire_fist;
     if (!m) return;
-    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
-    const attacking = phase > 0;
 
+    const onCooldown = combat.cooldown > 0;
     m.idleTime += 0.016;
     const t = m.idleTime;
 
-    // Idle: bottom-right with gentle wavering
-    const idleX = 0.55;
-    const idleY = -0.55;
-    const idleZ = -0.7;
-    const waveX = Math.sin(t * 1.8) * 0.015;
-    const waveY = Math.cos(t * 1.3) * 0.02;
-    const waveRot = Math.sin(t * 1.1) * 0.03;
-
-    if (attacking) {
-      // Attack phases
-      const windup = THREE.MathUtils.smoothstep(phase, 0, 0.15);
-      const launch = THREE.MathUtils.smoothstep(phase, 0.1, 0.45);
-      const recover = THREE.MathUtils.smoothstep(phase, 0.55, 1);
-      const fly = Math.max(0, launch - recover * 0.9);
-
-      // Pull back then fly forward toward center
-      m.group.position.set(
-        THREE.MathUtils.lerp(idleX, -0.05, fly) + windup * 0.08,
-        THREE.MathUtils.lerp(idleY, 0.05, fly) + windup * 0.06,
-        THREE.MathUtils.lerp(idleZ, -2.2, fly),
-      );
-
-      // Rotate to face forward during punch
-      m.group.rotation.set(
-        THREE.MathUtils.lerp(0.15, -0.1, fly) + windup * 0.2,
-        THREE.MathUtils.lerp(-0.2, 0, fly),
-        THREE.MathUtils.lerp(-0.15, 0, fly),
-      );
-
-      // Scale up slightly during impact
-      const impactScale = 1 + fly * 0.3 * mod.fistScale;
-      if (m.glbModel) m.glbModel.scale.multiplyScalar(impactScale / (m.glbModel.userData._lastImpact || 1));
-      if (m.glbModel) m.glbModel.userData._lastImpact = impactScale;
-
-      // Spawn fire trail particles during flight
-      this._updateFireTrail(m, phase, fly, true);
+    // Hide the held model while on cooldown (fist was "shot")
+    if (onCooldown) {
+      m.group.visible = false;
     } else {
-      // Idle position with wavering
-      m.group.position.set(idleX + waveX, idleY + waveY, idleZ);
+      // Idle: bottom-right with gentle wavering
+      const waveX = Math.sin(t * 1.8) * 0.015;
+      const waveY = Math.cos(t * 1.3) * 0.02;
+      const waveRot = Math.sin(t * 1.1) * 0.03;
+      m.group.position.set(0.55 + waveX, -0.55 + waveY, -0.7);
       m.group.rotation.set(0.15 + waveRot, -0.2, -0.15 + waveRot * 0.5);
-
-      if (m.glbModel) {
-        m.glbModel.userData._lastImpact = 1;
-      }
-
-      this._updateFireTrail(m, 0, 0, false);
+      // Reset scale to base
+      if (m.glbModel) m.glbModel.scale.copy(m.glbBaseScale);
+      m.group.visible = gameState.mode === 'playing';
     }
 
-    m.group.visible = gameState.mode === 'playing';
+    // Update world-space projectiles
+    this._updateFireFistProjectiles(gameState);
   }
 
-  _updateFireTrail(m, phase, fly, attacking) {
-    const particles = m.fireParticles;
-    const dt = 0.016;
+  /**
+   * Called by Combat when fire_fist attack triggers.
+   * Spawns a world-space projectile in the direction the player is looking.
+   */
+  spawnFireFistProjectile(gameState) {
+    const m = this.models.fire_fist;
+    if (!m || !m.glbLoaded) return;
 
-    particles.forEach((p, i) => {
-      if (attacking && fly > 0.05) {
-        // Spawn new particles from fist position
-        if (p.life <= 0 && Math.random() < 0.4) {
-          const pos = m.group.position;
-          p.mesh.position.set(
-            pos.x + (Math.random() - 0.5) * 0.15,
-            pos.y + (Math.random() - 0.5) * 0.15,
-            pos.z + Math.random() * 0.3,
-          );
-          p.vel.set(
-            (Math.random() - 0.5) * 1.5,
-            (Math.random() - 0.3) * 2.0,
-            (Math.random() + 0.5) * 1.5,
-          );
-          p.life = 0.3 + Math.random() * 0.25;
-          p.maxLife = p.life;
-          p.mat.color.setHex(Math.random() > 0.5 ? 0xff6b35 : 0xffdd44);
+    const player = gameState.player;
+    // Direction from player yaw/pitch
+    const dir = new THREE.Vector3(
+      -Math.sin(player.yaw) * Math.cos(player.pitch),
+      Math.sin(player.pitch),
+      -Math.cos(player.yaw) * Math.cos(player.pitch),
+    ).normalize();
+
+    // Spawn position: in front of the player
+    const spawnPos = new THREE.Vector3(
+      player.position.x + dir.x * 0.8,
+      player.position.y + 1.4 + dir.y * 0.8,
+      player.position.z + dir.z * 0.8,
+    );
+
+    // Clone the GLB model for the projectile
+    const projModel = m.projectileTemplate.clone();
+    // Make it a bit bigger in world space
+    const ws = 1.8;
+    projModel.scale.copy(m.glbBaseScale).multiplyScalar(ws);
+    projModel.position.set(0, 0, 0);
+    // Rotate to face the direction of travel
+    const quat = new THREE.Quaternion();
+    const up = new THREE.Vector3(0, 1, 0);
+    const rotMatrix = new THREE.Matrix4().lookAt(new THREE.Vector3(), dir, up);
+    quat.setFromRotationMatrix(rotMatrix);
+
+    const projGroup = new THREE.Group();
+    projGroup.position.copy(spawnPos);
+    projGroup.quaternion.copy(quat);
+    projGroup.add(projModel);
+    this.scene.particleGroup.add(projGroup);
+
+    // Fire trail particles attached to this projectile
+    const trailParticles = [];
+    for (let i = 0; i < 12; i++) {
+      const tMat = new THREE.MeshBasicMaterial({
+        color: i % 2 === 0 ? 0xff6b35 : 0xffdd44,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+      });
+      const tMesh = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 0.06), tMat);
+      tMesh.visible = false;
+      tMesh.renderOrder = 56;
+      this.scene.particleGroup.add(tMesh);
+      trailParticles.push({
+        mesh: tMesh, mat: tMat,
+        vel: new THREE.Vector3(),
+        life: 0, maxLife: 0,
+      });
+    }
+
+    const skill = gameState.getSelectedSkill();
+    const speed = 18;
+    m.projectiles.push({
+      group: projGroup,
+      velocity: dir.clone().multiplyScalar(speed),
+      origin: spawnPos.clone(),
+      maxRange: skill.range + 2,
+      age: 0,
+      damage: (skill.damage ?? 2) * player.baseAttack,
+      knockback: skill.knockback ?? 6.0,
+      trailParticles,
+      alive: true,
+    });
+  }
+
+  _updateFireFistProjectiles(gameState) {
+    const m = this.models.fire_fist;
+    if (!m) return;
+    const dt = 0.016;
+    const enemies = this._enemyMgr;
+
+    for (let i = m.projectiles.length - 1; i >= 0; i--) {
+      const proj = m.projectiles[i];
+      if (!proj.alive) continue;
+
+      proj.age += dt;
+      proj.group.position.addScaledVector(proj.velocity, dt);
+
+      // Check distance traveled
+      const dist = proj.group.position.distanceTo(proj.origin);
+
+      // Check enemy collision
+      let hit = false;
+      if (enemies) {
+        const alive = enemies.getAlive();
+        for (const enemy of alive) {
+          const d = proj.group.position.distanceTo(enemy.root.position);
+          const hitRadius = 1.2 * (enemy.sizeMultiplier || 1);
+          if (d < hitRadius) {
+            // Deal damage
+            const def = enemy.baseDefense || 0;
+            const dmg = Math.max(1, proj.damage - def);
+            enemy.health -= dmg;
+            enemy.hitFlash = 1;
+
+            // Knockback
+            const away = new THREE.Vector3()
+              .subVectors(enemy.root.position, proj.group.position)
+              .normalize();
+            enemy.knockback.copy(away.multiplyScalar(proj.knockback));
+            enemy.knockbackTimer = 240;
+
+            // Particles
+            if (this._particles) {
+              this._particles.spawn(enemy.root.position.clone(), 'orange', 16);
+            }
+
+            // Defeat check
+            if (enemy.health <= 0) {
+              enemies.defeat(enemy, { source: 'fire_fist' });
+            }
+
+            events.emit('sound:punch');
+            events.emit('hud:update');
+            hit = true;
+            break;
+          }
         }
       }
 
-      if (p.life > 0) {
-        p.life -= dt;
-        p.mesh.position.x += p.vel.x * dt;
-        p.mesh.position.y += p.vel.y * dt;
-        p.mesh.position.z += p.vel.z * dt;
-        p.vel.y -= 2.0 * dt; // gravity
-        const ratio = Math.max(0, p.life / p.maxLife);
-        p.mat.opacity = ratio * 0.8;
-        const sc = 0.03 + ratio * 0.05;
-        p.mesh.scale.setScalar(sc / 0.04);
-        p.mesh.rotation.set(
-          p.mesh.rotation.x + dt * 5,
-          p.mesh.rotation.y + dt * 3,
-          p.mesh.rotation.z + dt * 4,
-        );
-        p.mesh.visible = true;
-      } else {
-        p.mesh.visible = false;
-        p.mat.opacity = 0;
+      // Remove if hit or out of range
+      if (hit || dist > proj.maxRange) {
+        proj.alive = false;
+        this.scene.particleGroup.remove(proj.group);
+        // Cleanup trail particles
+        proj.trailParticles.forEach((tp) => {
+          this.scene.particleGroup.remove(tp.mesh);
+          tp.mat.dispose();
+        });
+        m.projectiles.splice(i, 1);
+        continue;
       }
-    });
+
+      // Spawn trail particles behind projectile
+      proj.trailParticles.forEach((tp) => {
+        if (tp.life <= 0 && Math.random() < 0.5) {
+          tp.mesh.position.copy(proj.group.position);
+          tp.mesh.position.x += (Math.random() - 0.5) * 0.2;
+          tp.mesh.position.y += (Math.random() - 0.5) * 0.2;
+          tp.mesh.position.z += (Math.random() - 0.5) * 0.2;
+          tp.vel.set(
+            (Math.random() - 0.5) * 1.2,
+            (Math.random() - 0.2) * 1.5,
+            (Math.random() - 0.5) * 1.2,
+          );
+          tp.life = 0.2 + Math.random() * 0.15;
+          tp.maxLife = tp.life;
+          tp.mat.color.setHex(Math.random() > 0.5 ? 0xff6b35 : 0xffdd44);
+        }
+
+        if (tp.life > 0) {
+          tp.life -= dt;
+          tp.mesh.position.addScaledVector(tp.vel, dt);
+          tp.vel.y -= 1.5 * dt;
+          const ratio = Math.max(0, tp.life / tp.maxLife);
+          tp.mat.opacity = ratio * 0.8;
+          tp.mesh.scale.setScalar(0.5 + ratio * 0.8);
+          tp.mesh.rotation.x += dt * 5;
+          tp.mesh.rotation.z += dt * 4;
+          tp.mesh.visible = true;
+        } else {
+          tp.mesh.visible = false;
+        }
+      });
+    }
   }
+
 
   // ── Fruit VFX particle system ──
 

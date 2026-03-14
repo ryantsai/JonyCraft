@@ -1,11 +1,12 @@
 /**
- * Virtual gamepad for mobile devices: dual touch pads + action buttons.
+ * Virtual gamepad for mobile devices: move pad, swipe-to-look, action buttons.
  */
 export class MobileControls {
   constructor(inputManager, combatSystem, gameState) {
     this.input = inputManager;
     this.combat = combatSystem;
     this.state = gameState;
+    this.canvas = inputManager.canvas;
     this.isMobile = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
   }
 
@@ -15,8 +16,6 @@ export class MobileControls {
 
     const movePad = document.querySelector('#move-pad');
     const moveKnob = document.querySelector('#move-knob');
-    const lookPad = document.querySelector('#look-pad');
-    const lookKnob = document.querySelector('#look-knob');
     const touchJump = document.querySelector('#touch-jump');
     const touchPrimary = document.querySelector('#touch-primary');
     const touchSecondary = document.querySelector('#touch-secondary');
@@ -26,10 +25,7 @@ export class MobileControls {
       this.input.virtualInput.moveZ = y;
     });
 
-    this._bindTouchPad(lookPad, lookKnob, (x, y) => {
-      this.input.virtualInput.lookX = x * 16;
-      this.input.virtualInput.lookY = y * 16;
-    });
+    if (this.isMobile) this._bindSwipeToLook();
 
     this._bindHold(touchJump,
       () => this.input.keyState.add('Space'),
@@ -46,6 +42,46 @@ export class MobileControls {
     this._bindHold(touchSecondary, () => {
       if (this.state.getSelectedSkill().kind === 'block') this.combat.handlePlace();
     });
+  }
+
+  _bindSwipeToLook() {
+    const LOOK_SENSITIVITY = 0.006;
+    let activeId = null;
+    let lastX = 0;
+    let lastY = 0;
+
+    // Listen on the whole document so swipes anywhere (not on controls) rotate the camera
+    document.addEventListener('touchstart', (e) => {
+      if (this.state.mode !== 'playing' || activeId !== null) return;
+      // Ignore touches that land on interactive mobile controls
+      const el = e.target.closest('.touch-pad, .mobile-actions, .defense-scoreboard, .hotbar, .start-screen');
+      if (el) return;
+      const t = e.changedTouches[0];
+      activeId = t.identifier;
+      lastX = t.clientX;
+      lastY = t.clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (activeId === null) return;
+      const t = Array.from(e.changedTouches).find((x) => x.identifier === activeId);
+      if (!t) return;
+      const dx = t.clientX - lastX;
+      const dy = t.clientY - lastY;
+      lastX = t.clientX;
+      lastY = t.clientY;
+      this.state.player.yaw -= dx * LOOK_SENSITIVITY;
+      this.state.player.pitch = Math.max(-1.35, Math.min(1.35,
+        this.state.player.pitch - dy * LOOK_SENSITIVITY,
+      ));
+    }, { passive: true });
+
+    const endTouch = (e) => {
+      const t = Array.from(e.changedTouches).find((x) => x.identifier === activeId);
+      if (t) activeId = null;
+    };
+    document.addEventListener('touchend', endTouch, { passive: true });
+    document.addEventListener('touchcancel', endTouch, { passive: true });
   }
 
   _bindTouchPad(pad, knob, onMove) {

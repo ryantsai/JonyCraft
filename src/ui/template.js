@@ -45,9 +45,6 @@ export const gameTemplate = `
           <div id="move-pad" class="touch-pad" aria-label="移動搖桿">
             <div id="move-knob" class="touch-knob"></div>
           </div>
-          <div id="look-pad" class="touch-pad" aria-label="視角搖桿">
-            <div id="look-knob" class="touch-knob"></div>
-          </div>
         </div>
         <div class="mobile-actions">
           <button id="touch-jump" type="button">跳躍</button>

@@ -972,9 +972,8 @@ body {
 
 .stick-cluster {
   position: absolute;
-  left: 14px; right: 14px; bottom: 110px;
+  left: 14px; bottom: 110px;
   display: flex;
-  justify-content: space-between;
 }
 
 .touch-pad {
@@ -1016,6 +1015,8 @@ body {
 
 /* ── Responsive ── */
 @media (max-width: 720px) {
+  .defense-scoreboard { display: none !important; }
+
   .status-bar {
     max-width: calc(100vw - 24px);
     top: 12px; left: 12px;

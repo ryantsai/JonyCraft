@@ -758,6 +758,8 @@ export class WeaponModels {
       model.scale.set(s, s, s);
       const center = box.getCenter(new THREE.Vector3());
       model.position.set(-center.x * s, -center.y * s, -center.z * s);
+      // Model points along +X; rotate so head faces -Z (forward in camera space)
+      model.rotation.y = Math.PI / 2;
 
       group.add(model);
       this.models.flame_emperor.glbModel = model;

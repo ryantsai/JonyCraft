@@ -98,8 +98,8 @@ export class FireFistSpawner {
     if (!tmpl) return;
 
     const { dir, spawnPos, player } = this._getPlayerDirectionAndSpawn();
-    // Bigger projectile model in world space; rotate -90° Y so +X model faces forward (-Z)
-    const projGroup = this._createProjectileGroup(tmpl, 7.0, dir, spawnPos, -Math.PI / 2);
+    // Bigger projectile model in world space; rotate +90° Y so +X model head faces -Z (forward)
+    const projGroup = this._createProjectileGroup(tmpl, 7.0, dir, spawnPos, Math.PI / 2);
     const skill = this.state.getSelectedSkill();
 
     this.projectileSystem.spawn({
@@ -119,7 +119,7 @@ export class FireFistSpawner {
       aoe: true,
       aoeRadius: skill.aoeRadius || 5,
       explodeOnImpact: true,
-      explosionScale: 1.5,
+      explosionScale: 3.0,
       explosionColors: [0xff2200, 0xff4400, 0xffaa00, 0xffdd44, 0xff6b35],
     });
   }

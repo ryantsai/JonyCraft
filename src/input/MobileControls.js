@@ -46,9 +46,17 @@ export class MobileControls {
     const fullscreenBtn = document.querySelector('#touch-fullscreen');
     const doc = document.documentElement;
     const canFullscreen = doc.requestFullscreen || doc.webkitRequestFullscreen;
-    if (!canFullscreen) {
-      // iOS Safari: no fullscreen API — hide the button
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: fullscreen)').matches;
+
+    if (isStandalone) {
+      // Already running as PWA fullscreen — hide button
       fullscreenBtn.style.display = 'none';
+    } else if (!canFullscreen) {
+      // iOS: no fullscreen API — show "Add to Home Screen" prompt
+      fullscreenBtn.textContent = '⊕';
+      fullscreenBtn.addEventListener('click', () => {
+        this._showIOSPrompt();
+      });
     } else {
       fullscreenBtn.addEventListener('click', () => {
         const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
@@ -147,5 +155,44 @@ export class MobileControls {
     const release = (e) => { onRelease(); e.preventDefault(); };
     button.addEventListener('touchend', release, { passive: false });
     button.addEventListener('touchcancel', release, { passive: false });
+  }
+
+  _showIOSPrompt() {
+    document.querySelector('.ios-fullscreen-prompt')?.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'ios-fullscreen-prompt';
+
+    const card = document.createElement('div');
+    card.className = 'ios-prompt-card';
+
+    const title = document.createElement('p');
+    title.className = 'ios-prompt-title';
+    title.textContent = '全螢幕遊玩';
+
+    const text = document.createElement('p');
+    text.className = 'ios-prompt-text';
+    text.append(
+      '點擊瀏覽器底部的 ',
+      Object.assign(document.createElement('span'), { className: 'ios-share-icon', textContent: '⬆' }),
+      ' 分享按鈕，然後選擇',
+      document.createElement('br'),
+      Object.assign(document.createElement('strong'), { textContent: '「加入主畫面」' }),
+      '即可全螢幕遊玩',
+    );
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'ios-prompt-close';
+    closeBtn.type = 'button';
+    closeBtn.textContent = '知道了';
+    closeBtn.addEventListener('click', () => overlay.remove());
+
+    card.append(title, text, closeBtn);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
   }
 }

@@ -3,61 +3,8 @@ import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
-function createTowerHealthBar() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 160;
-  canvas.height = 20;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(3.2, 0.4, 1);
-  sprite.userData.canvas = canvas;
-  sprite.userData.texture = texture;
-  return sprite;
-}
-
-function updateTowerHealthBar(sprite, hp, maxHp) {
-  if (!sprite) return;
-  const canvas = sprite.userData.canvas;
-  const ctx = canvas.getContext('2d');
-  const ratio = Math.max(0, hp / maxHp);
-  const w = canvas.width;
-  const h = canvas.height;
-  const barW = 108;
-  const barH = 14;
-  const barX = 2;
-  const barY = 3;
-
-  ctx.clearRect(0, 0, w, h);
-
-  // Background track
-  ctx.beginPath();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-  ctx.roundRect(barX, barY, barW, barH, 5);
-  ctx.fill();
-
-  // Filled portion
-  if (ratio > 0) {
-    ctx.beginPath();
-    const fillW = Math.round((barW - 2) * ratio);
-    ctx.fillStyle = ratio > 0.5 ? '#4ae04a' : ratio > 0.25 ? '#e0c030' : '#e04040';
-    ctx.roundRect(barX + 1, barY + 1, fillW, barH - 2, 4);
-    ctx.fill();
-  }
-
-  // HP text
-  const hpVal = Math.max(0, Math.ceil(hp));
-  const maxVal = Math.round(maxHp);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${hpVal}/${maxVal}`, barX + barW + 4, barY + barH / 2);
-
-  sprite.userData.texture.needsUpdate = true;
-}
+import { GameMode } from './GameMode.js';
+import { createTowerHealthBar, updateTowerHealthBar, buildFortress } from './DefenseUtils.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -71,8 +18,9 @@ function computeToughness(enemy) {
   return def.maxHealth + (def.baseAttack * 1.5) + (def.baseDefense * 2) + (def.sizeMultiplier * 1.2);
 }
 
-export class HomelandDefenseMode {
+export class HomelandDefenseMode extends GameMode {
   constructor(gameState, world, enemyManager, scene) {
+    super();
     this.state = gameState;
     this.world = world;
     this.enemies = enemyManager;
@@ -83,21 +31,37 @@ export class HomelandDefenseMode {
     this.towerHealthBar = null;
     this.turrets = [];
     this._turretTick = 0;
+    this._unsubs = [];
   }
 
-  activate() {
+  activate(context) {
+    // If context provides world/renderer/player, do full mode setup
+    if (context) {
+      context.world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
+      context.worldRenderer.buildAll();
+      context.playerController.setSpawn();
+      this.enemies.clearAll();
+    }
+
     this.state.defense.enabled = true;
     this.state.defense.totalKills = 0;
     this.state.defense.totalGold = 0;
     this.state.defense.wave = 0;
     this.state.defense.timeLeft = WAVE_DURATION;
     this.state.defense.towerHp = this.state.defense.towerMaxHp;
-    this._buildFortress();
+    buildFortress(this.world, this.center.x, this.center.z);
     this._buildTowerVisual();
     this.startNextWave();
 
-    events.on('enemy:killed', ({ enemy }) => this._onEnemyKilled(enemy));
-    events.on('shop:purchase', ({ item }) => this.purchase(item));
+    this._unsubs.push(
+      events.on('enemy:killed', ({ enemy }) => this._onEnemyKilled(enemy)),
+      events.on('shop:purchase', ({ item }) => this.purchase(item)),
+    );
+  }
+
+  deactivate() {
+    this._unsubs.forEach(unsub => unsub());
+    this._unsubs = [];
   }
 
   update(dt) {
@@ -146,12 +110,15 @@ export class HomelandDefenseMode {
     return this.center;
   }
 
+  getDamageTarget() {
+    return 'tower';
+  }
+
   _buildTowerVisual() {
     if (this.towerMesh) return;
     const y = this.world.getTerrainSurfaceY(this.center.x, this.center.z);
     this.center.y = y;
 
-    // Place a temporary placeholder while the model loads
     const placeholder = new THREE.Group();
     placeholder.position.set(this.center.x, y, this.center.z);
     this.scene.enemyGroup.add(placeholder);
@@ -162,17 +129,14 @@ export class HomelandDefenseMode {
     this.scene.enemyGroup.add(this.towerHealthBar);
     updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
 
-    // Load the homebase GLB model
     const loader = new GLTFLoader();
     loader.load('assets/buildings/homebase/tower.glb', (gltf) => {
       const model = gltf.scene;
-      // Scale to fit ~8 units tall
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const s = 8 / maxDim;
       model.scale.set(s, s, s);
-      // Center horizontally, base at y=0
       const scaledBox = new THREE.Box3().setFromObject(model);
       const center = scaledBox.getCenter(new THREE.Vector3());
       model.position.x -= center.x;
@@ -180,34 +144,9 @@ export class HomelandDefenseMode {
       model.position.z -= center.z;
 
       placeholder.add(model);
-      // Reposition health bar above the loaded model
       const finalBox = new THREE.Box3().setFromObject(placeholder);
       this.towerHealthBar.position.y = finalBox.max.y + 1;
     });
-  }
-
-  _buildFortress() {
-    const cx = Math.floor(this.center.x);
-    const cz = Math.floor(this.center.z);
-    const ground = Math.floor(this.world.getTerrainSurfaceY(cx, cz) - 1);
-    for (let x = -6; x <= 6; x += 1) {
-      for (let z = -6; z <= 6; z += 1) {
-        const ax = cx + x;
-        const az = cz + z;
-        for (let y = ground + 1; y <= ground + 3; y += 1) {
-          const onOuterWall = Math.abs(x) === 6 || Math.abs(z) === 6;
-          const isGate = (
-            (z === -6 && Math.abs(x) <= 1) ||
-            (z === 6 && Math.abs(x) <= 1) ||
-            (x === -6 && Math.abs(z) <= 1) ||
-            (x === 6 && Math.abs(z) <= 1)
-          );
-          if (onOuterWall && !isGate) {
-            this.world.setBlock(ax, y, az, 'brick');
-          }
-        }
-      }
-    }
   }
 
   _onEnemyKilled(enemy) {

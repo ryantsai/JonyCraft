@@ -43,7 +43,7 @@ src/
     Targeting.js           - DDA voxel raycast, enemy target detection
 
   combat/
-    Combat.js              - Attack logic (sword/punch/fruit), block break/place, damage
+    Combat.js              - Unified attack logic via attack(), block break/place, damage
 
   enemies/
     Zombie.js              - Zombie 3D model creation, tinting (legacy)
@@ -53,7 +53,12 @@ src/
 
   effects/
     Particles.js           - Hit particle system
-    WeaponModels.js        - First-person weapon models, per-fruit animations, screen shake/flash, cooldown HUD
+    WeaponModels.js        - First-person weapon model building and animation
+    ScreenEffects.js       - Camera shake, flash overlay, swing burst (extracted from WeaponModels)
+    ProjectileSystem.js    - World-space projectile movement, collision, trail particles
+    FireFistSpawner.js     - Bridges combat events to ProjectileSystem for fire fist
+    FruitVFX.js            - Per-fruit VFX particle definitions and rendering
+    CooldownHUD.js         - Cooldown overlay on hotbar items
 
   input/
     InputManager.js        - Keyboard, mouse, pointer lock
@@ -62,8 +67,13 @@ src/
   audio/
     SoundManager.js        - Sound effects loading and playback
 
+  config/
+    animStyles.js          - Per-fruit animation modifier data (ANIM_MODS)
+
   modes/
-    HomelandDefenseMode.js - Wave-based tower defense mode (fortress, turrets, shop, wave scaling)
+    GameMode.js            - Base class for game modes (provides no-op defaults)
+    HomelandDefenseMode.js - Wave-based tower defense mode (extends GameMode)
+    DefenseUtils.js        - Tower health bar rendering and fortress building
 
   ui/
     template.js            - Game HTML shell template (canvas, HUD, defense scoreboard, start screen)
@@ -133,7 +143,10 @@ Players select a game mode from the start screen before entering the world:
 - Maintain the automation testing hooks when modifying game state
 - Block textures support per-face definitions (`side`, `top`, `bottom`) or `all`
 - New enemy types go in `src/config/enemyTypes.js` with a behavior from `EnemyBehaviors.js`
-- New fruit definitions go in `src/config/fruits.js` with an `animStyle` key matching `WeaponModels.ANIM_MODS`
+- New fruit definitions go in `src/config/fruits.js` with an `animStyle` key matching entries in `src/config/animStyles.js`
+- New game modes extend `GameMode` base class in `src/modes/GameMode.js`
+- New projectile types use `ProjectileSystem.spawn()` with a trail config
+- Combat uses a single unified `attack()` path — all skills (default + fruit) define full stats on the skill object
 - Update `progress.md` after significant changes
 
 ## Multiplayer & Database Expansion Points

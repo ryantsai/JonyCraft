@@ -139,3 +139,21 @@ TODO
   - endpoint changes refresh on committed input (`change` / `Enter`), not every keystroke; that avoids noisy network calls but could be polished further with debouncing if desired
   - if movement still needs to feel better after the current polling improvements, the next major step is switching transform traffic from request/response polling to WebSockets so the server can push snapshots at a steadier cadence
   - scorecard ping is based on application-level request/response RTT, not ICMP; it is the most relevant number for gameplay sync, but it will differ from OS `ping`
+
+2026-03-14
+- Major architecture refactor for extensibility:
+  - Extracted `GameMode` base class (`src/modes/GameMode.js`) — new modes extend it and override activate/deactivate/update/getDefenseTarget/getDamageTarget
+  - Extracted `DefenseUtils.js` (tower health bar rendering, fortress building) from HomelandDefenseMode
+  - HomelandDefenseMode now extends GameMode, properly unsubscribes events on deactivate
+  - Unified combat: all attack types (sword/punch/fruit) now follow a single `attack()` path in Combat.js; default skills in `skills.js` carry full combat stats (range, damage, knockback, cooldown, etc.)
+  - Simplified InputManager: removed branching between swingSword/punchAttack/fruitAttack, calls `combat.attack()` directly
+  - Renamed `_attackZombie` to `_attackEnemy` throughout Combat.js
+  - Extracted `animStyles.js` — data-driven per-fruit animation modifiers (ANIM_MODS) into config
+  - Extracted `ScreenEffects.js` — camera shake, flash overlay, swing burst as standalone system
+  - Extracted `ProjectileSystem.js` — world-space projectile movement, collision, trail particles
+  - Extracted `FruitVFX.js` — per-fruit VFX particle definitions and behavior rendering
+  - Extracted `CooldownHUD.js` — hotbar cooldown overlay
+  - Created `FireFistSpawner.js` — bridges combat events to ProjectileSystem
+  - WeaponModels.js reduced from ~1450 lines to ~600 lines (weapon building + animation only)
+  - Updated main.js to wire ScreenEffects, ProjectileSystem, and FireFistSpawner
+  - Updated CLAUDE.md with new file structure and development guidelines

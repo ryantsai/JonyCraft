@@ -13,6 +13,9 @@ import { Targeting } from './player/Targeting.js';
 import { EnemyManager } from './enemies/EnemyManager.js';
 import { ParticleSystem } from './effects/Particles.js';
 import { WeaponModels } from './effects/WeaponModels.js';
+import { ScreenEffects } from './effects/ScreenEffects.js';
+import { ProjectileSystem } from './effects/ProjectileSystem.js';
+import { FireFistSpawner } from './effects/FireFistSpawner.js';
 import { CombatSystem } from './combat/Combat.js';
 import { InputManager } from './input/InputManager.js';
 import { MobileControls } from './input/MobileControls.js';
@@ -49,7 +52,8 @@ const targeting = new Targeting(gameState, world, scene, enemyManager);
 const particles = new ParticleSystem(scene, textureManager);
 enemyManager.setParticles(particles);
 const weaponModels = new WeaponModels(scene, textureManager, blockMaterials);
-weaponModels.setRefs(enemyManager, particles);
+const screenEffects = new ScreenEffects(scene);
+const projectileSystem = new ProjectileSystem(scene, particles, enemyManager);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);
@@ -61,6 +65,7 @@ const remotePlayers = new RemotePlayers(scene);
 multiplayer.attachRemotePlayers(remotePlayers);
 multiplayer.attachEnemyManager(enemyManager);
 const multiplayerLobby = new MultiplayerLobby(gameState, multiplayer);
+const fireFistSpawner = new FireFistSpawner(gameState, scene, weaponModels, projectileSystem);
 const soundManager = new SoundManager(gameState);
 const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
 const multiplayerHomelandMode = new MultiplayerHomelandMode(
@@ -111,6 +116,8 @@ function stepSimulation(deltaMs) {
     const stepMs = Math.min(FIXED_STEP_MS, remaining);
     const dt = stepMs / 1000;
     weaponModels.update(dt, gameState);
+    screenEffects.update(dt);
+    projectileSystem.update(dt);
     particles.update(dt);
     if (gameState.mode === 'playing') {
       inputManager.update();
@@ -170,6 +177,8 @@ async function init() {
   fruitSelect.init();
   multiplayer.init();
   multiplayerLobby.init();
+  screenEffects.init();
+  fireFistSpawner.init();
   soundManager.init();
   inputManager.init();
   mobileControls.init();

@@ -1,14 +1,10 @@
 import * as THREE from 'three';
-import {
-  SWORD_RANGE, SWORD_SWING_MS, SWORD_COOLDOWN_MS,
-  PUNCH_RANGE, PUNCH_SWING_MS, PUNCH_COOLDOWN_MS,
-  PLAYER_HEIGHT, PLAYER_RADIUS,
-} from '../config/constants.js';
+import { PLAYER_HEIGHT, PLAYER_RADIUS } from '../config/constants.js';
 import { events } from '../core/EventBus.js';
 
 /**
  * Combat system: handles attacks, block break/place, and damage application.
- * Emits events so other systems (particles, HUD, networking) can react.
+ * All attack skills (default + fruit) follow a single unified path via attack().
  */
 export class CombatSystem {
   constructor(gameState, world, targeting, enemyManager, particles, multiplayerClient = null) {
@@ -21,9 +17,10 @@ export class CombatSystem {
   }
 
   /**
-   * Generic fruit skill attack. Reads stats from the active skill definition.
+   * Unified attack method. Reads stats from the active skill definition.
+   * Replaces the old swingSword/punchAttack/fruitAttack split.
    */
-  fruitAttack() {
+  attack() {
     const combat = this.state.combat;
     if (combat.cooldown > 0) return;
 
@@ -37,9 +34,8 @@ export class CombatSystem {
       combat.swordSwingTime = skill.swingMs;
       events.emit('sound:sword');
     } else {
-      // punch, cast, slam, uppercut, clap all use punchTime as their animation timer
       combat.punchTime = skill.swingMs;
-      events.emit(skill.weaponType === 'slam' ? 'sound:punch' : 'sound:punch');
+      events.emit('sound:punch');
     }
 
     // Trigger fruit-specific visual effects (shake, flash)
@@ -67,7 +63,7 @@ export class CombatSystem {
       return;
     }
 
-    this._attackZombie({
+    this._attackEnemy({
       range: skill.range,
       knockbackStrength: skill.knockback,
       particleColor: skill.particleColor,
@@ -76,45 +72,10 @@ export class CombatSystem {
     });
   }
 
-  swingSword() {
-    const combat = this.state.combat;
-    if (combat.cooldown > 0) return;
-    combat.cooldown = SWORD_COOLDOWN_MS;
-    combat.swordSwingTime = SWORD_SWING_MS;
-    events.emit('sound:sword');
-    if (this._shouldUseServerHomelandAttack()) {
-      this._queueHomelandAttack({
-        range: SWORD_RANGE,
-        damageMultiplier: 1,
-        cooldownMs: SWORD_COOLDOWN_MS,
-      });
-      return;
-    }
-    this._attackZombie({
-      range: SWORD_RANGE, knockbackStrength: 4.6,
-      particleColor: 'red', particleCount: 12,
-    });
-  }
-
-  punchAttack() {
-    const combat = this.state.combat;
-    if (combat.cooldown > 0) return;
-    combat.cooldown = PUNCH_COOLDOWN_MS;
-    combat.punchTime = PUNCH_SWING_MS;
-    events.emit('sound:punch');
-    if (this._shouldUseServerHomelandAttack()) {
-      this._queueHomelandAttack({
-        range: PUNCH_RANGE,
-        damageMultiplier: 1,
-        cooldownMs: PUNCH_COOLDOWN_MS,
-      });
-      return;
-    }
-    this._attackZombie({
-      range: PUNCH_RANGE, knockbackStrength: 7.4,
-      particleColor: 'white', particleCount: 14,
-    });
-  }
+  // Legacy aliases for backward compatibility with any external callers
+  fruitAttack() { this.attack(); }
+  swingSword() { this.attack(); }
+  punchAttack() { this.attack(); }
 
   handleBreak() {
     if (!this.state.target) return;
@@ -160,17 +121,17 @@ export class CombatSystem {
     return true;
   }
 
-  _attackZombie({ range, knockbackStrength, particleColor, particleCount, damageMultiplier = 1 }) {
-    const zombie = this.targeting.updateEnemyTarget() ?? this.targeting.findMeleeCandidate();
-    if (!zombie || !zombie.alive) return false;
-    const distance = zombie.root.position.distanceTo(this.state.player.position);
+  _attackEnemy({ range, knockbackStrength, particleColor, particleCount, damageMultiplier = 1 }) {
+    const enemy = this.targeting.updateEnemyTarget() ?? this.targeting.findMeleeCandidate();
+    if (!enemy || !enemy.alive) return false;
+    const distance = enemy.root.position.distanceTo(this.state.player.position);
     if (distance > range + 0.35) return false;
 
-    const damage = Math.max(1, this.state.player.baseAttack * damageMultiplier - zombie.baseDefense);
-    zombie.health -= damage;
-    zombie.hitFlash = 1;
+    const damage = Math.max(1, this.state.player.baseAttack * damageMultiplier - enemy.baseDefense);
+    enemy.health -= damage;
+    enemy.hitFlash = 1;
     events.emit('sound:hit');
-    const away = new THREE.Vector3().subVectors(zombie.root.position, this.state.player.position);
+    const away = new THREE.Vector3().subVectors(enemy.root.position, this.state.player.position);
     away.y = 0;
     if (away.lengthSq() < 0.001) {
       away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
@@ -180,19 +141,19 @@ export class CombatSystem {
     // Negative knockback = pull toward player (dark fruit)
     const kbDir = knockbackStrength < 0 ? -1 : 1;
     const kbMag = Math.abs(knockbackStrength);
-    zombie.knockback.copy(away.multiplyScalar(kbMag * kbDir));
-    zombie.knockbackTimer = 240;
+    enemy.knockback.copy(away.multiplyScalar(kbMag * kbDir));
+    enemy.knockbackTimer = 240;
     this.particles.spawn(
-      zombie.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
+      enemy.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
       particleColor, particleCount,
     );
 
-    if (zombie.health <= 0) {
+    if (enemy.health <= 0) {
       this.particles.spawn(
-        zombie.root.position.clone().add(new THREE.Vector3(0, 1, 0)),
+        enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0)),
         'white', 16,
       );
-      this.enemies.defeat(zombie, { source: 'player' });
+      this.enemies.defeat(enemy, { source: 'player' });
       if (!this.state.defense.enabled) this.enemies.scheduleRespawn();
     }
 

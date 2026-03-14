@@ -4,7 +4,6 @@ import { events } from '../core/EventBus.js';
 /**
  * Manages keyboard, mouse, and pointer lock input.
  * Translates raw browser events into game actions.
- * Future: remap keys, handle gamepad, network input forwarding.
  */
 export class InputManager {
   constructor(gameState, canvas, combatSystem) {
@@ -92,14 +91,7 @@ export class InputManager {
     if (!skill) return;
 
     if (skill.kind === 'attack') {
-      // Fruit skills define their full combat stats directly on the skill.
-      if (skill.range !== undefined) {
-        this.combat.fruitAttack();
-      } else if (skill.id === 'sword') {
-        this.combat.swingSword();
-      } else if (skill.id === 'punch') {
-        this.combat.punchAttack();
-      }
+      this.combat.attack();
       return;
     }
 

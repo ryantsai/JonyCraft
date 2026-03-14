@@ -12,9 +12,23 @@ export class ProjectileSystem {
     this.particles = particleSystem;
     this.enemyManager = enemyManager;
     this.projectiles = [];
+    this._explosionEffect = null;
   }
 
-  spawn({ group, velocity, origin, maxRange, damage, knockback, trailConfig }) {
+  setExplosionEffect(explosionEffect) {
+    this._explosionEffect = explosionEffect;
+  }
+
+  /**
+   * @param {object} opts
+   * @param {boolean} [opts.aoe] - if true, explosion damages all enemies in aoeRadius
+   * @param {number} [opts.aoeRadius] - radius of AOE damage
+   * @param {boolean} [opts.explodeOnImpact] - spawn explosion effect on hit
+   * @param {number} [opts.explosionScale] - scale of explosion visual
+   * @param {number[]} [opts.explosionColors] - override fire colors for explosion
+   */
+  spawn({ group, velocity, origin, maxRange, damage, knockback, trailConfig,
+    aoe = false, aoeRadius = 0, explodeOnImpact = false, explosionScale = 1, explosionColors }) {
     const trailParticles = [];
     if (trailConfig) {
       for (let i = 0; i < trailConfig.count; i++) {
@@ -50,6 +64,11 @@ export class ProjectileSystem {
       knockback,
       trailParticles,
       trailConfig,
+      aoe,
+      aoeRadius,
+      explodeOnImpact,
+      explosionScale,
+      explosionColors,
       alive: true,
       age: 0,
       _velDir: velocity.clone().normalize(),
@@ -73,23 +92,24 @@ export class ProjectileSystem {
         const d = proj.group.position.distanceTo(enemy.root.position);
         const hitRadius = 1.2 * (enemy.sizeMultiplier || 1);
         if (d < hitRadius) {
-          const def = enemy.baseDefense || 0;
-          const dmg = Math.max(1, proj.damage - def);
-          enemy.health -= dmg;
-          enemy.hitFlash = 1;
+          const impactPos = proj.group.position.clone();
 
-          const away = new THREE.Vector3()
-            .subVectors(enemy.root.position, proj.group.position)
-            .normalize();
-          enemy.knockback.copy(away.multiplyScalar(proj.knockback));
-          enemy.knockbackTimer = 240;
-
-          if (this.particles) {
-            this.particles.spawn(enemy.root.position.clone(), 'orange', 16);
+          if (proj.aoe && proj.aoeRadius > 0) {
+            // AOE: damage all enemies within explosion radius
+            this._applyAOEDamage(proj, impactPos, alive);
+          } else {
+            // Single-target damage
+            this._applySingleDamage(proj, enemy);
           }
 
-          if (enemy.health <= 0) {
-            this.enemyManager.defeat(enemy, { source: 'projectile' });
+          // Spawn explosion or simple particles
+          if (proj.explodeOnImpact && this._explosionEffect) {
+            this._explosionEffect.spawn(impactPos, {
+              scale: proj.explosionScale,
+              fireColors: proj.explosionColors,
+            });
+          } else if (this.particles) {
+            this.particles.spawn(impactPos, 'orange', 16);
           }
 
           events.emit('sound:punch');
@@ -100,6 +120,10 @@ export class ProjectileSystem {
       }
 
       if (hit || dist > proj.maxRange) {
+        // Spawn a smaller fizzle explosion when expiring without a hit (only for explosive projectiles)
+        if (!hit && proj.explodeOnImpact && this._explosionEffect) {
+          this._explosionEffect.spawn(proj.group.position.clone(), { scale: proj.explosionScale * 0.4 });
+        }
         this._removeProjectile(i);
         continue;
       }
@@ -107,6 +131,48 @@ export class ProjectileSystem {
       // Update trail particles
       if (proj.trailConfig && proj.trailParticles.length > 0) {
         this._updateTrail(dt, proj);
+      }
+    }
+  }
+
+  _applySingleDamage(proj, enemy) {
+    const def = enemy.baseDefense || 0;
+    const dmg = Math.max(1, proj.damage - def);
+    enemy.health -= dmg;
+    enemy.hitFlash = 1;
+
+    const away = new THREE.Vector3()
+      .subVectors(enemy.root.position, proj.group.position)
+      .normalize();
+    enemy.knockback.copy(away.multiplyScalar(proj.knockback));
+    enemy.knockbackTimer = 240;
+
+    if (enemy.health <= 0) {
+      this.enemyManager.defeat(enemy, { source: 'projectile' });
+    }
+  }
+
+  _applyAOEDamage(proj, impactPos, allAlive) {
+    for (const enemy of allAlive) {
+      const d = enemy.root.position.distanceTo(impactPos);
+      if (d > proj.aoeRadius) continue;
+
+      // Damage falls off linearly with distance
+      const falloff = 1 - (d / proj.aoeRadius) * 0.5;
+      const def = enemy.baseDefense || 0;
+      const dmg = Math.max(1, Math.round(proj.damage * falloff) - def);
+      enemy.health -= dmg;
+      enemy.hitFlash = 1;
+
+      const away = new THREE.Vector3()
+        .subVectors(enemy.root.position, impactPos);
+      if (away.lengthSq() < 0.01) away.set(Math.random() - 0.5, 0.5, Math.random() - 0.5);
+      away.normalize();
+      enemy.knockback.copy(away.multiplyScalar(proj.knockback * falloff));
+      enemy.knockbackTimer = 240;
+
+      if (enemy.health <= 0) {
+        this.enemyManager.defeat(enemy, { source: 'projectile' });
       }
     }
   }

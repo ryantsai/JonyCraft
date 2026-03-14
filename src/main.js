@@ -15,6 +15,7 @@ import { ParticleSystem } from './effects/Particles.js';
 import { WeaponModels } from './effects/WeaponModels.js';
 import { ScreenEffects } from './effects/ScreenEffects.js';
 import { ProjectileSystem } from './effects/ProjectileSystem.js';
+import { ExplosionEffect } from './effects/ExplosionEffect.js';
 import { FireFistSpawner } from './effects/FireFistSpawner.js';
 import { CombatSystem } from './combat/Combat.js';
 import { InputManager } from './input/InputManager.js';
@@ -53,7 +54,9 @@ const particles = new ParticleSystem(scene, textureManager);
 enemyManager.setParticles(particles);
 const weaponModels = new WeaponModels(scene, textureManager, blockMaterials);
 const screenEffects = new ScreenEffects(scene);
+const explosionEffect = new ExplosionEffect(scene);
 const projectileSystem = new ProjectileSystem(scene, particles, enemyManager);
+projectileSystem.setExplosionEffect(explosionEffect);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);
@@ -118,6 +121,7 @@ function stepSimulation(deltaMs) {
     weaponModels.update(dt, gameState);
     screenEffects.update(dt);
     projectileSystem.update(dt);
+    explosionEffect.update(dt);
     particles.update(dt);
     if (gameState.mode === 'playing') {
       inputManager.update();

@@ -48,9 +48,13 @@ export class CombatSystem {
       });
     }
 
-    // fire_fist uses projectile — damage is handled by the projectile on hit
+    // Projectile-based weapon types — damage is handled by the projectile on hit
     if (skill.weaponType === 'fire_fist') {
       events.emit('combat:fire-fist-shoot');
+      return;
+    }
+    if (skill.weaponType === 'flame_emperor') {
+      events.emit('combat:flame-emperor-shoot');
       return;
     }
 

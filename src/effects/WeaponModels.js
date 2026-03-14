@@ -47,6 +47,7 @@ export class WeaponModels {
     this._buildUppercutFist();
     this._buildClapFists();
     this._buildFireFist();
+    this._buildFlameEmperor();
     this._buildDirtSkill();
     this._fruitVFX.build();
   }
@@ -85,6 +86,8 @@ export class WeaponModels {
       this._animateClap(combat, swingMs, mod, gameState);
     } else if (wt === 'fire_fist') {
       this._animateFireFist(combat, swingMs, mod, gameState);
+    } else if (wt === 'flame_emperor') {
+      this._animateFlameEmperor(combat, swingMs, mod, gameState);
     } else if (wt === 'dirt') {
       this.models.dirt.group.position.set(0.58, -0.56, -0.72);
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
@@ -693,11 +696,185 @@ export class WeaponModels {
     }
   }
 
-  /** Returns the GLB template for projectile cloning (used by FireFistProjectileSpawner). */
-  getFireFistTemplate() {
-    const m = this.models.fire_fist;
+  /** Returns the GLB template for projectile cloning by weapon type key. */
+  getProjectileTemplate(key) {
+    const m = this.models[key];
     if (!m || !m.glbLoaded) return null;
-    return { template: m.projectileTemplate || m.glbModel, baseScale: m.glbBaseScale };
+    return { template: m.glbModel, baseScale: m.glbBaseScale };
+  }
+
+  // Legacy alias
+  getFireFistTemplate() {
+    return this.getProjectileTemplate('fire_fist');
+  }
+
+  // ── Flame Emperor: GLB model held in first person (bigger fireball) ──
+
+  _buildFlameEmperor() {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+
+    // Burning VFX particles around the held fireball
+    const burnGroup = new THREE.Group();
+    burnGroup.renderOrder = 55;
+    group.add(burnGroup);
+    const burnParticles = [];
+    const burnCount = 16;
+    const burnColors = [0xff4400, 0xff6b35, 0xffaa00, 0xffdd44, 0xff2200];
+    for (let i = 0; i < burnCount; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: burnColors[i % burnColors.length],
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+      });
+      const sz = 0.015 + Math.random() * 0.015;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sz, sz, sz), mat);
+      mesh.visible = false;
+      mesh.renderOrder = 55;
+      burnGroup.add(mesh);
+      burnParticles.push({ mesh, mat, seed: Math.random() * Math.PI * 2 });
+    }
+
+    this.models.flame_emperor = {
+      group,
+      glbModel: null,
+      glbLoaded: false,
+      glbBaseScale: new THREE.Vector3(1, 1, 1),
+      idleTime: 0,
+      burnGroup,
+      burnParticles,
+    };
+
+    const loader = new GLTFLoader();
+    loader.load('assets/firstperson/skills/firefruit/flame_emperor.glb', (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const s = 0.6 / maxDim;
+      model.scale.set(s, s, s);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+
+      group.add(model);
+      this.models.flame_emperor.glbModel = model;
+      this.models.flame_emperor.glbBaseScale.copy(model.scale);
+      this.models.flame_emperor.glbLoaded = true;
+    });
+  }
+
+  _animateFlameEmperor(combat, swingMs, mod, gameState) {
+    const m = this.models.flame_emperor;
+    if (!m) return;
+
+    const onCooldown = combat.cooldown > 0;
+    m.idleTime += 0.016;
+    const t = m.idleTime;
+
+    if (onCooldown) {
+      m.group.visible = false;
+      m.burnParticles.forEach(p => { p.mesh.visible = false; });
+    } else {
+      // Hovering fireball with slow pulse
+      const pulseScale = 1 + Math.sin(t * 2.0) * 0.06;
+      const waveX = Math.sin(t * 1.2) * 0.02;
+      const waveY = Math.cos(t * 0.9) * 0.025;
+      const waveRot = Math.sin(t * 0.8) * 0.04;
+      m.group.position.set(0.5 + waveX, -0.45 + waveY, -0.65);
+      m.group.rotation.set(0.1 + waveRot, -0.15 + waveRot * 0.3, -0.1);
+      if (m.glbModel) {
+        m.glbModel.scale.copy(m.glbBaseScale).multiplyScalar(pulseScale);
+      }
+      m.group.visible = gameState.mode === 'playing';
+
+      // Animate burning VFX around the fireball
+      this._updateFlameEmperorBurn(m, t);
+    }
+  }
+
+  _updateFlameEmperorBurn(m, t) {
+    const count = m.burnParticles.length;
+    for (let i = 0; i < count; i++) {
+      const p = m.burnParticles[i];
+      const s = p.seed;
+      const idx = i / count;
+
+      // Layer 1 (0-7): orbiting embers that circle and rise
+      // Layer 2 (8-11): flickering sparks that jump around
+      // Layer 3 (12-15): rising wisps that drift upward
+
+      if (i < 8) {
+        // Orbiting embers — circle the fireball at varying heights and speeds
+        const orbitSpeed = 2.5 + idx * 1.5;
+        const angle = s + t * orbitSpeed;
+        const radius = 0.06 + Math.sin(t * 3 + s) * 0.02;
+        const riseOffset = ((t * 0.8 + idx * 2.0) % 1.0) * 0.12 - 0.04;
+        const x = Math.cos(angle) * radius;
+        const y = riseOffset + Math.sin(angle * 1.3) * 0.02;
+        const z = Math.sin(angle) * radius - 0.02;
+
+        p.mesh.position.set(x, y, z);
+        p.mesh.rotation.set(t * 4 + s, t * 3 + s * 2, t * 5);
+
+        // Pulse opacity
+        const flickerBase = 0.4 + Math.sin(t * 8 + s * 5) * 0.2;
+        const brightPulse = Math.sin(t * 3 + s * 3) > 0.7 ? 0.3 : 0;
+        p.mat.opacity = flickerBase + brightPulse;
+        p.mesh.visible = true;
+
+        // Cycle colors for shimmer
+        if (Math.sin(t * 6 + s * 4) > 0.5) {
+          p.mat.color.setHex(0xffdd44);
+        } else if (Math.sin(t * 4 + s * 7) > 0.3) {
+          p.mat.color.setHex(0xff6b35);
+        } else {
+          p.mat.color.setHex(0xff4400);
+        }
+      } else if (i < 12) {
+        // Flickering sparks — snap to random positions near the fireball
+        const flickerOn = Math.sin(t * 15 + s * 8) > 0.2;
+        if (!flickerOn) {
+          p.mesh.visible = false;
+          p.mat.opacity = 0;
+          continue;
+        }
+        const sparkAngle = s + t * 5;
+        const sparkR = 0.04 + Math.random() * 0.04;
+        p.mesh.position.set(
+          Math.cos(sparkAngle) * sparkR + (Math.random() - 0.5) * 0.02,
+          (Math.random() - 0.3) * 0.08,
+          Math.sin(sparkAngle) * sparkR + (Math.random() - 0.5) * 0.02,
+        );
+        p.mesh.rotation.set(
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+          Math.random() * Math.PI,
+        );
+        p.mat.opacity = 0.6 + Math.random() * 0.3;
+        p.mat.color.setHex(0xffdd44);
+        p.mesh.visible = true;
+      } else {
+        // Rising wisps — drift upward and fade, then reset
+        const wispCycle = ((t * 0.6 + idx * 3.0) % 1.5);
+        const wispProgress = wispCycle / 1.5;
+        const wispX = Math.sin(s * 3 + t * 1.5) * 0.04;
+        const wispY = wispCycle * 0.15 - 0.02;
+        const wispZ = Math.cos(s * 2 + t * 1.2) * 0.03;
+
+        p.mesh.position.set(wispX, wispY, wispZ);
+        p.mesh.rotation.set(0, 0, t * 3 + s);
+
+        // Fade in then out
+        const fadeIn = Math.min(1, wispProgress * 4);
+        const fadeOut = Math.max(0, 1 - (wispProgress - 0.5) / 0.5);
+        p.mat.opacity = fadeIn * fadeOut * 0.5;
+        p.mat.color.setHex(wispProgress > 0.6 ? 0xff6b35 : 0xffaa00);
+        p.mesh.visible = p.mat.opacity > 0.01;
+      }
+    }
   }
 
   _buildDirtSkill() {

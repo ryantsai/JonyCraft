@@ -3,6 +3,61 @@ import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
 
+function createTowerHealthBar() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 20;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(3.2, 0.4, 1);
+  sprite.userData.canvas = canvas;
+  sprite.userData.texture = texture;
+  return sprite;
+}
+
+function updateTowerHealthBar(sprite, hp, maxHp) {
+  if (!sprite) return;
+  const canvas = sprite.userData.canvas;
+  const ctx = canvas.getContext('2d');
+  const ratio = Math.max(0, hp / maxHp);
+  const w = canvas.width;
+  const h = canvas.height;
+  const barW = 108;
+  const barH = 14;
+  const barX = 2;
+  const barY = 3;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // Background track
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  ctx.roundRect(barX, barY, barW, barH, 5);
+  ctx.fill();
+
+  // Filled portion
+  if (ratio > 0) {
+    ctx.beginPath();
+    const fillW = Math.round((barW - 2) * ratio);
+    ctx.fillStyle = ratio > 0.5 ? '#4ae04a' : ratio > 0.25 ? '#e0c030' : '#e04040';
+    ctx.roundRect(barX + 1, barY + 1, fillW, barH - 2, 4);
+    ctx.fill();
+  }
+
+  // HP text
+  const hpVal = Math.max(0, Math.ceil(hp));
+  const maxVal = Math.round(maxHp);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 12px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${hpVal}/${maxVal}`, barX + barW + 4, barY + barH / 2);
+
+  sprite.userData.texture.needsUpdate = true;
+}
+
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
 
@@ -24,6 +79,7 @@ export class HomelandDefenseMode {
 
     this.center = new THREE.Vector3(WORLD_SIZE_X / 2, 0, WORLD_SIZE_Z / 2);
     this.towerMesh = null;
+    this.towerHealthBar = null;
     this.turrets = [];
     this._turretTick = 0;
   }
@@ -34,6 +90,7 @@ export class HomelandDefenseMode {
     this.state.defense.totalGold = 0;
     this.state.defense.wave = 0;
     this.state.defense.timeLeft = WAVE_DURATION;
+    this.state.defense.towerHp = this.state.defense.towerMaxHp;
     this._buildFortress();
     this._buildTowerVisual();
     this.startNextWave();
@@ -53,13 +110,13 @@ export class HomelandDefenseMode {
     }
 
     this._updateTurrets(dt);
+    updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
     events.emit('hud:update');
   }
 
   startNextWave() {
     this.state.defense.wave += 1;
     this.state.defense.timeLeft = WAVE_DURATION;
-    this.state.defense.towerHp = this.state.defense.towerMaxHp;
     this.enemies.clearAll();
 
     const wave = this.state.defense.wave;
@@ -97,6 +154,11 @@ export class HomelandDefenseMode {
     this.center.y = y;
     this.towerMesh.position.set(this.center.x, y + 2.75, this.center.z);
     this.scene.enemyGroup.add(this.towerMesh);
+
+    this.towerHealthBar = createTowerHealthBar();
+    this.towerHealthBar.position.set(this.center.x, y + 6.2, this.center.z);
+    this.scene.enemyGroup.add(this.towerHealthBar);
+    updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
   }
 
   _buildFortress() {

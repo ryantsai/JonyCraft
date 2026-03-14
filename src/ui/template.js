@@ -26,7 +26,6 @@ export const gameTemplate = `
       </div>
       <div id="defense-scoreboard" class="defense-scoreboard" data-visible="false" aria-label="保衛家園記分板">
         <div class="defense-row">波次 <span id="def-wave">1</span> · 倒數 <span id="def-timer">60</span>s</div>
-        <div class="defense-row">守護塔 HP <span id="def-tower">240/240</span></div>
         <div class="defense-row">總擊殺 <span id="def-kills">0</span> · 金幣 <span id="def-gold">0</span></div>
         <div class="defense-shop">
           <button class="defense-shop-btn" data-shop-item="heal" type="button">+45 生命 (15金)</button>
@@ -39,7 +38,6 @@ export const gameTemplate = `
         <div class="health-track">
           <div id="hp-fill" class="health-fill" style="width: 100%"></div>
         </div>
-        <div id="homebase-hp" class="homebase-hp" data-visible="false">🏰 基地塔 HP <span id="homebase-hp-text">240 / 240</span></div>
       </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">

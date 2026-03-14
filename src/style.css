@@ -763,7 +763,7 @@ body {
 
 .multiplayer-panel {
   position: relative;
-  width: min(720px, 100%);
+  width: min(1060px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
   padding: 30px 28px 24px;
@@ -774,6 +774,25 @@ body {
     0 0 0 1px rgba(0, 0, 0, 0.5),
     0 4px 24px rgba(0, 0, 0, 0.5),
     0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.multiplayer-columns {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 28px;
+  margin-top: 18px;
+}
+
+.multiplayer-col-skin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.multiplayer-col-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .multiplayer-header,
@@ -798,7 +817,7 @@ body {
 }
 
 .multiplayer-identity {
-  margin-top: 22px;
+  margin-top: 0;
 }
 
 .multiplayer-pill {
@@ -1381,6 +1400,10 @@ body {
     padding: 24px 18px 18px;
   }
 
+  .multiplayer-columns {
+    grid-template-columns: 1fr;
+  }
+
   .multiplayer-create-btn {
     width: 100%;
   }
@@ -1402,12 +1425,14 @@ body {
 .skin-section-label {
   color: rgba(236, 244, 255, 0.82);
   font-size: 0.84rem;
+  text-align: center;
 }
 
 .skin-select-layout {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
 }
 
 .skin-preview-wrap {
@@ -1435,9 +1460,9 @@ body {
 
 .skin-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 8px;
-  flex: 1;
+  width: 100%;
   min-width: 0;
 }
 

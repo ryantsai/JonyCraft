@@ -139,6 +139,9 @@ async function upgradeAvatarToSkin(avatar, skin, name) {
 
     if (parent) parent.remove(avatar.root);
 
+    // GLB model faces +Z; game yaw 0 faces -Z, so rotate model 180°
+    model.rotation.y = Math.PI;
+
     const newRoot = new THREE.Group();
     newRoot.add(model, tag);
     newRoot.position.copy(pos);

@@ -129,10 +129,10 @@ export const FRUITS = [
       {
         id: 'flame_emperor',
         name: '炎帝',
-        desc: '釋放巨大火球轟炸，範圍12，攻擊力×5，CD 5秒。遠距範圍爆炸高傷害',
+        desc: '釋放巨大火球轟炸，範圍18，攻擊力×5，CD 5秒。遠距範圍爆炸高傷害',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
-        range: 12,
+        range: 18,
         swingMs: 400,
         cooldownMs: 5000,
         knockback: 10.0,

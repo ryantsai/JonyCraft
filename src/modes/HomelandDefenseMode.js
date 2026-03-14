@@ -4,7 +4,7 @@ import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GameMode } from './GameMode.js';
-import { createTowerHealthBar, updateTowerHealthBar, buildFortress } from './DefenseUtils.js';
+import { createTowerHealthBar, updateTowerHealthBar, buildFortress, buildTowerCollision } from './DefenseUtils.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -39,7 +39,6 @@ export class HomelandDefenseMode extends GameMode {
     if (context) {
       context.world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
       context.worldRenderer.buildAll();
-      context.playerController.setSpawn();
       this.enemies.clearAll();
     }
 
@@ -50,6 +49,7 @@ export class HomelandDefenseMode extends GameMode {
     this.state.defense.timeLeft = WAVE_DURATION;
     this.state.defense.towerHp = this.state.defense.towerMaxHp;
     buildFortress(this.world, this.center.x, this.center.z);
+    buildTowerCollision(this.world, this.center.x, this.center.z);
     this._buildTowerVisual();
     this.startNextWave();
 

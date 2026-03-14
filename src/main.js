@@ -55,7 +55,7 @@ enemyManager.setParticles(particles);
 const weaponModels = new WeaponModels(scene, textureManager, blockMaterials);
 const screenEffects = new ScreenEffects(scene);
 const explosionEffect = new ExplosionEffect(scene);
-const projectileSystem = new ProjectileSystem(scene, particles, enemyManager);
+const projectileSystem = new ProjectileSystem(scene, particles, enemyManager, world);
 projectileSystem.setExplosionEffect(explosionEffect);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
@@ -87,7 +87,6 @@ events.on('fruit:selected', () => {
   if (gameState.gameMode === 'homeland') {
     world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
     worldRenderer.buildAll();
-    playerController.setSpawn();
     enemyManager.clearAll();
   }
 
@@ -101,6 +100,8 @@ events.on('fruit:selected', () => {
       gameState.modeController = homelandMode;
       homelandMode.activate();
     }
+    // Spawn player AFTER fortress/tower blocks are built so they don't spawn inside
+    playerController.setSpawn();
   } else if (gameState.playStyle === 'multiplayer') {
     gameState.modeController = null;
     enemyManager.clearAll();

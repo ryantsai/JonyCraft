@@ -45,15 +45,13 @@ export const gameTemplate = `
           <div id="move-pad" class="touch-pad" aria-label="移動搖桿">
             <div id="move-knob" class="touch-knob"></div>
           </div>
-          <div id="look-pad" class="touch-pad" aria-label="視角搖桿">
-            <div id="look-knob" class="touch-knob"></div>
-          </div>
         </div>
         <div class="mobile-actions">
           <button id="touch-jump" type="button">跳躍</button>
           <button id="touch-primary" type="button">使用</button>
           <button id="touch-secondary" type="button">放置</button>
         </div>
+        <button id="touch-fullscreen" class="mobile-fullscreen-btn" type="button">⛶</button>
       </div>
     </div>
     <div id="start-screen" class="start-screen">
@@ -91,38 +89,6 @@ export const gameTemplate = `
                 <span class="mode-desc">瀏覽房間、查看模式，或建立新的伺服器</span>
               </div>
             </button>
-          </div>
-        </div>
-
-        <div class="menu-divider"></div>
-
-        <div class="controls-section">
-          <p class="section-label">操作說明</p>
-          <div class="control-grid">
-            <div class="control-item">
-              <kbd>W A S D</kbd>
-              <span>移動</span>
-            </div>
-            <div class="control-item">
-              <kbd>空白鍵</kbd>
-              <span>跳躍</span>
-            </div>
-            <div class="control-item">
-              <kbd>滑鼠</kbd>
-              <span>視角</span>
-            </div>
-            <div class="control-item">
-              <kbd>左鍵</kbd>
-              <span>攻擊</span>
-            </div>
-            <div class="control-item">
-              <kbd>右鍵</kbd>
-              <span>放置方塊</span>
-            </div>
-            <div class="control-item">
-              <kbd>1 2 3 4</kbd>
-              <span>切換技能</span>
-            </div>
           </div>
         </div>
 

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 function createTowerHealthBar() {
   const canvas = document.createElement('canvas');
@@ -147,18 +148,42 @@ export class HomelandDefenseMode {
 
   _buildTowerVisual() {
     if (this.towerMesh) return;
-    const geom = new THREE.CylinderGeometry(1.2, 1.6, 5.5, 12);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xbca77f, roughness: 0.85 });
-    this.towerMesh = new THREE.Mesh(geom, mat);
     const y = this.world.getTerrainSurfaceY(this.center.x, this.center.z);
     this.center.y = y;
-    this.towerMesh.position.set(this.center.x, y + 2.75, this.center.z);
-    this.scene.enemyGroup.add(this.towerMesh);
+
+    // Place a temporary placeholder while the model loads
+    const placeholder = new THREE.Group();
+    placeholder.position.set(this.center.x, y, this.center.z);
+    this.scene.enemyGroup.add(placeholder);
+    this.towerMesh = placeholder;
 
     this.towerHealthBar = createTowerHealthBar();
-    this.towerHealthBar.position.set(this.center.x, y + 6.2, this.center.z);
+    this.towerHealthBar.position.set(this.center.x, y + 8, this.center.z);
     this.scene.enemyGroup.add(this.towerHealthBar);
     updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
+
+    // Load the homebase GLB model
+    const loader = new GLTFLoader();
+    loader.load('assets/buildings/homebase/tower.glb', (gltf) => {
+      const model = gltf.scene;
+      // Scale to fit ~8 units tall
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const s = 8 / maxDim;
+      model.scale.set(s, s, s);
+      // Center horizontally, base at y=0
+      const scaledBox = new THREE.Box3().setFromObject(model);
+      const center = scaledBox.getCenter(new THREE.Vector3());
+      model.position.x -= center.x;
+      model.position.y -= scaledBox.min.y;
+      model.position.z -= center.z;
+
+      placeholder.add(model);
+      // Reposition health bar above the loaded model
+      const finalBox = new THREE.Box3().setFromObject(placeholder);
+      this.towerHealthBar.position.y = finalBox.max.y + 1;
+    });
   }
 
   _buildFortress() {

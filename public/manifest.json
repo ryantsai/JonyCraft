@@ -1,0 +1,19 @@
+{
+  "name": "JonyCraft",
+  "short_name": "JonyCraft",
+  "description": "體素沙盒冒險",
+  "start_url": ".",
+  "scope": ".",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#04080e",
+  "theme_color": "#04080e",
+  "icons": [
+    {
+      "src": "assets/kenney/tiles/dirt_grass.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

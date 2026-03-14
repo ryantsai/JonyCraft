@@ -56,6 +56,28 @@ export function updateTowerHealthBar(sprite, hp, maxHp) {
   sprite.userData.texture.needsUpdate = true;
 }
 
+/**
+ * Place solid blocks under the tower model so enemies collide with it.
+ * Fills a cylindrical area at the center matching the GLB tower footprint.
+ */
+export function buildTowerCollision(world, centerX, centerZ) {
+  const cx = Math.floor(centerX);
+  const cz = Math.floor(centerZ);
+  const ground = Math.floor(world.getTerrainSurfaceY(cx, cz) - 1);
+  const towerRadius = 2;
+  const towerHeight = 8;
+
+  for (let x = -towerRadius; x <= towerRadius; x += 1) {
+    for (let z = -towerRadius; z <= towerRadius; z += 1) {
+      // Circular footprint
+      if (x * x + z * z > towerRadius * towerRadius + 1) continue;
+      for (let y = ground + 1; y <= ground + towerHeight; y += 1) {
+        world.setBlock(cx + x, y, cz + z, 'brick');
+      }
+    }
+  }
+}
+
 export function buildFortress(world, centerX, centerZ) {
   const cx = Math.floor(centerX);
   const cz = Math.floor(centerZ);

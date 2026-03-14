@@ -87,7 +87,6 @@ events.on('fruit:selected', () => {
   if (gameState.gameMode === 'homeland') {
     world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
     worldRenderer.buildAll();
-    playerController.setSpawn();
     enemyManager.clearAll();
   }
 
@@ -101,6 +100,8 @@ events.on('fruit:selected', () => {
       gameState.modeController = homelandMode;
       homelandMode.activate();
     }
+    // Spawn player AFTER fortress/tower blocks are built so they don't spawn inside
+    playerController.setSpawn();
   } else if (gameState.playStyle === 'multiplayer') {
     gameState.modeController = null;
     enemyManager.clearAll();

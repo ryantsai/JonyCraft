@@ -82,7 +82,7 @@ export class World {
     return neighbors.some(([dx, dy, dz]) => {
       const neighbor = this.getBlock(x + dx, y + dy, z + dz);
       if (!neighbor) return true;
-      return BLOCK_DEFS[neighbor].transparent;
+      return BLOCK_DEFS[neighbor].transparent || BLOCK_DEFS[neighbor].invisible;
     });
   }
 

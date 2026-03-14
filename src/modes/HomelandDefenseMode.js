@@ -157,9 +157,11 @@ export class HomelandDefenseMode extends GameMode {
         luffy.scale.set(ls, ls, ls);
         const lScaled = new THREE.Box3().setFromObject(luffy);
         const lCenter = lScaled.getCenter(new THREE.Vector3());
+        const towerHeight = finalBox.max.y - finalBox.min.y;
+        const roofY = finalBox.min.y + towerHeight * 0.55 - placeholder.position.y;
         luffy.position.x -= lCenter.x;
-        luffy.position.y = finalBox.max.y - placeholder.position.y - lScaled.min.y;
-        luffy.position.z -= lCenter.z;
+        luffy.position.y = roofY - lScaled.min.y;
+        luffy.position.z -= lCenter.z - 1.2;
         placeholder.add(luffy);
 
         // Raise health bar above mascot

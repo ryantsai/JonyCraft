@@ -158,7 +158,7 @@ export class HomelandDefenseMode extends GameMode {
         const lScaled = new THREE.Box3().setFromObject(luffy);
         const lCenter = lScaled.getCenter(new THREE.Vector3());
         const towerHeight = finalBox.max.y - finalBox.min.y;
-        const roofY = finalBox.min.y + towerHeight * 0.64 - placeholder.position.y;
+        const roofY = finalBox.min.y + towerHeight * 0.67 - placeholder.position.y;
         luffy.position.x -= lCenter.x;
         luffy.position.y = roofY - lScaled.min.y;
         luffy.position.z -= lCenter.z + 1.5;

@@ -7,10 +7,11 @@ import { events } from '../core/EventBus.js';
  * Extracted from WeaponModels for single-responsibility.
  */
 export class ProjectileSystem {
-  constructor(sceneSetup, particleSystem, enemyManager) {
+  constructor(sceneSetup, particleSystem, enemyManager, world) {
     this.scene = sceneSetup;
     this.particles = particleSystem;
     this.enemyManager = enemyManager;
+    this.world = world;
     this.projectiles = [];
     this._explosionEffect = null;
   }
@@ -119,6 +120,11 @@ export class ProjectileSystem {
         }
       }
 
+      // Check terrain/block collision
+      if (!hit) {
+        hit = this._checkWorldCollision(proj);
+      }
+
       if (hit || dist > proj.maxRange) {
         // Spawn a smaller fizzle explosion when expiring without a hit (only for explosive projectiles)
         if (!hit && proj.explodeOnImpact && this._explosionEffect) {
@@ -133,6 +139,39 @@ export class ProjectileSystem {
         this._updateTrail(dt, proj);
       }
     }
+  }
+
+  _checkWorldCollision(proj) {
+    if (!this.world) return false;
+    const pos = proj.group.position;
+    const bx = Math.floor(pos.x);
+    const by = Math.floor(pos.y);
+    const bz = Math.floor(pos.z);
+
+    // Hit ground (below y=0) or solid block
+    const hitWorld = pos.y < 0 || this.world.getBlock(bx, by, bz) != null;
+    if (!hitWorld) return false;
+
+    const impactPos = pos.clone();
+
+    // AOE damage nearby enemies on world collision too
+    if (proj.aoe && proj.aoeRadius > 0) {
+      const alive = this.enemyManager.getAlive();
+      this._applyAOEDamage(proj, impactPos, alive);
+    }
+
+    // Spawn explosion or particles
+    if (proj.explodeOnImpact && this._explosionEffect) {
+      this._explosionEffect.spawn(impactPos, {
+        scale: proj.explosionScale,
+        fireColors: proj.explosionColors,
+      });
+    } else if (this.particles) {
+      this.particles.spawn(impactPos, 'orange', 16);
+    }
+
+    events.emit('sound:punch');
+    return true;
   }
 
   _applySingleDamage(proj, enemy) {

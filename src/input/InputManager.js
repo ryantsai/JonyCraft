@@ -111,7 +111,12 @@ export class InputManager {
   }
 
   _toggleFullscreen() {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else document.documentElement.requestFullscreen?.();
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    if (isFullscreen) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    } else {
+      const doc = document.documentElement;
+      (doc.requestFullscreen || doc.webkitRequestFullscreen)?.call(doc);
+    }
   }
 }

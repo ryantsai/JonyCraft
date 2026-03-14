@@ -44,10 +44,21 @@ export class MobileControls {
     });
 
     const fullscreenBtn = document.querySelector('#touch-fullscreen');
-    fullscreenBtn.addEventListener('click', () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.documentElement.requestFullscreen?.();
-    });
+    const doc = document.documentElement;
+    const canFullscreen = doc.requestFullscreen || doc.webkitRequestFullscreen;
+    if (!canFullscreen) {
+      // iOS Safari: no fullscreen API — hide the button
+      fullscreenBtn.style.display = 'none';
+    } else {
+      fullscreenBtn.addEventListener('click', () => {
+        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+        if (isFullscreen) {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        } else {
+          (doc.requestFullscreen || doc.webkitRequestFullscreen).call(doc);
+        }
+      });
+    }
   }
 
   _bindSwipeToLook() {

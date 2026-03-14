@@ -192,6 +192,9 @@ export class WeaponModels {
       this.models.dirt.group.visible = gameState.mode === 'playing';
     }
 
+    // Always update fire fist projectiles (they live in world space)
+    if (this.models.fire_fist) this._updateFireFistProjectiles(gameState);
+
     // Update fruit-specific VFX particles
     const attackPhase = wt === 'sword'
       ? (combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / swingMs : 0)
@@ -957,8 +960,6 @@ export class WeaponModels {
       m.group.visible = gameState.mode === 'playing';
     }
 
-    // Update world-space projectiles
-    this._updateFireFistProjectiles(gameState);
   }
 
   /**
@@ -1102,9 +1103,20 @@ export class WeaponModels {
       // Remove if hit or out of range
       if (hit || dist > proj.maxRange) {
         proj.alive = false;
+        // Dispose cloned GLB geometry and materials
+        proj.group.traverse((child) => {
+          if (child.isMesh) {
+            child.geometry?.dispose();
+            if (child.material) {
+              const mats = Array.isArray(child.material) ? child.material : [child.material];
+              mats.forEach((mt) => { mt.map?.dispose(); mt.dispose(); });
+            }
+          }
+        });
         this.scene.particleGroup.remove(proj.group);
         // Cleanup trail particles
         proj.trailParticles.forEach((tp) => {
+          tp.mesh.geometry?.dispose();
           this.scene.particleGroup.remove(tp.mesh);
           tp.mat.dispose();
         });
@@ -1113,8 +1125,8 @@ export class WeaponModels {
       }
 
       // Spawn fire trail covering the back of the fist
-      const vel = proj.velocity;
-      const velDir = vel.clone().normalize();
+      if (!proj._velDir) proj._velDir = proj.velocity.clone().normalize();
+      const velDir = proj._velDir;
       proj.trailParticles.forEach((tp) => {
         // High spawn rate — almost every particle respawns each frame
         if (tp.life <= 0 && Math.random() < 0.85) {

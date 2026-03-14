@@ -977,17 +977,23 @@ export class WeaponModels {
       -Math.cos(player.yaw) * Math.cos(player.pitch),
     ).normalize();
 
-    // Spawn position: in front of the player
+    // Right vector (perpendicular to look direction, horizontal plane)
+    const right = new THREE.Vector3(
+      -Math.cos(player.yaw),
+      0,
+      Math.sin(player.yaw),
+    ).normalize();
+
+    // Spawn from bottom-right of the player's view (where the held fist is)
     const spawnPos = new THREE.Vector3(
-      player.position.x + dir.x * 0.8,
-      player.position.y + 1.4 + dir.y * 0.8,
-      player.position.z + dir.z * 0.8,
+      player.position.x + right.x * 0.6 + dir.x * 1.0,
+      player.position.y + 1.0 + dir.y * 1.0,
+      player.position.z + right.z * 0.6 + dir.z * 1.0,
     );
 
     // Clone the GLB model for the projectile
     const projModel = m.projectileTemplate.clone();
-    // Make it a bit bigger in world space
-    const ws = 1.8;
+    const ws = 4.5;
     projModel.scale.copy(m.glbBaseScale).multiplyScalar(ws);
     projModel.position.set(0, 0, 0);
     // Rotate to face the direction of travel

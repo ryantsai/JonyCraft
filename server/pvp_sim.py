@@ -78,12 +78,15 @@ def process_pvp_attack(
         range_value = float(attack.get("range") or 0.0)
         damage_multiplier = float(attack.get("damageMultiplier") or 1.0)
         cooldown_ms = float(attack.get("cooldownMs") or 0.0)
+        knockback = float(attack.get("knockback") or 0.0)
     except (TypeError, ValueError):
         return
 
     range_value = max(1.0, min(range_value, 12.0))
     damage_multiplier = max(1.0, min(damage_multiplier, 8.0))
     cooldown_ms = max(120.0, min(cooldown_ms, 3000.0))
+    knockback = max(-20.0, min(knockback, 20.0))
+    weapon_type = str(attack.get("weaponType") or "")[:32]
 
     ax = float(attacker.state.get("x") or 0.0)
     az = float(attacker.state.get("z") or 0.0)
@@ -97,6 +100,13 @@ def process_pvp_attack(
     damage = max(1.0, damage_multiplier)
     target.state["serverHp"] = max(0.0, float(target.state.get("serverHp") or PVP_MAX_HP) - damage)
     attacker.state["attackReadyAt"] = server_time + cooldown_ms / 1000.0
+
+    # Store hit info so the target client can apply knockback
+    target.state["lastHitFromX"] = round(ax, 2)
+    target.state["lastHitFromZ"] = round(az, 2)
+    target.state["lastHitKnockback"] = round(knockback, 2)
+    target.state["lastHitWeapon"] = weapon_type
+    target.state["lastHitAt"] = server_time
 
     if target.state["serverHp"] <= 0.0:
         # Target died - respawn

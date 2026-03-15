@@ -315,6 +315,20 @@ export class MultiplayerClient {
       this.state.player.hp = Number(selfPlayer.serverHp);
       this.state.player.maxHp = Number(selfPlayer.serverMaxHp ?? this.state.player.maxHp);
     }
+    // PvP knockback: server tells us we got hit
+    if (selfPlayer?.lastHitAt !== undefined) {
+      const hitAt = Number(selfPlayer.lastHitAt);
+      if (hitAt > (this._lastHitHandled ?? 0)) {
+        this._lastHitHandled = hitAt;
+        events.emit('pvp:knockback', {
+          fromX: Number(selfPlayer.lastHitFromX ?? 0),
+          fromZ: Number(selfPlayer.lastHitFromZ ?? 0),
+          knockback: Number(selfPlayer.lastHitKnockback ?? 0),
+          weaponType: selfPlayer.lastHitWeapon ?? '',
+        });
+      }
+    }
+
     // PvP respawn: server tells us where to spawn after death
     if (selfPlayer?.respawnX !== undefined && selfPlayer?.respawnZ !== undefined) {
       const respawnUntil = Number(selfPlayer.respawnUntil ?? 0);

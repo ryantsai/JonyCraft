@@ -214,11 +214,14 @@ export class CombatSystem {
       );
     }
 
+    const skill = this.state.getSelectedSkill();
     this.multiplayer?.queuePvPAttack({
       targetPlayer: bestTarget,
       range,
       damageMultiplier,
       cooldownMs,
+      knockback: knockbackStrength ?? 0,
+      weaponType: skill?.weaponType ?? '',
     });
   }
 

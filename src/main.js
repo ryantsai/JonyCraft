@@ -83,6 +83,30 @@ multiplayer.attachHomelandMode(multiplayerHomelandMode);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
+events.on('pvp:knockback', ({ fromX, fromZ, knockback, weaponType }) => {
+  const player = gameState.player;
+  const dx = player.position.x - fromX;
+  const dz = player.position.z - fromZ;
+  const dist = Math.sqrt(dx * dx + dz * dz);
+  let dirX = dx;
+  let dirZ = dz;
+  if (dist > 0.01) {
+    dirX /= dist;
+    dirZ /= dist;
+  } else {
+    dirX = Math.sin(player.yaw);
+    dirZ = Math.cos(player.yaw);
+  }
+  const kbDir = knockback < 0 ? -1 : 1;
+  const kbMag = Math.abs(knockback);
+  player.velocity.x += dirX * kbMag * kbDir * 0.6;
+  player.velocity.z += dirZ * kbMag * kbDir * 0.6;
+  // Fire pillar: upward knockback
+  if (weaponType === 'fire_pillar') {
+    player.velocity.y = Math.max(player.velocity.y, kbMag * 0.7 + 4);
+    player.onGround = false;
+  }
+});
 events.on('pvp:respawn', ({ x, z }) => {
   const y = world.getTerrainSurfaceY(x, z) + 0.01;
   gameState.player.position.set(x, y, z);

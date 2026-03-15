@@ -19,6 +19,7 @@ export class FireFistSpawner {
     this.projectileSystem = projectileSystem;
     this._enemyManager = null;
     this._explosionEffect = null;
+    this._world = null;
     this._pillarEffects = [];
   }
 
@@ -28,6 +29,10 @@ export class FireFistSpawner {
 
   setExplosionEffect(explosionEffect) {
     this._explosionEffect = explosionEffect;
+  }
+
+  setWorld(world) {
+    this._world = world;
   }
 
   init() {
@@ -113,19 +118,44 @@ export class FireFistSpawner {
   _spawnFirePillar() {
     const player = this.state.player;
     const skill = this.state.getSelectedSkill();
-    const aoeRadius = skill.aoeRadius || 3.5;
+    const aoeRadius = skill.aoeRadius || 5.25;
+    const spawnDist = 4.0; // fixed distance in front of player
+
+    // Spawn position: fixed distance in front of player (horizontal only)
+    const forward = new THREE.Vector3(
+      -Math.sin(player.yaw),
+      0,
+      -Math.cos(player.yaw),
+    ).normalize();
+    const groundY = this._world
+      ? this._world.getTerrainSurfaceY(
+          player.position.x + forward.x * spawnDist,
+          player.position.z + forward.z * spawnDist,
+        )
+      : player.position.y;
     const pillarPos = new THREE.Vector3(
-      player.position.x,
-      player.position.y,
-      player.position.z,
+      player.position.x + forward.x * spawnDist,
+      groundY,
+      player.position.z + forward.z * spawnDist,
     );
 
-    // Spawn the GLB model at player's feet as a rising flame tornado
+    // Spawn the GLB model as a rising flame tornado (thinner: scale X/Z reduced)
     const tmpl = this.weaponModels.getProjectileTemplate('fire_pillar');
     if (tmpl) {
       const pillarModel = tmpl.template.clone();
+      // Clone materials so fade-out doesn't affect the held-item model
+      pillarModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material = child.material.clone();
+        }
+      });
       const worldScale = 6.0;
-      pillarModel.scale.copy(tmpl.baseScale).multiplyScalar(worldScale);
+      const thinFactor = 0.5; // thinner tornado
+      pillarModel.scale.set(
+        tmpl.baseScale.x * worldScale * thinFactor,
+        tmpl.baseScale.y * worldScale,
+        tmpl.baseScale.z * worldScale * thinFactor,
+      );
       pillarModel.position.set(0, 0, 0);
 
       const pillarGroup = new THREE.Group();
@@ -137,6 +167,8 @@ export class FireFistSpawner {
         group: pillarGroup,
         model: pillarModel,
         baseScale: worldScale,
+        thinFactor,
+        baseScaleVec: tmpl.baseScale.clone(),
         age: 0,
         maxAge: 1.2,
         pos: pillarPos.clone(),
@@ -149,7 +181,7 @@ export class FireFistSpawner {
     const particleCount = 60;
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2 * 3; // 3 spirals
-      const radius = 0.3 + (i / particleCount) * aoeRadius * 0.8;
+      const radius = 0.2 + (i / particleCount) * aoeRadius * 0.5; // tighter spiral
       const height = (i / particleCount) * 4.0;
       const color = fireColors[i % fireColors.length];
       const mat = new THREE.MeshBasicMaterial({
@@ -159,7 +191,7 @@ export class FireFistSpawner {
         blending: THREE.AdditiveBlending,
         depthTest: false,
       });
-      const sz = 0.1 + Math.random() * 0.15;
+      const sz = 0.08 + Math.random() * 0.12;
       const mesh = new THREE.Mesh(
         new THREE.BoxGeometry(sz, sz, sz),
         mat,
@@ -179,19 +211,19 @@ export class FireFistSpawner {
         age: 0,
         maxAge: 0.6 + Math.random() * 0.6,
         vel: new THREE.Vector3(
-          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 1.5,
           3 + Math.random() * 5,
-          (Math.random() - 0.5) * 2,
+          (Math.random() - 0.5) * 1.5,
         ),
         spinAngle: angle,
         spinRadius: radius,
-        spinSpeed: 4 + Math.random() * 3,
+        spinSpeed: 5 + Math.random() * 4,
         basePos: pillarPos.clone(),
         startY: mesh.position.y,
       });
     }
 
-    // Spawn upward explosion effect at center
+    // Spawn upward explosion effect at pillar center
     if (this._explosionEffect) {
       this._explosionEffect.spawn(
         new THREE.Vector3(pillarPos.x, pillarPos.y + 1.0, pillarPos.z),
@@ -202,7 +234,7 @@ export class FireFistSpawner {
       );
     }
 
-    // AOE damage: hurt all enemies within radius and launch them upward
+    // AOE damage centered on pillar position, launch enemies upward
     if (this._enemyManager) {
       const alive = this._enemyManager.getAlive();
       const damage = (skill.damage ?? 3) * player.baseAttack;
@@ -226,8 +258,8 @@ export class FireFistSpawner {
         enemy.knockback.copy(away.multiplyScalar(2.0 * falloff));
         enemy.knockbackTimer = 300;
 
-        // Launch enemy upward (main knockback is vertical)
-        enemy.velocityY = (skill.knockback ?? 8) * falloff + 8;
+        // Launch enemy upward (30% less than before)
+        enemy.velocityY = ((skill.knockback ?? 16) * falloff + 8) * 0.7;
         enemy.onGround = false;
 
         if (enemy.health <= 0) {
@@ -272,13 +304,10 @@ export class FireFistSpawner {
       // GLB pillar model — rising flame tornado
       effect.age += dt;
       if (effect.age >= effect.maxAge) {
+        // Dispose cloned materials, but not geometry (shared with template)
         effect.group.traverse((child) => {
-          if (child.isMesh) {
-            child.geometry?.dispose();
-            if (child.material) {
-              const mats = Array.isArray(child.material) ? child.material : [child.material];
-              mats.forEach((mt) => { mt.map?.dispose(); mt.dispose(); });
-            }
+          if (child.isMesh && child.material) {
+            child.material.dispose();
           }
         });
         this.scene.particleGroup.remove(effect.group);
@@ -294,8 +323,12 @@ export class FireFistSpawner {
       const yRise = risePhase * 3.0;
 
       effect.group.position.y = effect.pos.y + yRise;
-      effect.model.scale.copy(
-        new THREE.Vector3(1, 1, 1).multiplyScalar(effect.baseScale * scaleExpand),
+      const thin = effect.thinFactor || 0.5;
+      const bs = effect.baseScaleVec || new THREE.Vector3(1, 1, 1);
+      effect.model.scale.set(
+        bs.x * effect.baseScale * thin * scaleExpand,
+        bs.y * effect.baseScale * scaleExpand,
+        bs.z * effect.baseScale * thin * scaleExpand,
       );
       // Spin the tornado
       effect.group.rotation.y += dt * 8;

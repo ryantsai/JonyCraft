@@ -71,6 +71,7 @@ const multiplayerLobby = new MultiplayerLobby(gameState, multiplayer);
 const fireFistSpawner = new FireFistSpawner(gameState, scene, weaponModels, projectileSystem);
 fireFistSpawner.setEnemyManager(enemyManager);
 fireFistSpawner.setExplosionEffect(explosionEffect);
+fireFistSpawner.setWorld(world);
 const soundManager = new SoundManager(gameState);
 const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
 const multiplayerHomelandMode = new MultiplayerHomelandMode(

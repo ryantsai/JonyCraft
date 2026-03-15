@@ -2,9 +2,8 @@ import * as THREE from 'three';
 import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GameMode } from './GameMode.js';
-import { createTowerHealthBar, updateTowerHealthBar, buildFortress, buildTowerCollision } from './DefenseUtils.js';
+import { updateTowerHealthBar, buildFortress, buildTowerCollision, buildTowerVisual } from './DefenseUtils.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -116,59 +115,14 @@ export class HomelandDefenseMode extends GameMode {
 
   _buildTowerVisual() {
     if (this.towerMesh) return;
-    const y = this.world.getTerrainSurfaceY(this.center.x, this.center.z);
-    this.center.y = y;
-
-    const placeholder = new THREE.Group();
-    placeholder.position.set(this.center.x, y, this.center.z);
-    this.scene.enemyGroup.add(placeholder);
-    this.towerMesh = placeholder;
-
-    this.towerHealthBar = createTowerHealthBar();
-    this.towerHealthBar.position.set(this.center.x, y + 8, this.center.z);
-    this.scene.enemyGroup.add(this.towerHealthBar);
-    updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
-
-    const loader = new GLTFLoader();
-    loader.load('assets/buildings/homebase/tower.glb', (gltf) => {
-      const model = gltf.scene;
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const s = 8 / maxDim;
-      model.scale.set(s, s, s);
-      const scaledBox = new THREE.Box3().setFromObject(model);
-      const center = scaledBox.getCenter(new THREE.Vector3());
-      model.position.x -= center.x;
-      model.position.y -= scaledBox.min.y;
-      model.position.z -= center.z;
-
-      placeholder.add(model);
-      const finalBox = new THREE.Box3().setFromObject(placeholder);
-      this.towerHealthBar.position.y = finalBox.max.y + 1;
-
-      // Load Luffy mascot on top of the tower
-      loader.load('assets/npc/luffy.glb', (luffyGltf) => {
-        const luffy = luffyGltf.scene;
-        const lBox = new THREE.Box3().setFromObject(luffy);
-        const lSize = lBox.getSize(new THREE.Vector3());
-        const lMax = Math.max(lSize.x, lSize.y, lSize.z);
-        const ls = 2.5 / lMax;
-        luffy.scale.set(ls, ls, ls);
-        const lScaled = new THREE.Box3().setFromObject(luffy);
-        const lCenter = lScaled.getCenter(new THREE.Vector3());
-        const towerHeight = finalBox.max.y - finalBox.min.y;
-        const roofY = finalBox.min.y + towerHeight * 0.67 - placeholder.position.y;
-        luffy.position.x -= lCenter.x;
-        luffy.position.y = roofY - lScaled.min.y;
-        luffy.position.z -= lCenter.z + 1.5;
-        placeholder.add(luffy);
-
-        // Raise health bar above mascot
-        const topBox = new THREE.Box3().setFromObject(placeholder);
-        this.towerHealthBar.position.y = topBox.max.y + 2.5;
-      });
+    const result = buildTowerVisual({
+      world: this.world,
+      scene: this.scene,
+      center: this.center,
+      defense: this.state.defense,
     });
+    this.towerMesh = result.towerMesh;
+    this.towerHealthBar = result.towerHealthBar;
   }
 
   _onEnemyKilled(enemy) {

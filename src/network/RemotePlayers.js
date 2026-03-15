@@ -393,7 +393,11 @@ export class RemotePlayers {
       const wasDead = avatar.isDead;
       avatar.isDead = respawnUntil > 0 && respawnUntil > srvTime;
       if (avatar.isDead && !wasDead) {
-        avatar.deathTimer = 2.0; // show death for 2 seconds
+        avatar.deathTimer = 2.0;
+        this._spawnDeathDebris(avatar);
+      }
+      if (!avatar.isDead && wasDead) {
+        this._cleanupDeathState(avatar);
       }
     });
 
@@ -445,56 +449,41 @@ export class RemotePlayers {
         avatar.rightLeg.rotation.x = -stride;
       }
 
-      // Death visual effects
+      // Death debris physics
       if (avatar.deathTimer > 0) {
         avatar.deathTimer -= dt;
-        avatar.root.visible = true;
-
-        // Red tint on death start
-        if (avatar.deathTimer > 1.5 && !avatar._deathTinted) {
-          avatar._deathTinted = true;
-          avatar.root.traverse((child) => {
-            if (child.material && child.material.color) {
-              child.userData._origColor = child.material.color.clone();
-              child.material.color.lerp(new THREE.Color(0xff0000), 0.6);
+        // Hide original model, show debris
+        avatar.root.visible = false;
+        if (avatar._deathDebris) {
+          avatar._deathDebris.forEach((piece) => {
+            piece.velocity.y -= 15 * dt; // gravity
+            piece.mesh.position.addScaledVector(piece.velocity, dt);
+            piece.mesh.rotation.x += piece.spin.x * dt;
+            piece.mesh.rotation.z += piece.spin.z * dt;
+            // Fade out in last 0.6 seconds
+            if (avatar.deathTimer < 0.6) {
+              piece.mesh.traverse((child) => {
+                if (child.material) {
+                  child.material.transparent = true;
+                  child.material.opacity = Math.max(0, avatar.deathTimer / 0.6);
+                }
+              });
             }
           });
         }
-
-        // Fade out in last 0.8 seconds
-        const fadeStart = 0.8;
-        if (avatar.deathTimer < fadeStart) {
-          const alpha = Math.max(0, avatar.deathTimer / fadeStart);
-          avatar.root.traverse((child) => {
-            if (child.material) {
-              child.material.transparent = true;
-              child.material.opacity = alpha;
-            }
-          });
-        }
-
         if (avatar.deathTimer <= 0) {
           avatar.deathTimer = 0;
-          avatar._deathTinted = false;
-          // Restore colors and opacity
-          avatar.root.traverse((child) => {
-            if (child.material) {
-              child.material.opacity = 1;
-              if (child.userData._origColor && child.material.color) {
-                child.material.color.copy(child.userData._origColor);
-              }
-            }
-          });
+          this._removeDeathDebris(avatar);
         }
       }
       // Hide health bar during death
       if (avatar.healthBar) {
         avatar.healthBar.visible = !avatar.isDead && avatar.deathTimer <= 0;
       }
-      // Hide during respawn (after death animation finishes)
+      // Show/hide based on alive state
       if (avatar.isDead && avatar.deathTimer <= 0) {
         avatar.root.visible = false;
-      } else if (!avatar.isDead) {
+      } else if (!avatar.isDead && avatar.deathTimer <= 0) {
         avatar.root.visible = true;
       }
 
@@ -520,6 +509,120 @@ export class RemotePlayers {
     this._updateRemoteVFX(dt);
   }
 
+  _spawnDeathDebris(avatar) {
+    this._removeDeathDebris(avatar);
+    const worldPos = avatar.root.position.clone();
+    const debris = [];
+
+    // Body part names in the GLB model
+    const partNames = ['head', 'arm-left', 'arm-right', 'leg-left', 'leg-right', 'torso'];
+
+    // Find the GLB model node inside the root group
+    let modelNode = null;
+    avatar.root.traverse((child) => {
+      if (child.isGroup && child.rotation.y === Math.PI) modelNode = child;
+    });
+
+    for (const partName of partNames) {
+      let srcNode = null;
+      const searchRoot = modelNode || avatar.root;
+      searchRoot.traverse((child) => {
+        if (child.name === partName) srcNode = child;
+      });
+
+      if (!srcNode) continue;
+
+      // Clone the body part as a standalone mesh group
+      const piece = srcNode.clone(true);
+      // Get world position of the part
+      const partWorldPos = new THREE.Vector3();
+      srcNode.getWorldPosition(partWorldPos);
+      piece.position.copy(partWorldPos);
+      // Reset rotation to world-aligned
+      piece.rotation.set(0, 0, 0);
+      // Apply the model's scale to the clone
+      if (modelNode) {
+        const s = modelNode.scale.x * (modelNode.parent?.scale.x ?? 1);
+        piece.scale.setScalar(s);
+      }
+
+      // Random outward velocity (Roblox-style burst)
+      const angle = Math.random() * Math.PI * 2;
+      const upForce = partName === 'head' ? 8 : 3 + Math.random() * 4;
+      const outForce = 2 + Math.random() * 3;
+      const velocity = new THREE.Vector3(
+        Math.cos(angle) * outForce,
+        upForce,
+        Math.sin(angle) * outForce,
+      );
+      const spin = new THREE.Vector3(
+        (Math.random() - 0.5) * 12,
+        0,
+        (Math.random() - 0.5) * 12,
+      );
+
+      this.scene.remotePlayerGroup.add(piece);
+      debris.push({ mesh: piece, velocity, spin });
+    }
+
+    // If no GLB parts found (fallback avatar), create box debris from limbs
+    if (debris.length === 0) {
+      const color = 0xcc3333;
+      const parts = [
+        { size: [0.5, 0.5, 0.5], offset: [0, 1.6, 0], up: 8 },  // head
+        { size: [0.72, 0.82, 0.46], offset: [0, 0.9, 0], up: 3 }, // body
+        { size: [0.18, 0.72, 0.18], offset: [-0.48, 0.9, 0], up: 5 }, // left arm
+        { size: [0.18, 0.72, 0.18], offset: [0.48, 0.9, 0], up: 5 },  // right arm
+        { size: [0.2, 0.68, 0.2], offset: [-0.18, 0.34, 0], up: 4 },  // left leg
+        { size: [0.2, 0.68, 0.2], offset: [0.18, 0.34, 0], up: 4 },   // right leg
+      ];
+      for (const part of parts) {
+        const geom = new THREE.BoxGeometry(...part.size);
+        const mat = new THREE.MeshLambertMaterial({ color });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.set(
+          worldPos.x + part.offset[0],
+          worldPos.y + part.offset[1],
+          worldPos.z + part.offset[2],
+        );
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = new THREE.Vector3(
+          Math.cos(angle) * (2 + Math.random() * 3),
+          part.up + Math.random() * 2,
+          Math.sin(angle) * (2 + Math.random() * 3),
+        );
+        const spin = new THREE.Vector3(
+          (Math.random() - 0.5) * 12, 0, (Math.random() - 0.5) * 12,
+        );
+        this.scene.remotePlayerGroup.add(mesh);
+        debris.push({ mesh, velocity, spin });
+      }
+    }
+
+    avatar._deathDebris = debris;
+  }
+
+  _removeDeathDebris(avatar) {
+    if (!avatar._deathDebris) return;
+    avatar._deathDebris.forEach((piece) => {
+      this.scene.remotePlayerGroup.remove(piece.mesh);
+    });
+    avatar._deathDebris = null;
+  }
+
+  _cleanupDeathState(avatar) {
+    this._removeDeathDebris(avatar);
+    avatar.deathTimer = 0;
+    avatar.root.visible = true;
+    // Restore any material state
+    avatar.root.traverse((child) => {
+      if (child.material) {
+        child.material.opacity = 1;
+        child.material.transparent = false;
+      }
+    });
+  }
+
   applyKnockback(playerName, direction, strength) {
     const avatar = this.avatars.get(playerName);
     if (!avatar) return;
@@ -528,11 +631,8 @@ export class RemotePlayers {
   }
 
   _updateAnimationState(avatar) {
-    // Death animation overrides everything
-    if (avatar.isDead || avatar.deathTimer > 0) {
-      _switchAnimation(avatar, ANIM_DIE);
-      return;
-    }
+    // During death, model is hidden — debris handles visuals
+    if (avatar.isDead || avatar.deathTimer > 0) return;
 
     const speed = avatar.snapshotVelocity.length();
 
@@ -864,6 +964,7 @@ export class RemotePlayers {
 
   clear() {
     this.avatars.forEach((avatar) => {
+      this._removeDeathDebris(avatar);
       this.scene.remotePlayerGroup.remove(avatar.root);
     });
     this.avatars.clear();

@@ -57,6 +57,11 @@ export class CombatSystem {
       events.emit('combat:flame-emperor-shoot');
       return;
     }
+    // Fire pillar — AOE centered on player, handled by FireFistSpawner
+    if (skill.weaponType === 'fire_pillar') {
+      events.emit('combat:fire-pillar-cast');
+      return;
+    }
 
     if (this._shouldUseServerHomelandAttack()) {
       this._queueHomelandAttack({

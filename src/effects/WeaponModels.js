@@ -47,6 +47,7 @@ export class WeaponModels {
     this._buildUppercutFist();
     this._buildClapFists();
     this._buildFireFist();
+    this._buildFirePillar();
     this._buildFlameEmperor();
     this._buildDirtSkill();
     this._fruitVFX.build();
@@ -86,6 +87,8 @@ export class WeaponModels {
       this._animateClap(combat, swingMs, mod, gameState);
     } else if (wt === 'fire_fist') {
       this._animateFireFist(combat, swingMs, mod, gameState);
+    } else if (wt === 'fire_pillar') {
+      this._animateFirePillar(combat, swingMs, mod, gameState);
     } else if (wt === 'flame_emperor') {
       this._animateFlameEmperor(combat, swingMs, mod, gameState);
     } else if (wt === 'dirt') {
@@ -692,6 +695,63 @@ export class WeaponModels {
       m.group.position.set(0.55 + waveX, -0.55 + waveY, -0.7);
       m.group.rotation.set(0.15 + waveRot, -0.2, -0.15 + waveRot * 0.5);
       if (m.glbModel) m.glbModel.scale.copy(m.glbBaseScale);
+      m.group.visible = gameState.mode === 'playing';
+    }
+  }
+
+  // ── Fire Pillar: GLB model held in first person (flame tornado) ──
+
+  _buildFirePillar() {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+
+    this.models.fire_pillar = {
+      group,
+      glbModel: null,
+      glbLoaded: false,
+      glbBaseScale: new THREE.Vector3(1, 1, 1),
+      idleTime: 0,
+    };
+
+    const loader = new GLTFLoader();
+    loader.load('assets/firstperson/skills/firefruit/fire_pillar.glb', (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const s = 0.5 / maxDim;
+      model.scale.set(s, s, s);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+
+      group.add(model);
+      this.models.fire_pillar.glbModel = model;
+      this.models.fire_pillar.glbBaseScale.copy(model.scale);
+      this.models.fire_pillar.glbLoaded = true;
+    });
+  }
+
+  _animateFirePillar(combat, swingMs, mod, gameState) {
+    const m = this.models.fire_pillar;
+    if (!m) return;
+
+    const onCooldown = combat.cooldown > 0;
+    m.idleTime += 0.016;
+    const t = m.idleTime;
+
+    if (onCooldown) {
+      m.group.visible = false;
+    } else {
+      const waveX = Math.sin(t * 1.5) * 0.012;
+      const waveY = Math.cos(t * 1.1) * 0.018;
+      const spinY = t * 1.5;
+      m.group.position.set(0.5 + waveX, -0.5 + waveY, -0.65);
+      m.group.rotation.set(0.1, spinY, -0.1);
+      if (m.glbModel) {
+        const pulse = 1 + Math.sin(t * 2.5) * 0.08;
+        m.glbModel.scale.copy(m.glbBaseScale).multiplyScalar(pulse);
+      }
       m.group.visible = gameState.mode === 'playing';
     }
   }

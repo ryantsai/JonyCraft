@@ -69,6 +69,8 @@ multiplayer.attachRemotePlayers(remotePlayers);
 multiplayer.attachEnemyManager(enemyManager);
 const multiplayerLobby = new MultiplayerLobby(gameState, multiplayer);
 const fireFistSpawner = new FireFistSpawner(gameState, scene, weaponModels, projectileSystem);
+fireFistSpawner.setEnemyManager(enemyManager);
+fireFistSpawner.setExplosionEffect(explosionEffect);
 const soundManager = new SoundManager(gameState);
 const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
 const multiplayerHomelandMode = new MultiplayerHomelandMode(
@@ -122,6 +124,7 @@ function stepSimulation(deltaMs) {
     weaponModels.update(dt, gameState);
     screenEffects.update(dt);
     projectileSystem.update(dt);
+    fireFistSpawner.update(dt);
     explosionEffect.update(dt);
     particles.update(dt);
     if (gameState.mode === 'playing') {

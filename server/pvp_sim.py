@@ -6,7 +6,7 @@ from typing import Any
 
 from storage import SessionRecord
 
-PVP_MAX_HP = 500.0
+PVP_MAX_HP = 20.0
 PVP_RESPAWN_DELAY = 2.0
 ARENA_SIZE_X = 56.0
 ARENA_SIZE_Z = 56.0

@@ -136,6 +136,7 @@ function createAvatar(name) {
     isAttacking: false,
     attackSkillId: '',
     wasAttacking: false,
+    attackAnimTimer: 0,
     // Remote player data for VFX
     remoteYaw: 0,
     remotePitch: 0,
@@ -143,6 +144,9 @@ function createAvatar(name) {
     // Death state
     isDead: false,
     deathTimer: 0,
+    // Knockback
+    knockbackVelocity: new THREE.Vector3(),
+    knockbackTimer: 0,
   };
 }
 
@@ -413,8 +417,19 @@ export class RemotePlayers {
         avatar.root.visible = true;
       }
 
+      // Knockback displacement
+      if (avatar.knockbackTimer > 0) {
+        avatar.knockbackTimer -= dt * 1000;
+        avatar.root.position.addScaledVector(avatar.knockbackVelocity, dt);
+        avatar.knockbackVelocity.multiplyScalar(0.92);
+      }
+
+      // Attack animation hold timer
+      if (avatar.attackAnimTimer > 0) avatar.attackAnimTimer -= dt;
+
       // Detect attack start for VFX
       if (avatar.isAttacking && !avatar.wasAttacking) {
+        avatar.attackAnimTimer = 0.4; // hold attack anim for at least 400ms
         this._spawnRemoteAttackVFX(avatar);
       }
       avatar.wasAttacking = avatar.isAttacking;
@@ -422,6 +437,13 @@ export class RemotePlayers {
 
     // Update remote VFX particles
     this._updateRemoteVFX(dt);
+  }
+
+  applyKnockback(playerName, direction, strength) {
+    const avatar = this.avatars.get(playerName);
+    if (!avatar) return;
+    avatar.knockbackVelocity.copy(direction).multiplyScalar(strength);
+    avatar.knockbackTimer = 240;
   }
 
   _updateAnimationState(avatar) {
@@ -433,7 +455,7 @@ export class RemotePlayers {
 
     const speed = avatar.snapshotVelocity.length();
 
-    if (avatar.isAttacking) {
+    if (avatar.isAttacking || avatar.attackAnimTimer > 0) {
       _switchAnimation(avatar, ANIM_ATTACK);
     } else if (speed > 4.0) {
       _switchAnimation(avatar, ANIM_SPRINT);

@@ -76,6 +76,9 @@ export class CombatSystem {
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
         cooldownMs: skill.cooldownMs,
+        knockbackStrength: skill.knockback,
+        particleColor: skill.particleColor,
+        particleCount: skill.particleCount,
       });
       // Also try to hit local enemies (mobs in test mode)
       if (!['fire_fist', 'flame_emperor', 'fire_pillar'].includes(skill.weaponType)) {
@@ -155,22 +158,25 @@ export class CombatSystem {
     return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'test';
   }
 
-  _queuePvPAttack({ range, damageMultiplier, cooldownMs }) {
+  _queuePvPAttack({ range, damageMultiplier, cooldownMs, knockbackStrength, particleColor, particleCount }) {
     if (!this.remotePlayers) return;
     const playerPos = this.state.player.position;
     const forward = new THREE.Vector3(
       -Math.sin(this.state.player.yaw), 0, -Math.cos(this.state.player.yaw),
     );
     let bestTarget = null;
+    let bestAvatar = null;
     let bestScore = -Infinity;
 
     this.remotePlayers.avatars.forEach((avatar, name) => {
+      if (avatar.isDead) return;
       const toTarget = new THREE.Vector3().subVectors(avatar.root.position, playerPos);
       const distance = toTarget.length();
       if (distance > range + 1.0) return;
       toTarget.y = 0;
       if (toTarget.lengthSq() < 0.001) {
         bestTarget = name;
+        bestAvatar = avatar;
         bestScore = Infinity;
         return;
       }
@@ -180,10 +186,34 @@ export class CombatSystem {
       if (facing > 0.2 && score > bestScore) {
         bestScore = score;
         bestTarget = name;
+        bestAvatar = avatar;
       }
     });
 
     if (!bestTarget) return;
+
+    // Apply knockback visually on the remote avatar
+    if (bestAvatar && knockbackStrength) {
+      const away = new THREE.Vector3().subVectors(bestAvatar.root.position, playerPos);
+      away.y = 0;
+      if (away.lengthSq() < 0.001) {
+        away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
+      }
+      away.normalize();
+      const kbDir = knockbackStrength < 0 ? -1 : 1;
+      const kbMag = Math.abs(knockbackStrength);
+      this.remotePlayers.applyKnockback(bestTarget, away, kbMag * kbDir);
+    }
+
+    // Spawn hit particles on target
+    if (bestAvatar && particleColor) {
+      events.emit('sound:hit');
+      this.particles.spawn(
+        bestAvatar.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
+        particleColor, particleCount ?? 6,
+      );
+    }
+
     this.multiplayer?.queuePvPAttack({
       targetPlayer: bestTarget,
       range,

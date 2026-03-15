@@ -116,9 +116,9 @@ events.on('fruit:selected', () => {
   } else if (gameState.playStyle === 'multiplayer') {
     gameState.modeController = null;
     enemyManager.clearAll();
-    // PvP test mode: set 500 HP and random spawn
-    gameState.player.maxHp = 500;
-    gameState.player.hp = 500;
+    // PvP test mode: set 20 HP and random spawn
+    gameState.player.maxHp = 20;
+    gameState.player.hp = 20;
     playerController.setRandomSpawn();
     events.emit('status:message', `多人房間 ${gameState.multiplayer.sessionName} 已連線，PvP 模式啟動！`);
   } else {

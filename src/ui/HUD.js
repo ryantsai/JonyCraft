@@ -26,6 +26,7 @@ export class HUD {
     this.multiplayerRows = document.querySelector('#multiplayer-scoreboard-rows');
     this._lastPingUpdate = 0;
     this._lastPingValue = 0;
+    this._cachedPlayerPings = new Map();
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
@@ -284,9 +285,13 @@ export class HUD {
       gold.className = 'score-value';
       gold.textContent = String(player.gold ?? 0);
 
+      const now = performance.now();
+      if (now - this._lastPingUpdate > 1000 || !this._cachedPlayerPings.has(player.name)) {
+        this._cachedPlayerPings.set(player.name, Math.round(player.pingMs ?? 0));
+      }
       const ping = document.createElement('span');
       ping.className = 'score-value';
-      ping.textContent = `${Math.round(player.pingMs ?? 0)} ms`;
+      ping.textContent = `${this._cachedPlayerPings.get(player.name) ?? 0} ms`;
 
       row.append(name, kills, gold, ping);
       this.multiplayerRows.appendChild(row);

@@ -83,6 +83,49 @@ function createNameTag(name, color) {
   return sprite;
 }
 
+function createPlayerHealthBar() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 16;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(1.8, 0.22, 1);
+  sprite.position.set(0, 2.15, 0);
+  sprite.userData.canvas = canvas;
+  sprite.userData.texture = texture;
+  return sprite;
+}
+
+function updatePlayerHealthBar(sprite, hp, maxHp) {
+  if (!sprite) return;
+  const canvas = sprite.userData.canvas;
+  const ctx = canvas.getContext('2d');
+  const ratio = Math.max(0, hp / maxHp);
+  const w = canvas.width;
+  const h = canvas.height;
+  const barW = w - 4;
+  const barH = h - 4;
+
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.roundRect(1, 1, barW + 2, barH + 2, 4);
+  ctx.fill();
+
+  if (ratio > 0) {
+    ctx.beginPath();
+    const fillW = Math.round(barW * ratio);
+    ctx.fillStyle = ratio > 0.5 ? '#4ae04a' : ratio > 0.25 ? '#e0c030' : '#e04040';
+    ctx.roundRect(2, 2, fillW, barH, 3);
+    ctx.fill();
+  }
+
+  sprite.userData.texture.needsUpdate = true;
+}
+
 function createFallbackAvatar(name) {
   const root = new THREE.Group();
   const color = colorFromName(name);
@@ -106,16 +149,18 @@ function createFallbackAvatar(name) {
   const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.68, 0.2), accentMaterial);
   rightLeg.position.set(0.18, 0.34, 0);
   const tag = createNameTag(name, color);
+  const healthBar = createPlayerHealthBar();
 
-  root.add(body, head, leftArm, rightArm, leftLeg, rightLeg, tag);
-  return { root, leftArm, rightArm, leftLeg, rightLeg };
+  root.add(body, head, leftArm, rightArm, leftLeg, rightLeg, tag, healthBar);
+  return { root, leftArm, rightArm, leftLeg, rightLeg, healthBar };
 }
 
 function createAvatar(name) {
-  const { root, leftArm, rightArm, leftLeg, rightLeg } = createFallbackAvatar(name);
+  const { root, leftArm, rightArm, leftLeg, rightLeg, healthBar } = createFallbackAvatar(name);
   return {
     root,
     skinId: null,
+    healthBar,
     snapshotPosition: new THREE.Vector3(),
     snapshotVelocity: new THREE.Vector3(),
     targetPosition: new THREE.Vector3(),
@@ -144,6 +189,9 @@ function createAvatar(name) {
     // Death state
     isDead: false,
     deathTimer: 0,
+    // HP
+    hp: 20,
+    maxHp: 20,
     // Knockback
     knockbackVelocity: new THREE.Vector3(),
     knockbackTimer: 0,
@@ -201,8 +249,11 @@ async function upgradeAvatarToSkin(avatar, skin, name) {
     // GLB model faces +Z; game yaw 0 faces -Z, so rotate model 180°
     model.rotation.y = Math.PI;
 
+    const hpBar = createPlayerHealthBar();
+    avatar.healthBar = hpBar;
+
     const newRoot = new THREE.Group();
-    newRoot.add(model, tag);
+    newRoot.add(model, tag, hpBar);
     newRoot.position.copy(pos);
     newRoot.rotation.y = rot;
 
@@ -331,6 +382,11 @@ export class RemotePlayers {
       avatar.remotePitch = player.pitch ?? 0;
       avatar.remoteFruitId = player.fruitId ?? '';
 
+      // HP tracking
+      avatar.hp = Number(player.serverHp ?? player.hp ?? avatar.hp);
+      avatar.maxHp = Number(player.serverMaxHp ?? player.maxHp ?? avatar.maxHp);
+      updatePlayerHealthBar(avatar.healthBar, avatar.hp, avatar.maxHp);
+
       // Death state: server sets respawnUntil when player dies
       const respawnUntil = Number(player.respawnUntil ?? 0);
       const srvTime = Number(player._serverTime ?? player.lastSeen ?? 0);
@@ -389,26 +445,51 @@ export class RemotePlayers {
         avatar.rightLeg.rotation.x = -stride;
       }
 
-      // Death timer: fade out then hide
+      // Death visual effects
       if (avatar.deathTimer > 0) {
         avatar.deathTimer -= dt;
         avatar.root.visible = true;
-        // Fade out opacity in last 0.5 seconds
-        if (avatar.deathTimer < 0.5) {
+
+        // Red tint on death start
+        if (avatar.deathTimer > 1.5 && !avatar._deathTinted) {
+          avatar._deathTinted = true;
           avatar.root.traverse((child) => {
-            if (child.material) {
-              child.material.transparent = true;
-              child.material.opacity = Math.max(0, avatar.deathTimer / 0.5);
+            if (child.material && child.material.color) {
+              child.userData._origColor = child.material.color.clone();
+              child.material.color.lerp(new THREE.Color(0xff0000), 0.6);
             }
           });
         }
-        if (avatar.deathTimer <= 0) {
-          avatar.deathTimer = 0;
-          // Restore opacity
+
+        // Fade out in last 0.8 seconds
+        const fadeStart = 0.8;
+        if (avatar.deathTimer < fadeStart) {
+          const alpha = Math.max(0, avatar.deathTimer / fadeStart);
           avatar.root.traverse((child) => {
-            if (child.material) child.material.opacity = 1;
+            if (child.material) {
+              child.material.transparent = true;
+              child.material.opacity = alpha;
+            }
           });
         }
+
+        if (avatar.deathTimer <= 0) {
+          avatar.deathTimer = 0;
+          avatar._deathTinted = false;
+          // Restore colors and opacity
+          avatar.root.traverse((child) => {
+            if (child.material) {
+              child.material.opacity = 1;
+              if (child.userData._origColor && child.material.color) {
+                child.material.color.copy(child.userData._origColor);
+              }
+            }
+          });
+        }
+      }
+      // Hide health bar during death
+      if (avatar.healthBar) {
+        avatar.healthBar.visible = !avatar.isDead && avatar.deathTimer <= 0;
       }
       // Hide during respawn (after death animation finishes)
       if (avatar.isDead && avatar.deathTimer <= 0) {

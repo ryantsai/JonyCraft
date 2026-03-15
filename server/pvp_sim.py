@@ -40,6 +40,9 @@ def ensure_pvp_defaults(player_state: dict[str, Any]) -> None:
     """Set PvP HP defaults for test mode players."""
     if player_state.get("serverMaxHp") != PVP_MAX_HP:
         player_state["serverMaxHp"] = PVP_MAX_HP
+        # Cap current HP to new max (fixes 100/20 on first join)
+        if float(player_state.get("serverHp", PVP_MAX_HP)) > PVP_MAX_HP:
+            player_state["serverHp"] = PVP_MAX_HP
     player_state.setdefault("serverHp", PVP_MAX_HP)
     player_state.setdefault("attackReadyAt", 0.0)
     player_state.setdefault("respawnUntil", 0.0)

@@ -523,6 +523,9 @@ export class RemotePlayers {
       if (child.isGroup && child.rotation.y === Math.PI) modelNode = child;
     });
 
+    // Force world matrix update so getWorldPosition/Scale are accurate
+    avatar.root.updateMatrixWorld(true);
+
     for (const partName of partNames) {
       let srcNode = null;
       const searchRoot = modelNode || avatar.root;
@@ -534,17 +537,14 @@ export class RemotePlayers {
 
       // Clone the body part as a standalone mesh group
       const piece = srcNode.clone(true);
-      // Get world position of the part
+      // Get world position and scale of the part
       const partWorldPos = new THREE.Vector3();
+      const partWorldScale = new THREE.Vector3();
       srcNode.getWorldPosition(partWorldPos);
+      srcNode.getWorldScale(partWorldScale);
       piece.position.copy(partWorldPos);
-      // Reset rotation to world-aligned
       piece.rotation.set(0, 0, 0);
-      // Apply the model's scale to the clone
-      if (modelNode) {
-        const s = modelNode.scale.x * (modelNode.parent?.scale.x ?? 1);
-        piece.scale.setScalar(s);
-      }
+      piece.scale.copy(partWorldScale);
 
       // Random outward velocity (Roblox-style burst)
       const angle = Math.random() * Math.PI * 2;

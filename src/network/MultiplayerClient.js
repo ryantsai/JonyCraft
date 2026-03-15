@@ -368,6 +368,11 @@ export class MultiplayerClient {
       fruitId: this.state.selectedFruit?.id ?? '',
       selectedSkillId: this.state.getSelectedSkill()?.id ?? '',
       skinId: this.state.selectedSkin?.id ?? '',
+      // Attack state for remote animation & VFX
+      isAttacking: this.state.combat.punchTime > 0 || this.state.combat.swordSwingTime > 0,
+      attackSkillId: (this.state.combat.punchTime > 0 || this.state.combat.swordSwingTime > 0)
+        ? (this.state.getSelectedSkill()?.id ?? '')
+        : '',
     };
   }
 

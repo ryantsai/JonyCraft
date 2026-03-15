@@ -261,6 +261,7 @@ class SessionStore:
                 "skinId": clamp_text(incoming.get("skinId"), "", 24),
                 "isAttacking": bool(incoming.get("isAttacking", False)),
                 "attackSkillId": clamp_text(incoming.get("attackSkillId"), "", 32),
+                "attackSeq": max(0, int(incoming.get("attackSeq") or state.get("attackSeq") or 0)),
                 "hp": float(incoming.get("hp") or state.get("hp") or 100.0),
                 "maxHp": float(incoming.get("maxHp") or state.get("maxHp") or 100.0),
             }

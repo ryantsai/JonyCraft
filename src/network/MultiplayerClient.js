@@ -85,6 +85,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingPvPAttacks = [];
     this.suppressBlockSync = false;
 
     const endpoint = defaultServerEndpoint();
@@ -203,6 +204,10 @@ export class MultiplayerClient {
     this.pendingHomelandPurchases.push(item);
   }
 
+  queuePvPAttack(attack) {
+    this.pendingPvPAttacks.push(attack);
+  }
+
   update(dt) {
     if (!this.state.multiplayer.enabled || !this.state.multiplayer.sessionId) return;
     if (!this.hasTimedOut && (performance.now() - this.lastServerTrafficAt) >= this.disconnectTimeoutMs) {
@@ -227,6 +232,7 @@ export class MultiplayerClient {
     const outboundBlockOps = this.pendingBlockOps.splice(0, this.pendingBlockOps.length);
     const outboundHomelandAttacks = this.pendingHomelandAttacks.splice(0, this.pendingHomelandAttacks.length);
     const outboundHomelandPurchases = this.pendingHomelandPurchases.splice(0, this.pendingHomelandPurchases.length);
+    const outboundPvPAttacks = this.pendingPvPAttacks.splice(0, this.pendingPvPAttacks.length);
     try {
       const payload = await this._post(`/api/sessions/${this.state.multiplayer.sessionId}/sync`, {
         playerName: this.state.playerName,
@@ -237,12 +243,16 @@ export class MultiplayerClient {
           attacks: outboundHomelandAttacks,
           purchases: outboundHomelandPurchases,
         },
+        pvpActions: {
+          attacks: outboundPvPAttacks,
+        },
       });
       this._applySync(payload);
     } catch (error) {
       this.pendingBlockOps.unshift(...outboundBlockOps);
       this.pendingHomelandAttacks.unshift(...outboundHomelandAttacks);
       this.pendingHomelandPurchases.unshift(...outboundHomelandPurchases);
+      this.pendingPvPAttacks.unshift(...outboundPvPAttacks);
       this.state.multiplayer.connectionStatus = 'error';
       if (String(error.message).includes('session not found')) {
         this._resetSessionState();
@@ -304,6 +314,20 @@ export class MultiplayerClient {
     if (selfPlayer?.serverHp !== undefined) {
       this.state.player.hp = Number(selfPlayer.serverHp);
       this.state.player.maxHp = Number(selfPlayer.serverMaxHp ?? this.state.player.maxHp);
+    }
+    // PvP respawn: server tells us where to spawn after death
+    if (selfPlayer?.respawnX !== undefined && selfPlayer?.respawnZ !== undefined) {
+      const respawnUntil = Number(selfPlayer.respawnUntil ?? 0);
+      const serverTime = Number(payload.serverTime ?? 0);
+      if (respawnUntil > 0 && respawnUntil > serverTime - 2.5 && !this._lastRespawnHandled) {
+        this._lastRespawnHandled = respawnUntil;
+        events.emit('pvp:respawn', {
+          x: Number(selfPlayer.respawnX),
+          z: Number(selfPlayer.respawnZ),
+        });
+      } else if (respawnUntil <= serverTime) {
+        this._lastRespawnHandled = null;
+      }
     }
     this.state.multiplayer.playerStats = (payload.players ?? [])
       .map((player) => ({
@@ -421,6 +445,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingPvPAttacks = [];
     this.pendingImmediateSync = false;
   }
 

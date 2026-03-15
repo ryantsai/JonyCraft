@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from homeland_sim import ensure_homeland_state, process_actions, tick_homeland_session
+from pvp_sim import process_pvp_actions, tick_pvp_session
 from storage import (
     PlayerRecord,
     SQLiteSessionRepository,
@@ -189,9 +190,15 @@ class SessionStore:
                     player.last_seen,
                 )
 
+            pvp_actions = payload.get("pvpActions") or {}
+            had_pvp_actions = bool(pvp_actions.get("attacks"))
+            if session.mode == "test":
+                process_pvp_actions(session, player_name, pvp_actions, player.last_seen)
+
             should_persist = (
                 had_block_changes
                 or had_homeland_actions
+                or had_pvp_actions
                 or (player.last_seen - session.updated_at) >= MOVEMENT_PERSIST_INTERVAL_SECONDS
             )
             if should_persist:
@@ -224,6 +231,8 @@ class SessionStore:
                     tick_homeland_session(session, dt, current)
                     if (current - session.updated_at) >= HOMELAND_PERSIST_INTERVAL_SECONDS:
                         self._save_locked(session)
+                elif session.mode == "test":
+                    tick_pvp_session(session, current)
 
     def _require_locked(self, session_id: str) -> SessionRecord:
         session = self._sessions.get(session_id)

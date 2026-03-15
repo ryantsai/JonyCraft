@@ -6,6 +6,37 @@ const _predicted = new THREE.Vector3();
 const glbLoader = new GLTFLoader();
 let cachedGLTF = null;
 
+// Cached fire skill GLB templates { scene, baseScale }
+const _fireSkillTemplates = {};
+const _fireSkillPaths = {
+  fire_fist: 'assets/firstperson/skills/firefruit/fire_fist.glb',
+  flame_emperor: 'assets/firstperson/skills/firefruit/flame_emperor.glb',
+  fire_pillar: 'assets/firstperson/skills/firefruit/fire_pillar.glb',
+};
+
+function loadFireSkillTemplate(key) {
+  if (_fireSkillTemplates[key]) return _fireSkillTemplates[key];
+  const path = _fireSkillPaths[key];
+  if (!path) return null;
+  _fireSkillTemplates[key] = new Promise((resolve) => {
+    glbLoader.load(path, (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const s = 0.5 / maxDim;
+      model.scale.set(s, s, s);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+      resolve({ scene: model, baseScale: model.scale.clone() });
+    }, undefined, () => resolve(null));
+  });
+  return _fireSkillTemplates[key];
+}
+
+// Pre-load fire skill GLBs
+Object.keys(_fireSkillPaths).forEach((key) => loadFireSkillTemplate(key));
+
 function loadCharacterModel() {
   if (cachedGLTF) return cachedGLTF;
   cachedGLTF = new Promise((resolve, reject) => {
@@ -109,6 +140,9 @@ function createAvatar(name) {
     remoteYaw: 0,
     remotePitch: 0,
     remoteFruitId: '',
+    // Death state
+    isDead: false,
+    deathTimer: 0,
   };
 }
 
@@ -117,6 +151,7 @@ const ANIM_IDLE = 'idle';
 const ANIM_WALK = 'walk';
 const ANIM_SPRINT = 'sprint';
 const ANIM_ATTACK = 'attack-melee-right';
+const ANIM_DIE = 'die';
 
 async function upgradeAvatarToSkin(avatar, skin, name) {
   try {
@@ -183,7 +218,7 @@ async function upgradeAvatarToSkin(avatar, skin, name) {
     const mixer = new THREE.AnimationMixer(model);
     avatar.mixer = mixer;
     avatar.actions = {};
-    const clipNames = [ANIM_IDLE, ANIM_WALK, ANIM_SPRINT, ANIM_ATTACK];
+    const clipNames = [ANIM_IDLE, ANIM_WALK, ANIM_SPRINT, ANIM_ATTACK, ANIM_DIE];
     for (const clipName of clipNames) {
       const clip = gltf.animations.find((a) => a.name === clipName);
       if (clip) {
@@ -216,8 +251,8 @@ function _switchAnimation(avatar, animName) {
   newAction.fadeIn(fadeDuration);
   newAction.play();
 
-  // Attack animation plays once then returns to previous state
-  if (animName === ANIM_ATTACK) {
+  // Attack and die animations play once
+  if (animName === ANIM_ATTACK || animName === ANIM_DIE) {
     newAction.setLoop(THREE.LoopOnce, 1);
     newAction.clampWhenFinished = true;
   } else {
@@ -291,6 +326,15 @@ export class RemotePlayers {
       avatar.remoteYaw = player.yaw ?? 0;
       avatar.remotePitch = player.pitch ?? 0;
       avatar.remoteFruitId = player.fruitId ?? '';
+
+      // Death state: server sets respawnUntil when player dies
+      const respawnUntil = Number(player.respawnUntil ?? 0);
+      const srvTime = Number(player._serverTime ?? player.lastSeen ?? 0);
+      const wasDead = avatar.isDead;
+      avatar.isDead = respawnUntil > 0 && respawnUntil > srvTime;
+      if (avatar.isDead && !wasDead) {
+        avatar.deathTimer = 2.0; // show death for 2 seconds
+      }
     });
 
     Array.from(this.avatars.keys()).forEach((name) => {
@@ -326,7 +370,7 @@ export class RemotePlayers {
         if (avatar.headNode) {
           // Model is rotated 180° so pitch is inverted
           const targetPitch = Math.max(-1.2, Math.min(1.2, avatar.remotePitch));
-          avatar.headNode.rotation.x = targetPitch;
+          avatar.headNode.rotation.x = -targetPitch;
         }
       }
 
@@ -341,6 +385,34 @@ export class RemotePlayers {
         avatar.rightLeg.rotation.x = -stride;
       }
 
+      // Death timer: fade out then hide
+      if (avatar.deathTimer > 0) {
+        avatar.deathTimer -= dt;
+        avatar.root.visible = true;
+        // Fade out opacity in last 0.5 seconds
+        if (avatar.deathTimer < 0.5) {
+          avatar.root.traverse((child) => {
+            if (child.material) {
+              child.material.transparent = true;
+              child.material.opacity = Math.max(0, avatar.deathTimer / 0.5);
+            }
+          });
+        }
+        if (avatar.deathTimer <= 0) {
+          avatar.deathTimer = 0;
+          // Restore opacity
+          avatar.root.traverse((child) => {
+            if (child.material) child.material.opacity = 1;
+          });
+        }
+      }
+      // Hide during respawn (after death animation finishes)
+      if (avatar.isDead && avatar.deathTimer <= 0) {
+        avatar.root.visible = false;
+      } else if (!avatar.isDead) {
+        avatar.root.visible = true;
+      }
+
       // Detect attack start for VFX
       if (avatar.isAttacking && !avatar.wasAttacking) {
         this._spawnRemoteAttackVFX(avatar);
@@ -353,6 +425,12 @@ export class RemotePlayers {
   }
 
   _updateAnimationState(avatar) {
+    // Death animation overrides everything
+    if (avatar.isDead || avatar.deathTimer > 0) {
+      _switchAnimation(avatar, ANIM_DIE);
+      return;
+    }
+
     const speed = avatar.snapshotVelocity.length();
 
     if (avatar.isAttacking) {
@@ -384,10 +462,12 @@ export class RemotePlayers {
     if (skillId === 'fire_fist') {
       this._spawnRemoteFireball(pos, forward, yaw, {
         speed: 9, scale: 0.3, count: 20, life: 0.5,
+        glbKey: 'fire_fist', glbScale: 4.5,
       });
     } else if (skillId === 'flame_emperor') {
       this._spawnRemoteFireball(pos, forward, yaw, {
         speed: 7, scale: 0.5, count: 35, life: 0.8,
+        glbKey: 'flame_emperor', glbScale: 7.0, glbRotY: Math.PI / 2,
       });
     } else if (skillId === 'fire_pillar') {
       this._spawnRemoteFirePillar(pos, yaw);
@@ -397,7 +477,7 @@ export class RemotePlayers {
     }
   }
 
-  _spawnRemoteFireball(playerPos, forward, yaw, opts) {
+  async _spawnRemoteFireball(playerPos, forward, yaw, opts) {
     const spawnPos = new THREE.Vector3(
       playerPos.x + forward.x * 1.2,
       playerPos.y + 1.0 + forward.y * 1.0,
@@ -405,6 +485,42 @@ export class RemotePlayers {
     );
     const vel = forward.clone().multiplyScalar(opts.speed);
 
+    // Spawn GLB projectile model
+    if (opts.glbKey) {
+      const tmpl = await loadFireSkillTemplate(opts.glbKey);
+      if (tmpl) {
+        const projModel = tmpl.scene.clone();
+        projModel.traverse((child) => {
+          if (child.isMesh && child.material) child.material = child.material.clone();
+        });
+        projModel.scale.copy(tmpl.baseScale).multiplyScalar(opts.glbScale);
+        projModel.position.set(0, 0, 0);
+        if (opts.glbRotY) projModel.rotation.y = opts.glbRotY;
+
+        // Orient group to face travel direction
+        const projGroup = new THREE.Group();
+        projGroup.position.copy(spawnPos);
+        const quat = new THREE.Quaternion();
+        const rotMatrix = new THREE.Matrix4().lookAt(
+          new THREE.Vector3(), forward, new THREE.Vector3(0, 1, 0),
+        );
+        quat.setFromRotationMatrix(rotMatrix);
+        projGroup.quaternion.copy(quat);
+        projGroup.add(projModel);
+        this.scene.particleGroup.add(projGroup);
+
+        this._remoteVFX.push({
+          type: 'glb_projectile',
+          group: projGroup,
+          vel: vel.clone(),
+          age: 0,
+          maxAge: opts.life + 0.8,
+          fadeStart: opts.life + 0.3,
+        });
+      }
+    }
+
+    // Trail particles
     for (let i = 0; i < opts.count; i++) {
       const color = FIRE_COLORS[i % FIRE_COLORS.length];
       const mat = new THREE.MeshBasicMaterial({
@@ -434,7 +550,7 @@ export class RemotePlayers {
     }
   }
 
-  _spawnRemoteFirePillar(playerPos, yaw) {
+  async _spawnRemoteFirePillar(playerPos, yaw) {
     const spawnDist = 4.0;
     const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
     const pillarPos = new THREE.Vector3(
@@ -442,6 +558,40 @@ export class RemotePlayers {
       playerPos.y,
       playerPos.z + fwd.z * spawnDist,
     );
+
+    // Spawn GLB tornado model
+    const tmpl = await loadFireSkillTemplate('fire_pillar');
+    if (tmpl) {
+      const pillarModel = tmpl.scene.clone();
+      pillarModel.traverse((child) => {
+        if (child.isMesh && child.material) child.material = child.material.clone();
+      });
+      const worldScale = 6.0;
+      const thinFactor = 0.5;
+      pillarModel.scale.set(
+        tmpl.baseScale.x * worldScale * thinFactor,
+        tmpl.baseScale.y * worldScale,
+        tmpl.baseScale.z * worldScale * thinFactor,
+      );
+      pillarModel.position.set(0, 0, 0);
+
+      const pillarGroup = new THREE.Group();
+      pillarGroup.position.copy(pillarPos);
+      pillarGroup.add(pillarModel);
+      this.scene.particleGroup.add(pillarGroup);
+
+      this._remoteVFX.push({
+        type: 'glb_pillar',
+        group: pillarGroup,
+        model: pillarModel,
+        baseScale: worldScale,
+        thinFactor,
+        baseScaleVec: tmpl.baseScale.clone(),
+        pos: pillarPos.clone(),
+        age: 0,
+        maxAge: 1.2,
+      });
+    }
 
     const particleCount = 40;
     for (let i = 0; i < particleCount; i++) {
@@ -528,17 +678,52 @@ export class RemotePlayers {
       p.age += dt;
 
       if (p.age >= p.maxAge) {
-        this.scene.particleGroup.remove(p.mesh);
-        p.mat.dispose();
-        p.mesh.geometry?.dispose();
+        this._cleanupVFXEntry(p);
         this._remoteVFX.splice(i, 1);
         continue;
       }
 
       const t = p.age / p.maxAge;
 
-      if (p.type === 'pillar') {
-        // Spiral upward
+      if (p.type === 'glb_projectile') {
+        // GLB model flying forward
+        p.group.position.addScaledVector(p.vel, dt);
+        // Fade out materials near end
+        if (p.age > p.fadeStart) {
+          const fadeT = (p.age - p.fadeStart) / (p.maxAge - p.fadeStart);
+          p.group.traverse((child) => {
+            if (child.isMesh && child.material) {
+              child.material.transparent = true;
+              child.material.opacity = 1 - fadeT;
+            }
+          });
+        }
+      } else if (p.type === 'glb_pillar') {
+        // GLB tornado rising and spinning
+        const risePhase = Math.min(1, t * 3);
+        const fadePhase = Math.max(0, (t - 0.6) / 0.4);
+        const scaleExpand = 1 + risePhase * 1.5 - fadePhase * 0.8;
+        const yRise = risePhase * 3.0;
+
+        p.group.position.y = p.pos.y + yRise;
+        const thin = p.thinFactor;
+        const bs = p.baseScaleVec;
+        p.model.scale.set(
+          bs.x * p.baseScale * thin * scaleExpand,
+          bs.y * p.baseScale * scaleExpand,
+          bs.z * p.baseScale * thin * scaleExpand,
+        );
+        p.group.rotation.y += dt * 8;
+
+        // Fade out
+        p.group.traverse((child) => {
+          if (child.isMesh && child.material) {
+            child.material.transparent = true;
+            child.material.opacity = 1 - fadePhase;
+          }
+        });
+      } else if (p.type === 'pillar') {
+        // Spiral particle upward
         p.spinAngle += p.spinSpeed * dt;
         const expandRadius = p.spinRadius * (1 + t * 0.5);
         p.mesh.position.x = p.basePos.x + Math.cos(p.spinAngle) * expandRadius;
@@ -546,18 +731,31 @@ export class RemotePlayers {
         p.mesh.position.y += p.velY * dt;
         p.mesh.rotation.x += dt * 8;
         p.mesh.rotation.y += dt * 6;
+        p.mat.opacity = Math.max(0, (1 - t) * 0.9);
+        p.mesh.scale.setScalar(1 + t * 1.2);
       } else if (p.vel) {
         // Projectile-like particle
         p.mesh.position.addScaledVector(p.vel, dt);
         p.vel.y -= 2.0 * dt;
         p.mesh.rotation.x += dt * 6;
         p.mesh.rotation.y += dt * 4;
+        p.mat.opacity = Math.max(0, (1 - t) * 0.9);
+        p.mesh.scale.setScalar(1 + t * 1.2);
       }
+    }
+  }
 
-      // Fade out
-      p.mat.opacity = Math.max(0, (1 - t) * 0.9);
-      const scale = 1 + t * 1.2;
-      p.mesh.scale.setScalar(scale);
+  _cleanupVFXEntry(p) {
+    if (p.group) {
+      // GLB-based entry — dispose cloned materials, remove group
+      p.group.traverse((child) => {
+        if (child.isMesh && child.material) child.material.dispose();
+      });
+      this.scene.particleGroup.remove(p.group);
+    } else if (p.mesh) {
+      this.scene.particleGroup.remove(p.mesh);
+      p.mat?.dispose();
+      p.mesh.geometry?.dispose();
     }
   }
 
@@ -569,9 +767,7 @@ export class RemotePlayers {
 
     // Clean up VFX
     for (const p of this._remoteVFX) {
-      this.scene.particleGroup.remove(p.mesh);
-      p.mat.dispose();
-      p.mesh.geometry?.dispose();
+      this._cleanupVFXEntry(p);
     }
     this._remoteVFX = [];
   }

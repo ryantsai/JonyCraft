@@ -24,6 +24,8 @@ export class HUD {
     this.multiplayerScoreboard = document.querySelector('#multiplayer-scoreboard');
     this.multiplayerPingLabel = document.querySelector('#multiplayer-ping-label');
     this.multiplayerRows = document.querySelector('#multiplayer-scoreboard-rows');
+    this._lastPingUpdate = 0;
+    this._lastPingValue = 0;
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
@@ -159,7 +161,12 @@ export class HUD {
     const showScoreboard = multiplayer.enabled && multiplayer.playerStats.length > 0;
     this.multiplayerScoreboard.dataset.visible = showScoreboard ? 'true' : 'false';
     if (showScoreboard) {
-      this.multiplayerPingLabel.textContent = `Ping ${Math.round(multiplayer.pingMs || 0)} ms`;
+      const now = performance.now();
+      if (now - this._lastPingUpdate > 1000) {
+        this._lastPingUpdate = now;
+        this._lastPingValue = Math.round(multiplayer.pingMs || 0);
+      }
+      this.multiplayerPingLabel.textContent = `Ping ${this._lastPingValue} ms`;
       this._renderMultiplayerStats(multiplayer.playerStats);
     } else {
       this.multiplayerRows.textContent = '';

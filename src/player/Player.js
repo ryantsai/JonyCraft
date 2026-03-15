@@ -199,11 +199,47 @@ export class PlayerController {
 
     this.resolvePenetration(player);
 
-    if (player.position.y < -10 || player.hp <= 0) {
+    const isMultiplayer = this.state.playStyle === 'multiplayer';
+    if (player.position.y < -10) {
+      if (isMultiplayer) this.setRandomSpawn();
+      else this.setSpawn();
+    } else if (player.hp <= 0 && !isMultiplayer) {
       this.setSpawn();
     }
 
     this.scene.syncCamera(player);
+  }
+
+  setRandomSpawn() {
+    const player = this.state.player;
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const x = 4 + Math.random() * (WORLD_SIZE_X - 8);
+      const z = 4 + Math.random() * (WORLD_SIZE_Z - 8);
+      const ix = Math.floor(x);
+      const iz = Math.floor(z);
+      let surfaceY = -1;
+      for (let y = WORLD_HEIGHT - 2; y >= 0; y -= 1) {
+        const block = this.world.getBlock(ix, y, iz);
+        if (block && !['leaves', 'wood', 'water'].includes(block)) {
+          const head = this.world.getBlock(ix, y + 1, iz);
+          const aboveHead = this.world.getBlock(ix, y + 2, iz);
+          if (!head && !aboveHead) {
+            surfaceY = y + 1.01;
+            break;
+          }
+        }
+      }
+      if (surfaceY < 0) continue;
+      player.position.set(x, surfaceY, z);
+      player.velocity.set(0, 0, 0);
+      player.hp = player.maxHp;
+      player.yaw = Math.random() * Math.PI * 2;
+      player.pitch = -0.38;
+      this.scene.syncCamera(player);
+      return;
+    }
+    // Fallback to regular spawn
+    this.setSpawn();
   }
 
   setSpawn() {

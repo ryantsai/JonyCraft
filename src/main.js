@@ -60,11 +60,13 @@ projectileSystem.setExplosionEffect(explosionEffect);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);
+// Wire remote players for PvP targeting after remotePlayers is created below
 const mobileControls = new MobileControls(inputManager, combat, gameState);
 const hud = new HUD(gameState, canvas, enemyManager);
 const fruitSelect = new FruitSelect(gameState);
 multiplayer.setPlayerName(gameState.playerName);
 const remotePlayers = new RemotePlayers(scene);
+combat.setRemotePlayers(remotePlayers);
 multiplayer.attachRemotePlayers(remotePlayers);
 multiplayer.attachEnemyManager(enemyManager);
 const multiplayerLobby = new MultiplayerLobby(gameState, multiplayer);
@@ -81,6 +83,12 @@ multiplayer.attachHomelandMode(multiplayerHomelandMode);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
+events.on('pvp:respawn', ({ x, z }) => {
+  const y = world.getTerrainSurfaceY(Math.floor(x), Math.floor(z)) + 1.01;
+  gameState.player.position.set(x, y, z);
+  gameState.player.velocity.set(0, 0, 0);
+  scene.syncCamera(gameState.player);
+});
 events.on('fruit:selected', () => {
   gameState.defense.enabled = false;
   gameState.defense.remoteAuthoritative = false;
@@ -108,7 +116,11 @@ events.on('fruit:selected', () => {
   } else if (gameState.playStyle === 'multiplayer') {
     gameState.modeController = null;
     enemyManager.clearAll();
-    events.emit('status:message', `多人房間 ${gameState.multiplayer.sessionName} 已連線，開始一起探索。`);
+    // PvP test mode: set 500 HP and random spawn
+    gameState.player.maxHp = 500;
+    gameState.player.hp = 500;
+    playerController.setRandomSpawn();
+    events.emit('status:message', `多人房間 ${gameState.multiplayer.sessionName} 已連線，PvP 模式啟動！`);
   } else {
     gameState.modeController = null;
     enemyManager.spawnWave();

@@ -14,6 +14,11 @@ export class CombatSystem {
     this.enemies = enemyManager;
     this.particles = particles;
     this.multiplayer = multiplayerClient;
+    this.remotePlayers = null;
+  }
+
+  setRemotePlayers(remotePlayers) {
+    this.remotePlayers = remotePlayers;
   }
 
   /**
@@ -48,6 +53,43 @@ export class CombatSystem {
       });
     }
 
+    // In multiplayer homeland, all attacks go through the server
+    if (this._shouldUseServerHomelandAttack()) {
+      // Still emit VFX events for fire skills so local player sees effects
+      if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
+      else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
+      else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
+      this._queueHomelandAttack({
+        range: skill.range,
+        damageMultiplier: skill.damage ?? 1,
+        cooldownMs: skill.cooldownMs,
+      });
+      return;
+    }
+
+    // PvP attack in multiplayer test mode
+    if (this._shouldUsePvPAttack()) {
+      if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
+      else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
+      else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
+      this._queuePvPAttack({
+        range: skill.range,
+        damageMultiplier: skill.damage ?? 1,
+        cooldownMs: skill.cooldownMs,
+      });
+      // Also try to hit local enemies (mobs in test mode)
+      if (!['fire_fist', 'flame_emperor', 'fire_pillar'].includes(skill.weaponType)) {
+        this._attackEnemy({
+          range: skill.range,
+          knockbackStrength: skill.knockback,
+          particleColor: skill.particleColor,
+          particleCount: skill.particleCount,
+          damageMultiplier: skill.damage ?? 1,
+        });
+      }
+      return;
+    }
+
     // Projectile-based weapon types — damage is handled by the projectile on hit
     if (skill.weaponType === 'fire_fist') {
       events.emit('combat:fire-fist-shoot');
@@ -60,15 +102,6 @@ export class CombatSystem {
     // Fire pillar — AOE centered on player, handled by FireFistSpawner
     if (skill.weaponType === 'fire_pillar') {
       events.emit('combat:fire-pillar-cast');
-      return;
-    }
-
-    if (this._shouldUseServerHomelandAttack()) {
-      this._queueHomelandAttack({
-        range: skill.range,
-        damageMultiplier: skill.damage ?? 1,
-        cooldownMs: skill.cooldownMs,
-      });
       return;
     }
 
@@ -116,6 +149,47 @@ export class CombatSystem {
 
   _shouldUseServerHomelandAttack() {
     return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'homeland';
+  }
+
+  _shouldUsePvPAttack() {
+    return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'test';
+  }
+
+  _queuePvPAttack({ range, damageMultiplier, cooldownMs }) {
+    if (!this.remotePlayers) return;
+    const playerPos = this.state.player.position;
+    const forward = new THREE.Vector3(
+      -Math.sin(this.state.player.yaw), 0, -Math.cos(this.state.player.yaw),
+    );
+    let bestTarget = null;
+    let bestScore = -Infinity;
+
+    this.remotePlayers.avatars.forEach((avatar, name) => {
+      const toTarget = new THREE.Vector3().subVectors(avatar.root.position, playerPos);
+      const distance = toTarget.length();
+      if (distance > range + 1.0) return;
+      toTarget.y = 0;
+      if (toTarget.lengthSq() < 0.001) {
+        bestTarget = name;
+        bestScore = Infinity;
+        return;
+      }
+      toTarget.normalize();
+      const facing = forward.dot(toTarget);
+      const score = facing * 10 - distance;
+      if (facing > 0.2 && score > bestScore) {
+        bestScore = score;
+        bestTarget = name;
+      }
+    });
+
+    if (!bestTarget) return;
+    this.multiplayer?.queuePvPAttack({
+      targetPlayer: bestTarget,
+      range,
+      damageMultiplier,
+      cooldownMs,
+    });
   }
 
   _queueHomelandAttack({ range, damageMultiplier, cooldownMs }) {

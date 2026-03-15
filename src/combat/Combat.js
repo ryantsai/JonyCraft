@@ -33,6 +33,7 @@ export class CombatSystem {
     if (!skill || skill.kind !== 'attack') return;
 
     combat.cooldown = skill.cooldownMs;
+    combat.attackSeq = (combat.attackSeq || 0) + 1;
 
     // Drive the correct weapon animation
     if (skill.weaponType === 'sword') {

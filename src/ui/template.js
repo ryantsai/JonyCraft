@@ -39,6 +39,12 @@ export const gameTemplate = `
           <div id="hp-fill" class="health-fill" style="width: 100%"></div>
         </div>
       </div>
+      <div id="debug-panel" class="debug-panel" data-visible="false">
+        <button id="debug-fruit-btn" class="debug-toggle-btn" type="button">果實</button>
+        <button id="debug-skin-btn" class="debug-toggle-btn" type="button">造型</button>
+        <div id="debug-fruit-grid" class="debug-grid" data-visible="false"></div>
+        <div id="debug-skin-grid" class="debug-grid" data-visible="false"></div>
+      </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">
         <div class="stick-cluster">

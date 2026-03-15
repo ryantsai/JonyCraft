@@ -1,6 +1,6 @@
 import './style.css';
 
-import { FIXED_STEP_MS, LOOK_SPEED } from './config/constants.js';
+import { FIXED_STEP_MS, LOOK_SPEED, WORLD_HEIGHT } from './config/constants.js';
 import { events } from './core/EventBus.js';
 import { GameState } from './core/GameState.js';
 import { TextureManager } from './renderer/TextureManager.js';
@@ -111,9 +111,22 @@ events.on('pvp:knockback', ({ fromX, fromZ, knockback, weaponType }) => {
   }
 });
 events.on('pvp:respawn', ({ x, z }) => {
-  const y = world.getTerrainSurfaceY(x, z) + 0.01;
-  gameState.player.position.set(x, y, z);
+  // Find a safe Y with headroom (2 empty blocks above surface)
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  let safeY = world.getTerrainSurfaceY(x, z) + 0.01;
+  for (let y = WORLD_HEIGHT - 2; y >= 0; y--) {
+    const block = world.getBlock(ix, y, iz);
+    if (block && !['leaves', 'wood', 'water'].includes(block)) {
+      if (!world.getBlock(ix, y + 1, iz) && !world.getBlock(ix, y + 2, iz)) {
+        safeY = y + 1.01;
+      }
+      break;
+    }
+  }
+  gameState.player.position.set(x, safeY, z);
   gameState.player.velocity.set(0, 0, 0);
+  gameState.player.onGround = false;
   scene.syncCamera(gameState.player);
 });
 events.on('fruit:selected', () => {

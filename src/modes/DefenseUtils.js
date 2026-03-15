@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 /**
  * Shared utilities for defense game modes (single-player and multiplayer).
@@ -76,6 +77,68 @@ export function buildTowerCollision(world, centerX, centerZ) {
       }
     }
   }
+}
+
+/**
+ * Build the tower GLB visual with Luffy mascot on top.
+ * Returns { towerMesh, towerHealthBar } for the caller to store.
+ * @param {object} opts - { world, scene, center, defense }
+ */
+export function buildTowerVisual({ world, scene, center, defense }) {
+  const y = world.getTerrainSurfaceY(center.x, center.z);
+  center.y = y;
+
+  const placeholder = new THREE.Group();
+  placeholder.position.set(center.x, y, center.z);
+  scene.enemyGroup.add(placeholder);
+
+  const healthBar = createTowerHealthBar();
+  healthBar.position.set(center.x, y + 8, center.z);
+  scene.enemyGroup.add(healthBar);
+  if (defense) updateTowerHealthBar(healthBar, defense.towerHp, defense.towerMaxHp);
+
+  const loader = new GLTFLoader();
+  loader.load('assets/buildings/homebase/tower.glb', (gltf) => {
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const s = 8 / maxDim;
+    model.scale.set(s, s, s);
+    const scaledBox = new THREE.Box3().setFromObject(model);
+    const c = scaledBox.getCenter(new THREE.Vector3());
+    model.position.x -= c.x;
+    model.position.y -= scaledBox.min.y;
+    model.position.z -= c.z;
+
+    placeholder.add(model);
+    const finalBox = new THREE.Box3().setFromObject(placeholder);
+    healthBar.position.y = finalBox.max.y + 1;
+
+    // Load Luffy mascot on top of the tower
+    loader.load('assets/npc/luffy.glb', (luffyGltf) => {
+      const luffy = luffyGltf.scene;
+      const lBox = new THREE.Box3().setFromObject(luffy);
+      const lSize = lBox.getSize(new THREE.Vector3());
+      const lMax = Math.max(lSize.x, lSize.y, lSize.z);
+      const ls = 2.5 / lMax;
+      luffy.scale.set(ls, ls, ls);
+      const lScaled = new THREE.Box3().setFromObject(luffy);
+      const lCenter = lScaled.getCenter(new THREE.Vector3());
+      const towerHeight = finalBox.max.y - finalBox.min.y;
+      const roofY = finalBox.min.y + towerHeight * 0.67 - placeholder.position.y;
+      luffy.position.x -= lCenter.x;
+      luffy.position.y = roofY - lScaled.min.y;
+      luffy.position.z -= lCenter.z + 1.5;
+      placeholder.add(luffy);
+
+      // Raise health bar above mascot
+      const topBox = new THREE.Box3().setFromObject(placeholder);
+      healthBar.position.y = topBox.max.y + 2.5;
+    });
+  });
+
+  return { towerMesh: placeholder, towerHealthBar: healthBar };
 }
 
 export function buildFortress(world, centerX, centerZ) {

@@ -182,6 +182,8 @@ function createAvatar(name) {
     attackSkillId: '',
     wasAttacking: false,
     attackAnimTimer: 0,
+    attackSeq: 0,
+    lastAttackSeq: 0,
     // Remote player data for VFX
     remoteYaw: 0,
     remotePitch: 0,
@@ -378,6 +380,7 @@ export class RemotePlayers {
       // Attack state
       avatar.isAttacking = player.isAttacking ?? false;
       avatar.attackSkillId = player.attackSkillId ?? '';
+      avatar.attackSeq = player.attackSeq ?? 0;
       avatar.remoteYaw = player.yaw ?? 0;
       avatar.remotePitch = player.pitch ?? 0;
       avatar.remoteFruitId = player.fruitId ?? '';
@@ -497,8 +500,10 @@ export class RemotePlayers {
       // Attack animation hold timer
       if (avatar.attackAnimTimer > 0) avatar.attackAnimTimer -= dt;
 
-      // Detect attack start for VFX
-      if (avatar.isAttacking && !avatar.wasAttacking) {
+      // Detect attack start for VFX — use attackSeq to catch rapid-fire attacks
+      const newAttack = avatar.attackSeq !== avatar.lastAttackSeq;
+      if (newAttack) {
+        avatar.lastAttackSeq = avatar.attackSeq;
         avatar.attackAnimTimer = 0.4; // hold attack anim for at least 400ms
         this._spawnRemoteAttackVFX(avatar);
       }

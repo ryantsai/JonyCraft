@@ -1,4 +1,6 @@
 import { events } from '../core/EventBus.js';
+import { FRUITS } from '../config/fruits.js';
+import { SKINS } from '../config/skins.js';
 
 /**
  * HUD: hotbar, status bar, and start screen management.
@@ -27,6 +29,11 @@ export class HUD {
     this._lastPingUpdate = 0;
     this._lastPingValue = 0;
     this._cachedPlayerPings = new Map();
+    this.debugPanel = document.querySelector('#debug-panel');
+    this.debugFruitBtn = document.querySelector('#debug-fruit-btn');
+    this.debugSkinBtn = document.querySelector('#debug-skin-btn');
+    this.debugFruitGrid = document.querySelector('#debug-fruit-grid');
+    this.debugSkinGrid = document.querySelector('#debug-skin-grid');
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
@@ -85,6 +92,8 @@ export class HUD {
         events.emit('shop:purchase', { item: btn.dataset.shopItem });
       });
     });
+
+    this._initDebugPanel();
   }
 
   rebuildHotbar() {
@@ -173,6 +182,10 @@ export class HUD {
       this.multiplayerRows.textContent = '';
       this.multiplayerPingLabel.textContent = 'Ping -- ms';
     }
+
+    // Show debug panel only in test mode while playing
+    const showDebug = this.state.mode === 'playing' && this.state.gameMode === 'test';
+    this.debugPanel.dataset.visible = showDebug ? 'true' : 'false';
 
     const defense = this.state.defense;
     this.defenseBoard.dataset.visible = defense.enabled ? 'true' : 'false';
@@ -264,6 +277,97 @@ export class HUD {
     if (!this.disconnectTimer) return;
     window.clearTimeout(this.disconnectTimer);
     this.disconnectTimer = null;
+  }
+
+  _initDebugPanel() {
+    const fruitEmoji = (id) => {
+      const map = {
+        rubber: '\u{1F94A}', flame: '\u{1F525}', ice: '\u2744\uFE0F', lightning: '\u26A1',
+        dark: '\u{1F311}', light: '\u2600\uFE0F', quake: '\u{1F4A5}', magma: '\u{1F30B}',
+        sand: '\u{1F3DC}\uFE0F', bomb: '\u{1F4A3}',
+      };
+      return map[id] ?? '\u{1F34E}';
+    };
+
+    // Build fruit grid
+    FRUITS.forEach((fruit) => {
+      const btn = document.createElement('button');
+      btn.className = 'debug-grid-item';
+      btn.type = 'button';
+      btn.dataset.fruitId = fruit.id;
+      btn.style.setProperty('--item-color', fruit.color);
+      const emoji = document.createElement('span');
+      emoji.className = 'debug-emoji';
+      emoji.textContent = fruitEmoji(fruit.id);
+      const label = document.createElement('span');
+      label.textContent = fruit.name;
+      btn.append(emoji, label);
+      btn.addEventListener('click', () => {
+        this.state.selectFruit(fruit);
+        this.rebuildHotbar();
+        this.update();
+        this._updateDebugFruitSelection();
+        events.emit('sound:click');
+      });
+      this.debugFruitGrid.appendChild(btn);
+    });
+
+    // Build skin grid
+    SKINS.forEach((skin) => {
+      const btn = document.createElement('button');
+      btn.className = 'debug-grid-item';
+      btn.type = 'button';
+      btn.dataset.skinId = skin.id;
+      btn.style.setProperty('--item-color', skin.color);
+      const img = document.createElement('img');
+      img.className = 'debug-thumb';
+      img.src = skin.texture;
+      img.alt = skin.name;
+      const label = document.createElement('span');
+      label.textContent = skin.name;
+      btn.append(img, label);
+      btn.addEventListener('click', () => {
+        this.state.selectedSkin = skin;
+        this._updateDebugSkinSelection();
+        events.emit('sound:click');
+      });
+      this.debugSkinGrid.appendChild(btn);
+    });
+
+    // Toggle buttons
+    this.debugFruitBtn.addEventListener('click', () => {
+      const open = this.debugFruitGrid.dataset.visible !== 'true';
+      this.debugFruitGrid.dataset.visible = open ? 'true' : 'false';
+      this.debugSkinGrid.dataset.visible = 'false';
+      this.debugFruitBtn.dataset.open = open ? 'true' : 'false';
+      this.debugSkinBtn.dataset.open = 'false';
+      if (open) this._updateDebugFruitSelection();
+      events.emit('sound:click');
+    });
+
+    this.debugSkinBtn.addEventListener('click', () => {
+      const open = this.debugSkinGrid.dataset.visible !== 'true';
+      this.debugSkinGrid.dataset.visible = open ? 'true' : 'false';
+      this.debugFruitGrid.dataset.visible = 'false';
+      this.debugSkinBtn.dataset.open = open ? 'true' : 'false';
+      this.debugFruitBtn.dataset.open = 'false';
+      if (open) this._updateDebugSkinSelection();
+      events.emit('sound:click');
+    });
+  }
+
+  _updateDebugFruitSelection() {
+    const currentId = this.state.selectedFruit?.id ?? '';
+    this.debugFruitGrid.querySelectorAll('.debug-grid-item').forEach((btn) => {
+      btn.dataset.selected = btn.dataset.fruitId === currentId ? 'true' : 'false';
+    });
+  }
+
+  _updateDebugSkinSelection() {
+    const currentId = this.state.selectedSkin?.id ?? '';
+    this.debugSkinGrid.querySelectorAll('.debug-grid-item').forEach((btn) => {
+      btn.dataset.selected = btn.dataset.skinId === currentId ? 'true' : 'false';
+    });
   }
 
   _renderMultiplayerStats(players) {

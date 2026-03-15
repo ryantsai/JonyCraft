@@ -411,6 +411,7 @@ export class MultiplayerClient {
       attackSkillId: (this.state.combat.punchTime > 0 || this.state.combat.swordSwingTime > 0)
         ? (this.state.getSelectedSkill()?.id ?? '')
         : '',
+      attackSeq: this.state.combat.attackSeq || 0,
     };
   }
 

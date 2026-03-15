@@ -52,6 +52,7 @@ export class GameState {
       punchTime: 0,
       cooldown: 0,
       kills: 0,
+      attackSeq: 0, // increments each attack for remote animation detection
     };
 
     this.defense = {

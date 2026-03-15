@@ -408,9 +408,7 @@ export class MultiplayerClient {
       skinId: this.state.selectedSkin?.id ?? '',
       // Attack state for remote animation & VFX
       isAttacking: this.state.combat.punchTime > 0 || this.state.combat.swordSwingTime > 0,
-      attackSkillId: (this.state.combat.punchTime > 0 || this.state.combat.swordSwingTime > 0)
-        ? (this.state.getSelectedSkill()?.id ?? '')
-        : '',
+      attackSkillId: this.state.getSelectedSkill()?.id ?? '',
       attackSeq: this.state.combat.attackSeq || 0,
     };
   }

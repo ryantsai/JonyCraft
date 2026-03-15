@@ -14,10 +14,25 @@ export class ProjectileSystem {
     this.world = world;
     this.projectiles = [];
     this._explosionEffect = null;
+    this._remotePlayers = null;
+    this._multiplayerClient = null;
+    this._gameState = null;
   }
 
   setExplosionEffect(explosionEffect) {
     this._explosionEffect = explosionEffect;
+  }
+
+  setRemotePlayers(remotePlayers) {
+    this._remotePlayers = remotePlayers;
+  }
+
+  setMultiplayerClient(multiplayerClient) {
+    this._multiplayerClient = multiplayerClient;
+  }
+
+  setGameState(gameState) {
+    this._gameState = gameState;
   }
 
   /**
@@ -120,6 +135,11 @@ export class ProjectileSystem {
         }
       }
 
+      // Check remote player collision (PvP)
+      if (!hit && this._remotePlayers && this._isPvPMode()) {
+        hit = this._checkRemotePlayerCollision(proj);
+      }
+
       // Check terrain/block collision
       if (!hit) {
         hit = this._checkWorldCollision(proj);
@@ -214,6 +234,64 @@ export class ProjectileSystem {
         this.enemyManager.defeat(enemy, { source: 'projectile' });
       }
     }
+  }
+
+  _isPvPMode() {
+    return this._gameState?.playStyle === 'multiplayer' && this._gameState?.gameMode === 'test';
+  }
+
+  _checkRemotePlayerCollision(proj) {
+    const pos = proj.group.position;
+    let hitName = null;
+    let hitAvatar = null;
+
+    this._remotePlayers.avatars.forEach((avatar, name) => {
+      if (hitName || avatar.isDead || !avatar.root.visible) return;
+      const d = pos.distanceTo(avatar.root.position.clone().add(new THREE.Vector3(0, 0.9, 0)));
+      if (d < 1.4) {
+        hitName = name;
+        hitAvatar = avatar;
+      }
+    });
+
+    if (!hitName) return false;
+
+    const impactPos = pos.clone();
+
+    // Spawn explosion or particles
+    if (proj.explodeOnImpact && this._explosionEffect) {
+      this._explosionEffect.spawn(impactPos, {
+        scale: proj.explosionScale,
+        fireColors: proj.explosionColors,
+      });
+    } else if (this.particles) {
+      this.particles.spawn(impactPos, 'orange', 16);
+    }
+
+    // Apply visual knockback on the remote avatar
+    if (hitAvatar && proj.knockback) {
+      const away = new THREE.Vector3().subVectors(hitAvatar.root.position, impactPos);
+      away.y = 0;
+      if (away.lengthSq() < 0.01) away.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      away.normalize();
+      this._remotePlayers.applyKnockback(hitName, away, Math.abs(proj.knockback));
+    }
+
+    // Queue PvP damage through the server
+    if (this._multiplayerClient) {
+      this._multiplayerClient.queuePvPAttack({
+        targetPlayer: hitName,
+        range: 999, // already confirmed hit, bypass range check
+        damageMultiplier: proj.damage ?? 1,
+        cooldownMs: 0, // projectile already handles cooldown
+        knockback: proj.knockback ?? 0,
+        weaponType: proj.aoe ? 'flame_emperor' : 'fire_fist',
+      });
+    }
+
+    events.emit('sound:punch');
+    events.emit('hud:update');
+    return true;
   }
 
   _updateTrail(dt, proj) {

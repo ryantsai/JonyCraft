@@ -84,7 +84,7 @@ multiplayer.attachHomelandMode(multiplayerHomelandMode);
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
 events.on('pvp:respawn', ({ x, z }) => {
-  const y = world.getTerrainSurfaceY(Math.floor(x), Math.floor(z)) + 1.01;
+  const y = world.getTerrainSurfaceY(x, z) + 0.01;
   gameState.player.position.set(x, y, z);
   gameState.player.velocity.set(0, 0, 0);
   scene.syncCamera(gameState.player);

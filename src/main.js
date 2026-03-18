@@ -61,10 +61,10 @@ projectileSystem.setExplosionEffect(explosionEffect);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);
-inputManager.setInventory(inventory);
 // Wire remote players for PvP targeting after remotePlayers is created below
 const mobileControls = new MobileControls(inputManager, combat, gameState);
 const inventory = new Inventory(gameState, world);
+inputManager.setInventory(inventory);
 inventory.setEnemyManager(enemyManager);
 const hud = new HUD(gameState, canvas, enemyManager);
 hud.setInventory(inventory);

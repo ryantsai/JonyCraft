@@ -196,10 +196,12 @@ function stepSimulation(deltaMs) {
     if (gameState.mode === 'playing') {
       if (!gameState.shopOpen) {
         inputManager.update();
-        gameState.player.yaw -= inputManager.virtualInput.lookX * LOOK_SPEED * 1.3;
-        gameState.player.pitch = Math.max(-1.35, Math.min(1.35,
-          gameState.player.pitch - inputManager.virtualInput.lookY * LOOK_SPEED * 1.3,
-        ));
+        if (!gameState.inventoryOpen) {
+          gameState.player.yaw -= inputManager.virtualInput.lookX * LOOK_SPEED * 1.3;
+          gameState.player.pitch = Math.max(-1.35, Math.min(1.35,
+            gameState.player.pitch - inputManager.virtualInput.lookY * LOOK_SPEED * 1.3,
+          ));
+        }
         playerController.applyMovement(dt, inputManager.keyState, inputManager.virtualInput);
         soundManager.updateFootsteps(dt, inputManager.keyState, inputManager.virtualInput);
       }

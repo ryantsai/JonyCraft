@@ -25,12 +25,17 @@ export const gameTemplate = `
         <div id="multiplayer-scoreboard-rows" class="multiplayer-scoreboard-rows"></div>
       </div>
       <div id="defense-scoreboard" class="defense-scoreboard" data-visible="false" aria-label="保衛家園記分板">
-        <div class="defense-row">波次 <span id="def-wave">1</span> · 倒數 <span id="def-timer">60</span>s</div>
-        <div class="defense-row">總擊殺 <span id="def-kills">0</span> · 金幣 <span id="def-gold">0</span></div>
-        <div class="defense-hint">找到商人按 E 購買道具</div>
+        <span>波次 <span id="def-wave">1</span></span>
+        <span class="defense-sep">·</span>
+        <span>倒數 <span id="def-timer">60</span>s</span>
+        <span class="defense-sep">·</span>
+        <span>敵人 <span id="def-alive">0</span></span>
       </div>
       <div class="player-health-bar" aria-label="生命值">
-        <div class="health-label">❤ <span id="hp-text">100 / 100</span></div>
+        <div class="health-row">
+          <span class="health-label">❤ <span id="hp-text">100 / 100</span></span>
+          <span id="defense-stats" class="defense-stats" data-visible="false">擊殺 <span id="def-kills">0</span> · 金幣 <span id="def-gold">0</span></span>
+        </div>
         <div class="health-track">
           <div id="hp-fill" class="health-fill" style="width: 100%"></div>
         </div>
@@ -191,7 +196,7 @@ export const gameTemplate = `
               <span>切換技能</span>
             </div>
             <div class="control-item">
-              <kbd>Tab / I</kbd>
+              <kbd>Tab (按住)</kbd>
               <span>背包</span>
             </div>
             <div class="control-item">

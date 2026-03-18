@@ -45,8 +45,10 @@ export class HUD {
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
+    this.defAlive = document.querySelector('#def-alive');
     this.defKills = document.querySelector('#def-kills');
     this.defGold = document.querySelector('#def-gold');
+    this.defenseStats = document.querySelector('#defense-stats');
     this.merchantPanel = document.querySelector('#merchant-shop-panel');
     this.merchantGrid = document.querySelector('#merchant-shop-grid');
     this.merchantCloseBtn = document.querySelector('#merchant-close-btn');
@@ -102,11 +104,12 @@ export class HUD {
     events.on('multiplayer:lobby:closed', () => this.showHomeScreen());
     events.on('multiplayer:disconnected', ({ message }) => this.showDisconnectedScreen(message));
     events.on('inventory:changed', () => this._rebuildInventoryPanel());
-    events.on('inventory:toggle', () => this._toggleInventory());
+    events.on('inventory:open', () => this._openInventory());
+    events.on('inventory:close', () => this._closeInventory());
 
     this.inventoryCloseBtn.addEventListener('click', () => {
       events.emit('sound:click');
-      this._toggleInventory(false);
+      this._closeInventory();
     });
 
     this.rebuildHotbar();
@@ -250,9 +253,11 @@ export class HUD {
 
     const defense = this.state.defense;
     this.defenseBoard.dataset.visible = defense.enabled ? 'true' : 'false';
+    this.defenseStats.dataset.visible = defense.enabled ? 'true' : 'false';
     if (defense.enabled) {
       this.defWave.textContent = String(defense.wave);
       this.defTimer.textContent = String(Math.ceil(defense.timeLeft));
+      this.defAlive.textContent = String(alive);
       this.defKills.textContent = String(defense.totalKills);
       this.defGold.textContent = String(defense.totalGold);
     }
@@ -475,10 +480,20 @@ export class HUD {
     });
   }
 
-  _toggleInventory(forceState) {
-    const visible = forceState ?? this.inventoryPanel.dataset.visible !== 'true';
-    this.inventoryPanel.dataset.visible = visible ? 'true' : 'false';
-    if (visible) this._rebuildInventoryPanel();
+  _openInventory() {
+    if (this.state.shopOpen || this.state.mode === 'paused') return;
+    this.state.inventoryOpen = true;
+    this.inventoryPanel.dataset.visible = 'true';
+    document.exitPointerLock?.();
+    this._rebuildInventoryPanel();
+  }
+
+  _closeInventory() {
+    this.state.inventoryOpen = false;
+    this.inventoryPanel.dataset.visible = 'false';
+    if (this.state.mode === 'playing' && !this.state.shopOpen) {
+      this.canvas.requestPointerLock?.();
+    }
   }
 
   _rebuildInventoryPanel() {
@@ -545,7 +560,7 @@ export class HUD {
     if (this.state.mode !== 'playing') return;
     // Close shop/inventory first if open
     if (this.state.shopOpen) this._closeMerchantShop();
-    this._toggleInventory(false);
+    this._closeInventory();
 
     this.state.mode = 'paused';
     this.pauseMenu.dataset.visible = 'true';
@@ -564,7 +579,7 @@ export class HUD {
     this.state.mode = 'menu';
     this.state.shopOpen = false;
     this._closeMerchantShop();
-    this._toggleInventory(false);
+    this._closeInventory();
 
     // Leave multiplayer session if connected
     if (this.state.multiplayer.enabled) {

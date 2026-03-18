@@ -95,6 +95,13 @@ export class TestingHooks {
         totalKills: this.state.defense.totalKills,
         totalGold: this.state.defense.totalGold,
         turretCount: this.state.defense.turrets.length,
+        turrets: this.state.defense.turrets.slice(0, 8).map((turret) => ({
+          x: Number((turret.x ?? 0).toFixed(2)),
+          y: Number((turret.y ?? 0).toFixed(2)),
+          z: Number((turret.z ?? 0).toFixed(2)),
+          yaw: Number((turret.yaw ?? 0).toFixed(2)),
+        })),
+        placement: this.state.modeController?.cannonTowers?.getPlacementState?.() ?? null,
       },
       multiplayer: {
         enabled: this.state.multiplayer.enabled,

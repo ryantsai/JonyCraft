@@ -181,7 +181,11 @@ class SessionStore:
                 }
 
             homeland_actions = payload.get("homelandActions") or {}
-            had_homeland_actions = bool(homeland_actions.get("attacks")) or bool(homeland_actions.get("purchases"))
+            had_homeland_actions = (
+                bool(homeland_actions.get("attacks"))
+                or bool(homeland_actions.get("purchases"))
+                or bool(homeland_actions.get("placements"))
+            )
             if session.mode == "homeland":
                 process_actions(
                     session,

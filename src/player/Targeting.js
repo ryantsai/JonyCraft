@@ -95,6 +95,11 @@ export class Targeting {
     const normal = hit.normal;
     this.state.target = {
       block: { x, y, z, type: hit.type },
+      normal: {
+        x: Math.round(normal.x),
+        y: Math.round(normal.y),
+        z: Math.round(normal.z),
+      },
       placeAt: {
         x: x + Math.round(normal.x),
         y: y + Math.round(normal.y),

@@ -143,6 +143,11 @@ export class InputManager {
       return;
     }
 
+    if (skill.kind === 'deployable') {
+      this.combat.handleDeployable();
+      return;
+    }
+
     if (skill.kind === 'block') this.combat.handleBreak();
   }
 

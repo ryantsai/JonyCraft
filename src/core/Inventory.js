@@ -133,6 +133,25 @@ export class Inventory {
     return true;
   }
 
+  consumeSelectedDeployable(expectedItemId = null) {
+    const skill = this.state.activeSkills[this.state.selectedIndex];
+    if (!skill || !skill._itemId) return false;
+
+    const def = ITEMS[skill._itemId];
+    if (!def || def.kind !== 'deployable') return false;
+    if (expectedItemId && def.id !== expectedItemId) return false;
+
+    this.state.activeSkills.splice(this.state.selectedIndex, 1);
+    if (this.state.selectedIndex >= this.state.activeSkills.length) {
+      this.state.selectedIndex = Math.max(0, this.state.activeSkills.length - 1);
+    }
+
+    this._syncVersion++;
+    events.emit('inventory:changed');
+    events.emit('hotbar:rebuild');
+    return true;
+  }
+
   /** Update buff timers each frame. */
   update(dt) {
     for (const key of Object.keys(this.buffs)) {
@@ -222,6 +241,18 @@ export class Inventory {
         particleCount: def.particleCount,
         _itemId: def.id,
         _uses: Infinity,
+      };
+    }
+
+    if (def.kind === 'deployable') {
+      return {
+        id: def.id,
+        name: def.name,
+        icon: def.icon,
+        kind: 'deployable',
+        deployableType: def.deployableType,
+        _itemId: def.id,
+        _uses: 1,
       };
     }
 

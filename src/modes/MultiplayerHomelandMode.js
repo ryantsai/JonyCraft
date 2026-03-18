@@ -3,9 +3,10 @@ import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { events } from '../core/EventBus.js';
 import { updateTowerHealthBar, buildFortress, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
 import { SHOP_ITEMS, MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
+import { CannonTowerSystem } from './CannonTowerSystem.js';
 
 export class MultiplayerHomelandMode {
-  constructor(gameState, world, enemyManager, scene, multiplayerClient) {
+  constructor(gameState, world, enemyManager, scene, multiplayerClient, projectileSystem, remotePlayers) {
     this.state = gameState;
     this.world = world;
     this.enemies = enemyManager;
@@ -15,21 +16,24 @@ export class MultiplayerHomelandMode {
     this.center = new THREE.Vector3(WORLD_SIZE_X / 2, 0, WORLD_SIZE_Z / 2);
     this.towerMesh = null;
     this.towerHealthBar = null;
-    this.turretMeshes = new Map();
     this._unsubs = [];
     this.merchantNPC = null;
     this.merchantPos = null;
     this.inventory = null;
+    this.cannonTowers = new CannonTowerSystem(gameState, world, scene, enemyManager, projectileSystem, remotePlayers);
   }
 
   setInventory(inventory) {
     this.inventory = inventory;
+    this.cannonTowers.setInventory(inventory);
   }
 
   activate() {
     this.state.defense.enabled = true;
     this.state.defense.remoteAuthoritative = true;
     this.state.defense.status = 'waiting';
+    this.state.defense.turrets = [];
+    this.cannonTowers.clear();
     this._buildFortress();
     this._buildTowerVisual();
     this._buildMerchant();
@@ -44,11 +48,12 @@ export class MultiplayerHomelandMode {
   deactivate() {
     this._unsubs.forEach((unsub) => unsub());
     this._unsubs = [];
+    this.cannonTowers.clear();
   }
 
-  update() {
+  update(dt) {
     if (!this.state.defense.enabled) return;
-    this._syncTurretVisuals();
+    this.cannonTowers.update(dt, { remoteAuthoritative: true });
     updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
   }
 
@@ -74,7 +79,6 @@ export class MultiplayerHomelandMode {
     }
 
     this._buildTowerVisual();
-    this._syncTurretVisuals();
   }
 
   _buildMerchant() {
@@ -82,6 +86,7 @@ export class MultiplayerHomelandMode {
     const result = buildMerchantNPC(this.scene, this.world, this.center.x, this.center.z);
     this.merchantNPC = result.group;
     this.merchantPos = result.position;
+    this.cannonTowers.setMerchantPosition(this.merchantPos);
   }
 
   _isNearMerchant() {
@@ -124,8 +129,6 @@ export class MultiplayerHomelandMode {
       events.emit('status:message', `恢復了 ${item.effectValue} 生命值`);
     } else if (item.effect === 'repair_tower') {
       events.emit('status:message', `修復守護塔 ${item.effectValue} HP`);
-    } else if (item.effect === 'turret') {
-      events.emit('status:message', '放置了自動砲塔');
     } else if (item.giveItemId) {
       if (this.inventory) {
         this.inventory.addItem(item.giveItemId, 1);
@@ -146,31 +149,17 @@ export class MultiplayerHomelandMode {
     });
     this.towerMesh = result.towerMesh;
     this.towerHealthBar = result.towerHealthBar;
+    this.cannonTowers.setHomeTowerMesh(this.towerMesh);
   }
 
   _buildFortress() {
     buildFortress(this.world, this.center.x, this.center.z);
   }
 
-  _syncTurretVisuals() {
-    const keep = new Set();
-    this.state.defense.turrets.forEach((turret) => {
-      keep.add(turret.id);
-      if (!this.turretMeshes.has(turret.id)) {
-        const geom = new THREE.CylinderGeometry(0.3, 0.45, 1.2, 8);
-        const mat = new THREE.MeshStandardMaterial({ color: 0x6ec6ff, emissive: 0x224466 });
-        const mesh = new THREE.Mesh(geom, mat);
-        this.scene.enemyGroup.add(mesh);
-        this.turretMeshes.set(turret.id, mesh);
-      }
-      const mesh = this.turretMeshes.get(turret.id);
-      mesh.position.set(turret.x, turret.y, turret.z);
-    });
-
-    Array.from(this.turretMeshes.entries()).forEach(([id, mesh]) => {
-      if (keep.has(id)) return;
-      this.scene.enemyGroup.remove(mesh);
-      this.turretMeshes.delete(id);
+  tryPlaceDeployable(skill) {
+    if (skill?.deployableType !== 'cannon_tower') return false;
+    return this.cannonTowers.tryPlaceSelectedTower({
+      queuePlacement: (tower) => this.multiplayer.queueHomelandPlacement(tower),
     });
   }
 }

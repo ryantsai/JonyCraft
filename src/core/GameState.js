@@ -94,7 +94,11 @@ export class GameState {
   }
 
   getSelectedSkill() {
-    return this.activeSkills[this.selectedIndex];
+    if (!Array.isArray(this.activeSkills) || this.activeSkills.length === 0) return null;
+    if (this.selectedIndex < 0 || this.selectedIndex >= this.activeSkills.length) {
+      this.selectedIndex = Math.max(0, Math.min(this.selectedIndex, this.activeSkills.length - 1));
+    }
+    return this.activeSkills[this.selectedIndex] ?? this.activeSkills[0];
   }
 
   getSelectedBlockType() {

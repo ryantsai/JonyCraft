@@ -42,7 +42,9 @@ export class MobileControls {
     });
 
     this._bindHold(touchSecondary, () => {
-      if (this.state.getSelectedSkill().kind === 'block') this.combat.handlePlace();
+      const skill = this.state.getSelectedSkill();
+      if (skill.kind === 'block') this.combat.handlePlace();
+      if (skill.kind === 'deployable') this.combat.handleDeployable();
     });
 
     const touchInteract = document.querySelector('#touch-interact');

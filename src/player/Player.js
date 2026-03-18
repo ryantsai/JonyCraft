@@ -121,6 +121,20 @@ export class PlayerController {
       }
     }
 
+    if (Array.isArray(this.state.defense?.turrets)) {
+      for (let i = 0; i < this.state.defense.turrets.length; i += 1) {
+        const turret = this.state.defense.turrets[i];
+        const tBottom = (turret.y ?? 0);
+        const tTop = tBottom + 2.8;
+        if (py < tTop && pTop > tBottom) {
+          const dx = x - turret.x;
+          const dz = z - turret.z;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist < PLAYER_RADIUS + 0.9) return true;
+        }
+      }
+    }
+
     // Enemy collision
     if (this.enemyManager) {
       const alive = this.enemyManager.getAlive();

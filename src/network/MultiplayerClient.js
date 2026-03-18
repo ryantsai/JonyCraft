@@ -86,6 +86,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingHomelandPlacements = [];
     this.pendingPvPAttacks = [];
     this.suppressBlockSync = false;
 
@@ -211,6 +212,10 @@ export class MultiplayerClient {
     this.pendingHomelandPurchases.push(item);
   }
 
+  queueHomelandPlacement(placement) {
+    this.pendingHomelandPlacements.push(placement);
+  }
+
   queuePvPAttack(attack) {
     this.pendingPvPAttacks.push(attack);
   }
@@ -239,6 +244,7 @@ export class MultiplayerClient {
     const outboundBlockOps = this.pendingBlockOps.splice(0, this.pendingBlockOps.length);
     const outboundHomelandAttacks = this.pendingHomelandAttacks.splice(0, this.pendingHomelandAttacks.length);
     const outboundHomelandPurchases = this.pendingHomelandPurchases.splice(0, this.pendingHomelandPurchases.length);
+    const outboundHomelandPlacements = this.pendingHomelandPlacements.splice(0, this.pendingHomelandPlacements.length);
     const outboundPvPAttacks = this.pendingPvPAttacks.splice(0, this.pendingPvPAttacks.length);
     try {
       const payload = await this._post(`/api/sessions/${this.state.multiplayer.sessionId}/sync`, {
@@ -249,6 +255,7 @@ export class MultiplayerClient {
         homelandActions: {
           attacks: outboundHomelandAttacks,
           purchases: outboundHomelandPurchases,
+          placements: outboundHomelandPlacements,
         },
         pvpActions: {
           attacks: outboundPvPAttacks,
@@ -259,6 +266,7 @@ export class MultiplayerClient {
       this.pendingBlockOps.unshift(...outboundBlockOps);
       this.pendingHomelandAttacks.unshift(...outboundHomelandAttacks);
       this.pendingHomelandPurchases.unshift(...outboundHomelandPurchases);
+      this.pendingHomelandPlacements.unshift(...outboundHomelandPlacements);
       this.pendingPvPAttacks.unshift(...outboundPvPAttacks);
       this.state.multiplayer.connectionStatus = 'error';
       if (String(error.message).includes('session not found')) {
@@ -297,6 +305,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingHomelandPlacements = [];
     this.pendingImmediateSync = false;
   }
 
@@ -477,6 +486,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingHomelandPlacements = [];
     this.pendingPvPAttacks = [];
     this.pendingImmediateSync = false;
   }

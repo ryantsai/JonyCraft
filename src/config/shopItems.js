@@ -27,13 +27,13 @@ export const SHOP_ITEMS = [
     effectValue: 80,
   },
   {
-    id: 'turret',
-    name: '自動砲塔',
-    desc: '放置一座自動射擊砲塔',
+    id: 'buy_cannon_tower',
+    name: '加農砲塔',
+    desc: '購買後放入背包，可裝備到技能欄後自行放置',
     icon: assetUrl('assets/kenney/items/spear.png'),
     cost: 40,
-    category: 'service',
-    effect: 'turret',
+    category: 'item',
+    giveItemId: 'cannon_tower',
   },
 
   // ── Consumable items (added to inventory) ──

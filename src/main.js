@@ -88,10 +88,10 @@ const darkPullSpawner = new DarkPullSpawner(
   gameState, scene, weaponModels, targeting, enemyManager, particles, world,
 );
 const soundManager = new SoundManager(gameState);
-const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
+const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene, projectileSystem);
 homelandMode.setInventory(inventory);
 const multiplayerHomelandMode = new MultiplayerHomelandMode(
-  gameState, world, enemyManager, scene, multiplayer,
+  gameState, world, enemyManager, scene, multiplayer, projectileSystem, remotePlayers,
 );
 multiplayerHomelandMode.setInventory(inventory);
 multiplayer.attachHomelandMode(multiplayerHomelandMode);

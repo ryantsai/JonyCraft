@@ -116,6 +116,16 @@ export const ITEMS = {
     rarity: 'legendary',
     color: '#ffd966',
   },
+  cannon_tower: {
+    id: 'cannon_tower',
+    name: '加農砲塔',
+    desc: '裝備後可在地面或牆頂放置一座定向加農砲塔',
+    icon: assetUrl('assets/kenney/items/spear.png'),
+    kind: 'deployable',
+    deployableType: 'cannon_tower',
+    rarity: 'rare',
+    color: '#ffd966',
+  },
 
   // ── Weapons (equippable, infinite uses) ──
   hammer_diamond: {

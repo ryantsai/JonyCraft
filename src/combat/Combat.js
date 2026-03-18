@@ -157,6 +157,10 @@ export class CombatSystem {
     events.emit('hud:update');
   }
 
+  handleDeployable() {
+    this.state.modeController?.tryPlaceDeployable?.(this.state.getSelectedSkill());
+  }
+
   _shouldUseServerHomelandAttack() {
     return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'homeland';
   }

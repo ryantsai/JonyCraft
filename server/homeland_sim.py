@@ -13,6 +13,13 @@ TOWER_MAX_HP = 240.0
 ARENA_CENTER_X = 28.0
 ARENA_CENTER_Z = 28.0
 ARENA_Y = 3.0
+TURRET_RANGE = 9.5
+TURRET_VIEW_CONE_COS = math.cos(math.radians(38))
+TURRET_FIRE_INTERVAL = 0.82
+TURRET_DAMAGE = 2.5
+TURRET_AOE_RADIUS = 2.6
+TURRET_HOME_TOWER_RADIUS = 3.1
+TURRET_SPACING = 2.4
 
 ENEMY_DEFS: dict[str, dict[str, float | int]] = {
     "zombie": {"max_health": 3, "base_attack": 1, "base_defense": 0, "speed": 1.12, "size": 1.0, "attack_range": 1.8, "attack_cooldown": 1.0, "weight": 3},
@@ -206,7 +213,7 @@ def process_attack(session: SessionRecord, player_name: str, attack: dict[str, A
 SHOP_COSTS: dict[str, int] = {
     "heal": 15,
     "tower": 25,
-    "turret": 40,
+    "buy_cannon_tower": 40,
     "buy_potion_hp": 20,
     "buy_potion_hp_large": 40,
     "buy_crystal_power": 35,
@@ -220,10 +227,97 @@ SHOP_COSTS: dict[str, int] = {
 
 # Items that only deduct gold server-side; the client adds to inventory via snapshot sync
 SHOP_ITEM_ONLY = {
+    "buy_cannon_tower",
     "buy_potion_hp", "buy_potion_hp_large", "buy_crystal_power",
     "buy_feather_swift", "buy_blast_orb", "buy_shield_scroll",
     "buy_hammer", "buy_spear", "buy_bow",
 }
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    return max(minimum, min(maximum, value))
+
+
+def _find_turret_target(defense: dict[str, Any], turret: dict[str, Any]) -> dict[str, Any] | None:
+    yaw = float(turret.get("yaw") or 0.0)
+    forward_x = -math.sin(yaw)
+    forward_z = -math.cos(yaw)
+    best_enemy = None
+    best_score = float("-inf")
+
+    for enemy in defense["enemies"]:
+        dx = float(enemy["x"]) - float(turret["x"])
+        dz = float(enemy["z"]) - float(turret["z"])
+        distance = math.sqrt(dx * dx + dz * dz)
+        if distance <= 0.001 or distance > TURRET_RANGE:
+            continue
+        dir_x = dx / distance
+        dir_z = dz / distance
+        facing = forward_x * dir_x + forward_z * dir_z
+        if facing < TURRET_VIEW_CONE_COS:
+            continue
+        score = facing * 4.0 - distance * 0.22
+        if score > best_score:
+            best_score = score
+            best_enemy = enemy
+
+    return best_enemy
+
+
+def _apply_turret_explosion(session: SessionRecord, defense: dict[str, Any], turret: dict[str, Any]) -> None:
+    target = _find_turret_target(defense, turret)
+    if target is None:
+        return
+
+    survivors: list[dict[str, Any]] = []
+    defeated: list[dict[str, Any]] = []
+    for enemy in defense["enemies"]:
+        dx = float(enemy["x"]) - float(target["x"])
+        dz = float(enemy["z"]) - float(target["z"])
+        distance = math.sqrt(dx * dx + dz * dz)
+        if distance <= TURRET_AOE_RADIUS:
+            falloff = 1.0 - (distance / TURRET_AOE_RADIUS) * 0.45
+            damage = max(1.0, round(TURRET_DAMAGE * falloff) - float(enemy["baseDefense"]))
+            enemy["health"] = max(0.0, float(enemy["health"]) - damage)
+        if float(enemy["health"]) <= 0.0:
+            defeated.append(enemy)
+        else:
+            survivors.append(enemy)
+
+    defense["enemies"] = survivors
+    owner_name = str(turret.get("ownerName") or "")
+    owner_record = session.players.get(owner_name) if owner_name else None
+    for enemy in defeated:
+        _award_enemy_defeat(owner_record.state if owner_record is not None else None, defense, enemy)
+
+
+def process_placement(session: SessionRecord, player_name: str, placement: dict[str, Any]) -> None:
+    defense = ensure_homeland_state(session)
+    try:
+        x = float(placement.get("x"))
+        y = float(placement.get("y"))
+        z = float(placement.get("z"))
+        yaw = float(placement.get("yaw") or 0.0)
+    except (TypeError, ValueError):
+        return
+
+    if math.dist((x, z), (ARENA_CENTER_X, ARENA_CENTER_Z)) < TURRET_HOME_TOWER_RADIUS:
+        return
+    if any(math.dist((x, z), (float(t["x"]), float(t["z"]))) < TURRET_SPACING for t in defense["turrets"]):
+        return
+
+    defense["turrets"].append(
+        {
+            "id": f"turret-{defense['nextTurretId']}",
+            "x": round(_clamp(x, 1.0, 55.0), 2),
+            "y": round(_clamp(y, 1.0, 10.0), 2),
+            "z": round(_clamp(z, 1.0, 55.0), 2),
+            "yaw": round(yaw, 3),
+            "cooldown": 0.0,
+            "ownerName": player_name,
+        }
+    )
+    defense["nextTurretId"] += 1
 
 
 def process_purchase(session: SessionRecord, player_name: str, purchase: str) -> None:
@@ -245,21 +339,6 @@ def process_purchase(session: SessionRecord, player_name: str, purchase: str) ->
         defense["towerHp"] = min(defense["towerMaxHp"], defense["towerHp"] + 80)
         return
 
-    if purchase == "turret":
-        angle = len(defense["turrets"]) * 1.3
-        defense["turrets"].append(
-            {
-                "id": f"turret-{defense['nextTurretId']}",
-                "x": round(ARENA_CENTER_X + math.cos(angle) * 3.4, 2),
-                "y": round(ARENA_Y + 0.6, 2),
-                "z": round(ARENA_CENTER_Z + math.sin(angle) * 3.4, 2),
-                "cooldown": 0.0,
-                "ownerName": player_name,
-            }
-        )
-        defense["nextTurretId"] += 1
-        return
-
     if purchase == "heal":
         # Heal only the buyer, not all players
         if buyer is not None:
@@ -278,6 +357,9 @@ def process_actions(session: SessionRecord, player_name: str, actions: dict[str,
     for purchase in actions.get("purchases") or []:
         if isinstance(purchase, str):
             process_purchase(session, player_name, purchase)
+    for placement in actions.get("placements") or []:
+        if isinstance(placement, dict):
+            process_placement(session, player_name, placement)
 
 
 def tick_homeland_session(session: SessionRecord, dt: float, server_time: float) -> None:
@@ -348,22 +430,11 @@ def tick_homeland_session(session: SessionRecord, dt: float, server_time: float)
         turret["cooldown"] = max(0.0, float(turret["cooldown"]) - dt)
         if float(turret["cooldown"]) > 0.0:
             continue
-        enemy = next(
-            (
-                item
-                for item in defense["enemies"]
-                if math.dist((float(item["x"]), float(item["z"])), (float(turret["x"]), float(turret["z"]))) < 8.0
-            ),
-            None,
-        )
-        if enemy is None:
+        target = _find_turret_target(defense, turret)
+        if target is None:
             continue
-        enemy["health"] = max(0.0, float(enemy["health"]) - 1.2)
-        turret["cooldown"] = 0.65
-        if enemy["health"] <= 0.0:
-            defense["enemies"] = [item for item in defense["enemies"] if item["id"] != enemy["id"]]
-            owner_state = session.players.get(str(turret.get("ownerName") or "")) if turret.get("ownerName") else None
-            _award_enemy_defeat(owner_state.state if owner_state is not None else None, defense, enemy)
+        turret["cooldown"] = TURRET_FIRE_INTERVAL
+        _apply_turret_explosion(session, defense, turret)
 
     if float(defense["towerHp"]) <= 0.0:
         defense["status"] = "defeated"

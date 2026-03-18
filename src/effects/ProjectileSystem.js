@@ -42,9 +42,10 @@ export class ProjectileSystem {
    * @param {boolean} [opts.explodeOnImpact] - spawn explosion effect on hit
    * @param {number} [opts.explosionScale] - scale of explosion visual
    * @param {number[]} [opts.explosionColors] - override fire colors for explosion
+   * @param {boolean} [opts.visualOnly] - impacts/explosions only, no damage applied
    */
   spawn({ group, velocity, origin, maxRange, damage, knockback, trailConfig,
-    aoe = false, aoeRadius = 0, explodeOnImpact = false, explosionScale = 1, explosionColors }) {
+    aoe = false, aoeRadius = 0, explodeOnImpact = false, explosionScale = 1, explosionColors, visualOnly = false }) {
     const trailParticles = [];
     if (trailConfig) {
       for (let i = 0; i < trailConfig.count; i++) {
@@ -85,6 +86,7 @@ export class ProjectileSystem {
       explodeOnImpact,
       explosionScale,
       explosionColors,
+      visualOnly,
       alive: true,
       age: 0,
       _velDir: velocity.clone().normalize(),
@@ -110,10 +112,10 @@ export class ProjectileSystem {
         if (d < hitRadius) {
           const impactPos = proj.group.position.clone();
 
-          if (proj.aoe && proj.aoeRadius > 0) {
+          if (!proj.visualOnly && proj.aoe && proj.aoeRadius > 0) {
             // AOE: damage all enemies within explosion radius
             this._applyAOEDamage(proj, impactPos, alive);
-          } else {
+          } else if (!proj.visualOnly) {
             // Single-target damage
             this._applySingleDamage(proj, enemy);
           }
@@ -175,7 +177,7 @@ export class ProjectileSystem {
     const impactPos = pos.clone();
 
     // AOE damage nearby enemies on world collision too
-    if (proj.aoe && proj.aoeRadius > 0) {
+    if (!proj.visualOnly && proj.aoe && proj.aoeRadius > 0) {
       const alive = this.enemyManager.getAlive();
       this._applyAOEDamage(proj, impactPos, alive);
     }

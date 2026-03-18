@@ -5,6 +5,7 @@ import { events } from '../core/EventBus.js';
 import { GameMode } from './GameMode.js';
 import { updateTowerHealthBar, buildFortress, buildTowerCollision, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
 import { SHOP_ITEMS, MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
+import { CannonTowerSystem } from './CannonTowerSystem.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -19,7 +20,7 @@ function computeToughness(enemy) {
 }
 
 export class HomelandDefenseMode extends GameMode {
-  constructor(gameState, world, enemyManager, scene) {
+  constructor(gameState, world, enemyManager, scene, projectileSystem) {
     super();
     this.state = gameState;
     this.world = world;
@@ -29,16 +30,16 @@ export class HomelandDefenseMode extends GameMode {
     this.center = new THREE.Vector3(WORLD_SIZE_X / 2, 0, WORLD_SIZE_Z / 2);
     this.towerMesh = null;
     this.towerHealthBar = null;
-    this.turrets = [];
-    this._turretTick = 0;
     this._unsubs = [];
     this.merchantNPC = null;
     this.merchantPos = null;
     this.inventory = null;
+    this.cannonTowers = new CannonTowerSystem(gameState, world, scene, enemyManager, projectileSystem);
   }
 
   setInventory(inventory) {
     this.inventory = inventory;
+    this.cannonTowers.setInventory(inventory);
   }
 
   activate(context) {
@@ -55,6 +56,8 @@ export class HomelandDefenseMode extends GameMode {
     this.state.defense.wave = 0;
     this.state.defense.timeLeft = WAVE_DURATION;
     this.state.defense.towerHp = this.state.defense.towerMaxHp;
+    this.state.defense.turrets = [];
+    this.cannonTowers.clear();
     buildFortress(this.world, this.center.x, this.center.z);
     buildTowerCollision(this.world, this.center.x, this.center.z);
     this._buildTowerVisual();
@@ -71,6 +74,7 @@ export class HomelandDefenseMode extends GameMode {
   deactivate() {
     this._unsubs.forEach(unsub => unsub());
     this._unsubs = [];
+    this.cannonTowers.clear();
   }
 
   update(dt) {
@@ -83,7 +87,7 @@ export class HomelandDefenseMode extends GameMode {
       this.startNextWave();
     }
 
-    this._updateTurrets(dt);
+    this.cannonTowers.update(dt);
     updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
     events.emit('hud:update');
   }
@@ -133,6 +137,7 @@ export class HomelandDefenseMode extends GameMode {
     });
     this.towerMesh = result.towerMesh;
     this.towerHealthBar = result.towerHealthBar;
+    this.cannonTowers.setHomeTowerMesh(this.towerMesh);
   }
 
   _onEnemyKilled(enemy) {
@@ -147,6 +152,7 @@ export class HomelandDefenseMode extends GameMode {
     const result = buildMerchantNPC(this.scene, this.world, this.center.x, this.center.z);
     this.merchantNPC = result.group;
     this.merchantPos = result.position;
+    this.cannonTowers.setMerchantPosition(this.merchantPos);
   }
 
   _isNearMerchant() {
@@ -186,9 +192,6 @@ export class HomelandDefenseMode extends GameMode {
     } else if (item.effect === 'repair_tower') {
       this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + item.effectValue);
       events.emit('status:message', `修復守護塔 ${item.effectValue} HP`);
-    } else if (item.effect === 'turret') {
-      this._placeTurret();
-      events.emit('status:message', '放置了自動砲塔');
     } else if (item.giveItemId) {
       // Give item to inventory
       if (this.inventory) {
@@ -200,32 +203,8 @@ export class HomelandDefenseMode extends GameMode {
     events.emit('merchant:refreshShop');
   }
 
-  _placeTurret() {
-    const baseY = this.world.getTerrainSurfaceY(this.center.x + 3, this.center.z);
-    const geom = new THREE.CylinderGeometry(0.3, 0.45, 1.2, 8);
-    const mat = new THREE.MeshStandardMaterial({ color: 0x6ec6ff, emissive: 0x224466 });
-    const mesh = new THREE.Mesh(geom, mat);
-    const angle = this.turrets.length * 1.3;
-    mesh.position.set(this.center.x + Math.cos(angle) * 3.4, baseY + 0.6, this.center.z + Math.sin(angle) * 3.4);
-    this.scene.enemyGroup.add(mesh);
-    this.turrets.push({ mesh, cooldown: 0 });
-  }
-
-  _updateTurrets(dt) {
-    this._turretTick += dt;
-    if (this._turretTick < 0.12) return;
-    this._turretTick = 0;
-
-    const alive = this.enemies.getAlive();
-    this.turrets.forEach((turret) => {
-      turret.cooldown = Math.max(0, turret.cooldown - 120);
-      if (turret.cooldown > 0) return;
-      const target = alive.find((enemy) => enemy.root.position.distanceTo(turret.mesh.position) < 8);
-      if (!target) return;
-      target.health -= 1.2;
-      target.hitFlash = 1;
-      turret.cooldown = 650;
-      if (target.health <= 0) this.enemies.defeat(target, { source: 'turret' });
-    });
+  tryPlaceDeployable(skill) {
+    if (skill?.deployableType !== 'cannon_tower') return false;
+    return this.cannonTowers.tryPlaceSelectedTower();
   }
 }

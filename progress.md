@@ -182,3 +182,29 @@ TODO
 
 TODO
 - If you want cleaner automated regression coverage for fruit-specific skills, add a URL/debug hook that can preselect play style + mode + fruit so the bundled `develop-web-game` client can enter the world without multiple DOM clicks.
+
+- Reworked homeland cannon towers from an instant merchant service into a real inventory deployable:
+  - shop item `加農砲塔` now purchases `cannon_tower` into the bag instead of spawning immediately
+  - inventory hotbar conversion now supports `deployable` items, and placed cannon towers consume their hotbar entry
+  - hotbar slots now show a placement hint for deployables
+- Added `src/modes/CannonTowerSystem.js` and wired it into both homeland modes:
+  - placement preview/validation only allows supported ground or wall-top blocks and rejects overlaps with players, enemies, other towers, the merchant, and the home tower
+  - placed towers use `public/assets/buildings/canontower/canontower.glb`
+  - tower facing is captured from player yaw at placement time and targeting is limited to a fixed forward cone/range
+  - towers fire bright explosive shots visually and apply deterministic explosion damage in the same cone/range on the client; multiplayer server logic mirrors the same directional explosion rules
+- Multiplayer homeland sync now carries tower placement actions and turret yaw so deployed cannon towers work in authoritative sessions too.
+- Hardened selection state:
+  - `GameState.getSelectedSkill()` now clamps out-of-range indices instead of allowing undefined hotbar selections to break weapon updates
+- Verification:
+  - `npm run build` passes after the cannon tower changes
+  - `python -m py_compile server/homeland_sim.py server/multiplayer_server.py` passes
+  - bundled `develop-web-game` Playwright client still runs against the updated app at `output/web-game-cannon-client-final`
+  - direct Playwright verification confirmed:
+    - purchased cannon tower appears in inventory state before equip
+    - equipping moves it into the hotbar and removes it from the bag
+    - placing consumes the hotbar item and adds a turret to `defense.turrets`
+    - a target inside the turret cone/range takes damage and knockback (`hp: 4 -> 1` in the verified snapshot)
+  - screenshots:
+    - placed tower model: `output/cannon-tower-placed.png`
+    - firing pass: `output/cannon-tower-shot.png`
+    - post-fix runtime verification: `output/cannon-tower-verified.png`

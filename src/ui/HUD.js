@@ -162,6 +162,11 @@ export class HUD {
         stats.className = 'skill-stats';
         stats.textContent = `ATK ${skill.damage} · 範圍 ${skill.range} · CD ${skill.cooldownMs}ms`;
         item.appendChild(stats);
+      } else if (skill.kind === 'deployable') {
+        const stats = document.createElement('span');
+        stats.className = 'skill-stats';
+        stats.textContent = '左鍵放置 · 需瞄準地面或牆頂';
+        item.appendChild(stats);
       }
 
       // Show uses count for consumable items

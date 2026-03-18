@@ -96,7 +96,6 @@ export class HUD {
     });
 
     events.on('hotbar:rebuild', () => this.rebuildHotbar());
-    events.on('hotbar:scroll', (delta) => this.moveSelection(delta));
     events.on('hud:update', () => this.update());
     events.on('game:enter', () => this.enterWorld());
     events.on('status:message', (message) => { this.statusMessage.textContent = message; });
@@ -141,67 +140,80 @@ export class HUD {
   rebuildHotbar() {
     const skills = this.state.activeSkills;
     this.hotbar.textContent = '';
-    skills.forEach((skill, index) => {
+    for (let index = 0; index < 9; index++) {
+      const skill = skills[index];
       const item = document.createElement('button');
       item.className = 'hotbar-item';
       item.type = 'button';
       item.dataset.selected = String(index === this.state.selectedIndex);
-      if (skill._itemId) item.dataset.isItem = 'true';
-      item.style.setProperty('--icon', `url("${skill.icon}")`);
 
       const slotNum = document.createElement('span');
       slotNum.className = 'slot-number';
-      slotNum.textContent = index < 9 ? String(index + 1) : '0';
+      slotNum.textContent = String(index + 1);
 
-      const slotName = document.createElement('span');
-      slotName.className = 'slot-name';
-      slotName.textContent = skill.name;
+      if (skill) {
+        if (skill._itemId) item.dataset.isItem = 'true';
+        item.style.setProperty('--icon', `url("${skill.icon}")`);
 
-      if (skill.kind === 'attack' && skill.damage !== undefined) {
-        const stats = document.createElement('span');
-        stats.className = 'skill-stats';
-        stats.textContent = `ATK ${skill.damage} · 範圍 ${skill.range} · CD ${skill.cooldownMs}ms`;
-        item.appendChild(stats);
-      } else if (skill.kind === 'deployable') {
-        const stats = document.createElement('span');
-        stats.className = 'skill-stats';
-        stats.textContent = '左鍵放置 · 需瞄準地面或牆頂';
-        item.appendChild(stats);
-      }
+        const slotName = document.createElement('span');
+        slotName.className = 'slot-name';
+        slotName.textContent = skill.name;
 
-      // Show uses count for consumable items
-      if (skill.kind === 'consumable' && skill._uses !== undefined && skill._uses !== Infinity) {
-        const uses = document.createElement('span');
-        uses.className = 'slot-uses';
-        uses.textContent = `×${skill._uses}`;
-        item.appendChild(uses);
-      }
-
-      item.append(slotNum, slotName);
-      item.addEventListener('click', () => {
-        this.state.selectedIndex = index;
-        events.emit('sound:click');
-        this.rebuildHotbar();
-        this.update();
-      });
-      // Right-click to unequip items
-      item.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (skill._itemId && this.inventory) {
-          this.inventory.unequipFromHotbar(index);
+        if (skill.kind === 'attack' && skill.damage !== undefined) {
+          const stats = document.createElement('span');
+          stats.className = 'skill-stats';
+          stats.textContent = `ATK ${skill.damage} · 範圍 ${skill.range} · CD ${skill.cooldownMs}ms`;
+          item.appendChild(stats);
+        } else if (skill.kind === 'deployable') {
+          const stats = document.createElement('span');
+          stats.className = 'skill-stats';
+          stats.textContent = '左鍵放置 · 需瞄準地面或牆頂';
+          item.appendChild(stats);
         }
-      });
+
+        if (skill.kind === 'consumable' && skill._uses !== undefined && skill._uses !== Infinity) {
+          const uses = document.createElement('span');
+          uses.className = 'slot-uses';
+          uses.textContent = `×${skill._uses}`;
+          item.appendChild(uses);
+        }
+
+        item.append(slotNum, slotName);
+        item.addEventListener('click', () => {
+          this.state.selectedIndex = index;
+          events.emit('sound:click');
+          this.rebuildHotbar();
+          this.update();
+        });
+        item.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          if (skill._itemId && this.inventory) {
+            this.inventory.unequipFromHotbar(index);
+          }
+        });
+      } else {
+        item.dataset.empty = 'true';
+        item.appendChild(slotNum);
+      }
+
+      // Drop target for drag-and-drop from inventory
+      const canDrop = !skill || skill._itemId; // fruit skills can't be replaced
+      if (canDrop) {
+        item.addEventListener('dragover', (e) => { e.preventDefault(); item.dataset.dragover = 'true'; });
+        item.addEventListener('dragleave', () => { item.dataset.dragover = 'false'; });
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          item.dataset.dragover = 'false';
+          const bagIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          if (!isNaN(bagIdx) && this.inventory) {
+            this.inventory.equipToSlot(bagIdx, index);
+          }
+        });
+      }
+
       this.hotbar.appendChild(item);
-    });
+    }
   }
-
-  moveSelection(delta) {
-    const total = this.state.activeSkills.length;
-    this.state.selectedIndex = (this.state.selectedIndex + delta + total) % total;
-    this.rebuildHotbar();
-    this.update();
-  }
-
   update() {
     const player = this.state.player;
     const selected = this.state.getSelectedSkill().name;
@@ -541,10 +553,50 @@ export class HUD {
           events.emit('sound:click');
         }
       });
+
+      // Drag support for equipping to specific hotbar slot
+      if (def.kind !== 'passive') {
+        slot.draggable = true;
+        slot.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', String(index));
+          e.dataTransfer.effectAllowed = 'move';
+        });
+      }
+
       this.inventoryGrid.appendChild(slot);
     });
 
-    if (this.inventory.bag.length === 0) {
+    // Show equipped items (from hotbar) with an "equipped" badge
+    this.state.activeSkills.forEach((skill) => {
+      if (!skill._itemId) return; // skip fruit skills
+      const def = ITEMS[skill._itemId];
+      if (!def) return;
+
+      const slot = document.createElement('button');
+      slot.className = 'inventory-slot inventory-slot-equipped';
+      slot.type = 'button';
+      slot.style.setProperty('--rarity-color', RARITY_COLORS[def.rarity] || '#b0b0b0');
+
+      const icon = document.createElement('img');
+      icon.className = 'inventory-icon';
+      icon.src = def.icon;
+      icon.alt = def.name;
+
+      const name = document.createElement('span');
+      name.className = 'inventory-item-name';
+      name.textContent = def.name;
+
+      const badge = document.createElement('span');
+      badge.className = 'inventory-item-info inventory-equipped-badge';
+      badge.textContent = '已裝備';
+
+      slot.append(icon, name, badge);
+      slot.title = def.desc;
+      this.inventoryGrid.appendChild(slot);
+    });
+
+    const totalItems = this.inventory.bag.length + this.state.activeSkills.filter(s => s._itemId).length;
+    if (totalItems === 0) {
       const empty = document.createElement('div');
       empty.className = 'inventory-empty';
       empty.textContent = '背包是空的';
@@ -610,7 +662,7 @@ export class HUD {
   _closeMerchantShop() {
     this.merchantPanel.dataset.visible = 'false';
     this.state.shopOpen = false;
-    this.canvas.requestPointerLock?.();
+    if (this.state.mode === 'playing') this.canvas.requestPointerLock?.();
   }
 
   _rebuildMerchantShop() {

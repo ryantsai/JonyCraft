@@ -2,7 +2,7 @@ import { events } from './EventBus.js';
 import { ITEMS, LOOT_TABLES } from '../config/items.js';
 import { MOVE_SPEED, PLAYER_MAX_HP, WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 
-const MAX_HOTBAR_SLOTS = 10;
+const MAX_HOTBAR_SLOTS = 9;
 
 /**
  * Inventory system. Manages the player's bag of collected items,
@@ -42,6 +42,21 @@ export class Inventory {
     this._syncVersion++;
     events.emit('inventory:changed');
     events.emit('status:message', `獲得 ${def.name}${quantity > 1 ? ` ×${quantity}` : ''}`);
+
+    // Auto-equip to empty hotbar slots if possible
+    if (def.kind !== 'passive') this._autoEquipFromBag();
+  }
+
+  /** Auto-equip bag items into empty hotbar slots (up to MAX_HOTBAR_SLOTS). */
+  _autoEquipFromBag() {
+    while (this.state.activeSkills.length < MAX_HOTBAR_SLOTS && this.bag.length > 0) {
+      const idx = this.bag.findIndex(e => {
+        const d = ITEMS[e.itemId];
+        return d && d.kind !== 'passive';
+      });
+      if (idx < 0) break;
+      this.equipToHotbar(idx);
+    }
   }
 
   /** Remove a bag entry by index. */
@@ -70,6 +85,37 @@ export class Inventory {
     // Build a hotbar-compatible skill object from the item
     const hotbarEntry = this._makeHotbarEntry(entry, def);
     this.state.activeSkills.push(hotbarEntry);
+    this.bag.splice(bagIndex, 1);
+    this._syncVersion++;
+    events.emit('inventory:changed');
+    events.emit('hotbar:rebuild');
+    return true;
+  }
+
+  /**
+   * Equip a bag item to a specific hotbar slot index.
+   * If the slot is occupied by a fruit skill, it cannot be replaced.
+   * If occupied by an item, swap it back to the bag first.
+   */
+  equipToSlot(bagIndex, slotIndex) {
+    if (bagIndex < 0 || bagIndex >= this.bag.length) return false;
+    if (slotIndex < 0 || slotIndex >= MAX_HOTBAR_SLOTS) return false;
+
+    const entry = this.bag[bagIndex];
+    const def = ITEMS[entry.itemId];
+    if (!def || def.kind === 'passive') return false;
+
+    const existing = this.state.activeSkills[slotIndex];
+    // Fruit skills (no _itemId) cannot be replaced
+    if (existing && !existing._itemId) return false;
+
+    // Swap existing item back to bag
+    if (existing && existing._itemId) {
+      this.bag.push({ itemId: existing._itemId, uses: existing._uses ?? Infinity });
+    }
+
+    const hotbarEntry = this._makeHotbarEntry(entry, def);
+    this.state.activeSkills[slotIndex] = hotbarEntry;
     this.bag.splice(bagIndex, 1);
     this._syncVersion++;
     events.emit('inventory:changed');

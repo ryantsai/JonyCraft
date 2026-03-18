@@ -24,10 +24,10 @@ export class InputManager {
     window.addEventListener('keydown', (event) => {
       if (CONTROL_KEYS.includes(event.code)) this.keyState.add(event.code);
 
-      // Hotbar slots 1-0 (up to 10 slots)
+      // Hotbar slots 1-9
       const digitMap = {
         Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4,
-        Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8, Digit0: 9,
+        Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8,
       };
       const slot = digitMap[event.code];
       if (slot !== undefined && slot < this.state.activeSkills.length) {
@@ -84,9 +84,7 @@ export class InputManager {
       }
     });
 
-    window.addEventListener('wheel', (event) => {
-      events.emit('hotbar:scroll', event.deltaY > 0 ? 1 : -1);
-    });
+    // Scroll wheel skill switching removed — use number keys or tap instead
 
     window.addEventListener('mouseup', (event) => {
       if (event.button === 0) this.primaryHeld = false;

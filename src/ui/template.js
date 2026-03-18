@@ -54,7 +54,7 @@ export const gameTemplate = `
           <button id="inventory-close-btn" class="inventory-close-btn" type="button">✕</button>
         </div>
         <div id="inventory-grid" class="inventory-grid"></div>
-        <div class="inventory-hint">點擊道具裝備至技能欄 · 右鍵卸除技能欄道具</div>
+        <div class="inventory-hint">點擊自動裝備 · 拖曳至技能欄指定位置 · 右鍵卸除</div>
       </div>
       <div id="merchant-shop-panel" class="merchant-shop-panel" data-visible="false">
         <div class="merchant-shop-header">

@@ -42,8 +42,18 @@ export const gameTemplate = `
       <div id="debug-panel" class="debug-panel" data-visible="false">
         <button id="debug-fruit-btn" class="debug-toggle-btn" type="button">果實</button>
         <button id="debug-skin-btn" class="debug-toggle-btn" type="button">造型</button>
+        <button id="debug-item-btn" class="debug-toggle-btn" type="button">道具</button>
         <div id="debug-fruit-grid" class="debug-grid" data-visible="false"></div>
         <div id="debug-skin-grid" class="debug-grid" data-visible="false"></div>
+        <div id="debug-item-grid" class="debug-grid" data-visible="false"></div>
+      </div>
+      <div id="inventory-panel" class="inventory-panel" data-visible="false">
+        <div class="inventory-header">
+          <span class="inventory-title">背包</span>
+          <button id="inventory-close-btn" class="inventory-close-btn" type="button">✕</button>
+        </div>
+        <div id="inventory-grid" class="inventory-grid"></div>
+        <div class="inventory-hint">點擊道具裝備至技能欄 · 右鍵卸除技能欄道具</div>
       </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">
@@ -164,8 +174,12 @@ export const gameTemplate = `
               <span>放置方塊</span>
             </div>
             <div class="control-item">
-              <kbd>1 2 3 4</kbd>
+              <kbd>1~0</kbd>
               <span>切換技能</span>
+            </div>
+            <div class="control-item">
+              <kbd>Tab / I</kbd>
+              <span>背包</span>
             </div>
           </div>
         </div>

@@ -98,4 +98,10 @@ export class GameState {
   getSelectedBlockType() {
     return this.getSelectedSkill().blockType ?? 'dirt';
   }
+
+  /** Check if the selected hotbar slot is a consumable item. */
+  isSelectedConsumable() {
+    const skill = this.activeSkills[this.selectedIndex];
+    return skill?.kind === 'consumable';
+  }
 }

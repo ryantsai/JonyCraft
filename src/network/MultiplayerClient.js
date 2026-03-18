@@ -75,6 +75,7 @@ export class MultiplayerClient {
     this.remotePlayers = null;
     this.enemyManager = null;
     this.homelandMode = null;
+    this.inventory = null;
     this.syncAccumulatorMs = 0;
     this.syncIntervalMs = 60;
     this.syncInFlight = false;
@@ -125,6 +126,10 @@ export class MultiplayerClient {
 
   attachHomelandMode(homelandMode) {
     this.homelandMode = homelandMode;
+  }
+
+  attachInventory(inventory) {
+    this.inventory = inventory;
   }
 
   setPlayerName(name) {
@@ -315,6 +320,11 @@ export class MultiplayerClient {
       this.state.player.hp = Number(selfPlayer.serverHp);
       this.state.player.maxHp = Number(selfPlayer.serverMaxHp ?? this.state.player.maxHp);
     }
+
+    // Restore inventory from server on first sync / reconnect
+    if (selfPlayer?.inventoryState && this.inventory) {
+      this.inventory.restoreFromSync(selfPlayer.inventoryState);
+    }
     // PvP knockback: server tells us we got hit
     if (selfPlayer?.lastHitAt !== undefined) {
       const hitAt = Number(selfPlayer.lastHitAt);
@@ -389,7 +399,7 @@ export class MultiplayerClient {
 
   _snapshotPlayer() {
     const player = this.state.player;
-    return {
+    const snapshot = {
       x: Number(player.position.x.toFixed(2)),
       y: Number(player.position.y.toFixed(2)),
       z: Number(player.position.z.toFixed(2)),
@@ -411,6 +421,13 @@ export class MultiplayerClient {
       attackSkillId: this.state.getSelectedSkill()?.id ?? '',
       attackSeq: this.state.combat.attackSeq || 0,
     };
+
+    // Include inventory state for persistence
+    if (this.inventory) {
+      snapshot.inventoryState = this.inventory.snapshotForSync();
+    }
+
+    return snapshot;
   }
 
   async _post(path, payload) {

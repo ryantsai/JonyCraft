@@ -1,6 +1,7 @@
 import { events } from '../core/EventBus.js';
 import { FRUITS } from '../config/fruits.js';
 import { SKINS } from '../config/skins.js';
+import { ITEMS, ALL_ITEM_IDS, RARITY_COLORS } from '../config/items.js';
 
 /**
  * HUD: hotbar, status bar, and start screen management.
@@ -10,6 +11,7 @@ export class HUD {
     this.state = gameState;
     this.canvas = canvas;
     this.enemies = enemyManager;
+    this.inventory = null; // set via setInventory()
 
     this.hotbar = document.querySelector('#hotbar');
     this.statusMessage = document.querySelector('#status-message');
@@ -32,14 +34,23 @@ export class HUD {
     this.debugPanel = document.querySelector('#debug-panel');
     this.debugFruitBtn = document.querySelector('#debug-fruit-btn');
     this.debugSkinBtn = document.querySelector('#debug-skin-btn');
+    this.debugItemBtn = document.querySelector('#debug-item-btn');
     this.debugFruitGrid = document.querySelector('#debug-fruit-grid');
     this.debugSkinGrid = document.querySelector('#debug-skin-grid');
+    this.debugItemGrid = document.querySelector('#debug-item-grid');
+    this.inventoryPanel = document.querySelector('#inventory-panel');
+    this.inventoryGrid = document.querySelector('#inventory-grid');
+    this.inventoryCloseBtn = document.querySelector('#inventory-close-btn');
     this.defenseBoard = document.querySelector('#defense-scoreboard');
     this.defWave = document.querySelector('#def-wave');
     this.defTimer = document.querySelector('#def-timer');
     this.defKills = document.querySelector('#def-kills');
     this.defGold = document.querySelector('#def-gold');
     this.disconnectTimer = null;
+  }
+
+  setInventory(inventory) {
+    this.inventory = inventory;
   }
 
   init() {
@@ -82,6 +93,13 @@ export class HUD {
     events.on('multiplayer:session-ready', () => this.enterJoinedSession());
     events.on('multiplayer:lobby:closed', () => this.showHomeScreen());
     events.on('multiplayer:disconnected', ({ message }) => this.showDisconnectedScreen(message));
+    events.on('inventory:changed', () => this._rebuildInventoryPanel());
+    events.on('inventory:toggle', () => this._toggleInventory());
+
+    this.inventoryCloseBtn.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._toggleInventory(false);
+    });
 
     this.rebuildHotbar();
     this.showHomeScreen();
@@ -104,11 +122,12 @@ export class HUD {
       item.className = 'hotbar-item';
       item.type = 'button';
       item.dataset.selected = String(index === this.state.selectedIndex);
+      if (skill._itemId) item.dataset.isItem = 'true';
       item.style.setProperty('--icon', `url("${skill.icon}")`);
 
       const slotNum = document.createElement('span');
       slotNum.className = 'slot-number';
-      slotNum.textContent = String(index + 1);
+      slotNum.textContent = index < 9 ? String(index + 1) : '0';
 
       const slotName = document.createElement('span');
       slotName.className = 'slot-name';
@@ -121,12 +140,27 @@ export class HUD {
         item.appendChild(stats);
       }
 
+      // Show uses count for consumable items
+      if (skill.kind === 'consumable' && skill._uses !== undefined && skill._uses !== Infinity) {
+        const uses = document.createElement('span');
+        uses.className = 'slot-uses';
+        uses.textContent = `×${skill._uses}`;
+        item.appendChild(uses);
+      }
+
       item.append(slotNum, slotName);
       item.addEventListener('click', () => {
         this.state.selectedIndex = index;
         events.emit('sound:click');
         this.rebuildHotbar();
         this.update();
+      });
+      // Right-click to unequip items
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (skill._itemId && this.inventory) {
+          this.inventory.unequipFromHotbar(index);
+        }
       });
       this.hotbar.appendChild(item);
     });
@@ -334,24 +368,68 @@ export class HUD {
       this.debugSkinGrid.appendChild(btn);
     });
 
-    // Toggle buttons
+    // Build debug item grid
+    ALL_ITEM_IDS.forEach((itemId) => {
+      const def = ITEMS[itemId];
+      const btn = document.createElement('button');
+      btn.className = 'debug-grid-item';
+      btn.type = 'button';
+      btn.style.setProperty('--item-color', RARITY_COLORS[def.rarity] || '#b0b0b0');
+      const icon = document.createElement('img');
+      icon.className = 'debug-thumb';
+      icon.src = def.icon;
+      icon.alt = def.name;
+      const label = document.createElement('span');
+      label.textContent = def.name;
+      btn.append(icon, label);
+      btn.addEventListener('click', () => {
+        if (this.inventory) {
+          this.inventory.addItem(itemId, 1);
+          events.emit('sound:click');
+        }
+      });
+      this.debugItemGrid.appendChild(btn);
+    });
+
+    // Toggle buttons — close all others when opening one
+    const closeAllDebugGrids = () => {
+      this.debugFruitGrid.dataset.visible = 'false';
+      this.debugSkinGrid.dataset.visible = 'false';
+      this.debugItemGrid.dataset.visible = 'false';
+      this.debugFruitBtn.dataset.open = 'false';
+      this.debugSkinBtn.dataset.open = 'false';
+      this.debugItemBtn.dataset.open = 'false';
+    };
+
     this.debugFruitBtn.addEventListener('click', () => {
       const open = this.debugFruitGrid.dataset.visible !== 'true';
-      this.debugFruitGrid.dataset.visible = open ? 'true' : 'false';
-      this.debugSkinGrid.dataset.visible = 'false';
-      this.debugFruitBtn.dataset.open = open ? 'true' : 'false';
-      this.debugSkinBtn.dataset.open = 'false';
-      if (open) this._updateDebugFruitSelection();
+      closeAllDebugGrids();
+      if (open) {
+        this.debugFruitGrid.dataset.visible = 'true';
+        this.debugFruitBtn.dataset.open = 'true';
+        this._updateDebugFruitSelection();
+      }
       events.emit('sound:click');
     });
 
     this.debugSkinBtn.addEventListener('click', () => {
       const open = this.debugSkinGrid.dataset.visible !== 'true';
-      this.debugSkinGrid.dataset.visible = open ? 'true' : 'false';
-      this.debugFruitGrid.dataset.visible = 'false';
-      this.debugSkinBtn.dataset.open = open ? 'true' : 'false';
-      this.debugFruitBtn.dataset.open = 'false';
-      if (open) this._updateDebugSkinSelection();
+      closeAllDebugGrids();
+      if (open) {
+        this.debugSkinGrid.dataset.visible = 'true';
+        this.debugSkinBtn.dataset.open = 'true';
+        this._updateDebugSkinSelection();
+      }
+      events.emit('sound:click');
+    });
+
+    this.debugItemBtn.addEventListener('click', () => {
+      const open = this.debugItemGrid.dataset.visible !== 'true';
+      closeAllDebugGrids();
+      if (open) {
+        this.debugItemGrid.dataset.visible = 'true';
+        this.debugItemBtn.dataset.open = 'true';
+      }
       events.emit('sound:click');
     });
   }
@@ -368,6 +446,63 @@ export class HUD {
     this.debugSkinGrid.querySelectorAll('.debug-grid-item').forEach((btn) => {
       btn.dataset.selected = btn.dataset.skinId === currentId ? 'true' : 'false';
     });
+  }
+
+  _toggleInventory(forceState) {
+    const visible = forceState ?? this.inventoryPanel.dataset.visible !== 'true';
+    this.inventoryPanel.dataset.visible = visible ? 'true' : 'false';
+    if (visible) this._rebuildInventoryPanel();
+  }
+
+  _rebuildInventoryPanel() {
+    if (!this.inventory || this.inventoryPanel.dataset.visible !== 'true') return;
+    this.inventoryGrid.textContent = '';
+
+    this.inventory.bag.forEach((entry, index) => {
+      const def = ITEMS[entry.itemId];
+      if (!def) return;
+
+      const slot = document.createElement('button');
+      slot.className = 'inventory-slot';
+      slot.type = 'button';
+      slot.style.setProperty('--rarity-color', RARITY_COLORS[def.rarity] || '#b0b0b0');
+
+      const icon = document.createElement('img');
+      icon.className = 'inventory-icon';
+      icon.src = def.icon;
+      icon.alt = def.name;
+
+      const name = document.createElement('span');
+      name.className = 'inventory-item-name';
+      name.textContent = def.name;
+
+      const info = document.createElement('span');
+      info.className = 'inventory-item-info';
+      if (def.maxUses && def.maxUses !== Infinity) {
+        info.textContent = `${entry.uses}/${def.maxUses}`;
+      } else if (def.kind === 'weapon') {
+        info.textContent = `ATK ${def.damage}`;
+      } else if (def.kind === 'passive') {
+        info.textContent = '被動';
+      }
+
+      slot.append(icon, name, info);
+      slot.title = def.desc;
+      slot.addEventListener('click', () => {
+        if (def.kind === 'passive') return;
+        if (this.inventory.equipToHotbar(index)) {
+          events.emit('sound:click');
+        }
+      });
+      this.inventoryGrid.appendChild(slot);
+    });
+
+    if (this.inventory.bag.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'inventory-empty';
+      empty.textContent = '背包是空的';
+      this.inventoryGrid.appendChild(empty);
+    }
   }
 
   _renderMultiplayerStats(players) {

@@ -24,6 +24,7 @@ import { HUD } from './ui/HUD.js';
 import { FruitSelect } from './ui/FruitSelect.js';
 import { MultiplayerLobby } from './ui/MultiplayerLobby.js';
 import { TestingHooks } from './testing/TestingHooks.js';
+import { Inventory } from './core/Inventory.js';
 import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
 import { HomelandDefenseMode } from './modes/HomelandDefenseMode.js';
@@ -60,9 +61,13 @@ projectileSystem.setExplosionEffect(explosionEffect);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
 const inputManager = new InputManager(gameState, canvas, combat);
+inputManager.setInventory(inventory);
 // Wire remote players for PvP targeting after remotePlayers is created below
 const mobileControls = new MobileControls(inputManager, combat, gameState);
+const inventory = new Inventory(gameState, world);
+inventory.setEnemyManager(enemyManager);
 const hud = new HUD(gameState, canvas, enemyManager);
+hud.setInventory(inventory);
 const fruitSelect = new FruitSelect(gameState);
 multiplayer.setPlayerName(gameState.playerName);
 const remotePlayers = new RemotePlayers(scene);
@@ -72,6 +77,7 @@ projectileSystem.setMultiplayerClient(multiplayer);
 projectileSystem.setGameState(gameState);
 multiplayer.attachRemotePlayers(remotePlayers);
 multiplayer.attachEnemyManager(enemyManager);
+multiplayer.attachInventory(inventory);
 const multiplayerLobby = new MultiplayerLobby(gameState, multiplayer);
 const fireFistSpawner = new FireFistSpawner(gameState, scene, weaponModels, projectileSystem);
 fireFistSpawner.setEnemyManager(enemyManager);
@@ -195,6 +201,7 @@ function stepSimulation(deltaMs) {
         enemyManager.update(dt);
       }
       gameState.modeController?.update?.(dt);
+      inventory.update(dt);
     }
     multiplayer.update(dt);
     remotePlayers.update(dt);
@@ -224,6 +231,7 @@ window.__app = {
   enemyManager,
   remotePlayers,
   multiplayer,
+  inventory,
 };
 
 // --- Init ---
@@ -235,6 +243,7 @@ async function init() {
   playerController.setSpawn();
   // initial enemy spawn is game-mode specific and starts after mode entry
   hud.init();
+  inventory.init();
   fruitSelect.init();
   multiplayer.init();
   multiplayerLobby.init();

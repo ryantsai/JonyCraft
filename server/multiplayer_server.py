@@ -266,6 +266,26 @@ class SessionStore:
                 "maxHp": float(incoming.get("maxHp") or state.get("maxHp") or 100.0),
             }
         )
+        # Inventory state — client-authoritative, passed through for persistence
+        inv = incoming.get("inventoryState")
+        if isinstance(inv, dict):
+            sanitized_inv: dict[str, Any] = {"ver": max(0, int(inv.get("ver") or 0))}
+            if isinstance(inv.get("bag"), list):
+                sanitized_inv["bag"] = [
+                    {"id": clamp_text(e.get("id"), "", 32), "u": e.get("u", -1)}
+                    for e in inv["bag"]
+                    if isinstance(e, dict) and e.get("id")
+                ][:64]  # cap bag size
+            if isinstance(inv.get("hotbar"), list):
+                sanitized_inv["hotbar"] = [
+                    {"id": clamp_text(e.get("id"), "", 32), "u": e.get("u", -1)}
+                    for e in inv["hotbar"]
+                    if isinstance(e, dict) and e.get("id")
+                ][:10]  # cap hotbar size
+            state["inventoryState"] = sanitized_inv
+        else:
+            state.setdefault("inventoryState", None)
+
         state.setdefault("serverHp", state.get("maxHp", 100.0))
         state.setdefault("serverMaxHp", state.get("maxHp", 100.0))
         state.setdefault("attackReadyAt", 0.0)

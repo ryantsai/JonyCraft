@@ -10,21 +10,35 @@ export class InputManager {
     this.state = gameState;
     this.canvas = canvas;
     this.combat = combatSystem;
+    this.inventory = null; // set via setInventory()
     this.keyState = new Set();
     this.virtualInput = { moveX: 0, moveZ: 0, lookX: 0, lookY: 0 };
     this.primaryHeld = false;
+  }
+
+  setInventory(inventory) {
+    this.inventory = inventory;
   }
 
   init() {
     window.addEventListener('keydown', (event) => {
       if (CONTROL_KEYS.includes(event.code)) this.keyState.add(event.code);
 
-      // Hotbar slots 1-4 (dynamic based on active skills count)
-      const digitMap = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 };
+      // Hotbar slots 1-0 (up to 10 slots)
+      const digitMap = {
+        Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4,
+        Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8, Digit0: 9,
+      };
       const slot = digitMap[event.code];
       if (slot !== undefined && slot < this.state.activeSkills.length) {
         this.state.selectedIndex = slot;
         events.emit('hotbar:rebuild');
+      }
+
+      // Toggle inventory panel with Tab or I
+      if (event.code === 'Tab' || event.code === 'KeyI') {
+        event.preventDefault();
+        events.emit('inventory:toggle');
       }
 
       if (event.code === 'KeyF') this._toggleFullscreen();
@@ -83,12 +97,18 @@ export class InputManager {
   update() {
     if (this.state.mode !== 'playing' || !this.primaryHeld) return;
     const skill = this.state.getSelectedSkill();
+    // Only auto-repeat for attack skills, not consumables
     if (skill?.kind === 'attack') this.triggerPrimaryAction();
   }
 
   triggerPrimaryAction() {
     const skill = this.state.getSelectedSkill();
     if (!skill) return;
+
+    if (skill.kind === 'consumable') {
+      if (this.inventory) this.inventory.useSelected();
+      return;
+    }
 
     if (skill.kind === 'attack') {
       this.combat.attack();

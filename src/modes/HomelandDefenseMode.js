@@ -4,7 +4,7 @@ import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
 import { GameMode } from './GameMode.js';
 import { updateTowerHealthBar, buildFortress, buildTowerCollision, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
-import { MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
+import { SHOP_ITEMS, MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -168,26 +168,31 @@ export class HomelandDefenseMode extends GameMode {
 
   _purchaseShopItem(shopItem) {
     if (!this.state.defense.enabled) return;
-    if (this.state.defense.totalGold < shopItem.cost) {
+    const item = SHOP_ITEMS.find(candidate => candidate.id === shopItem?.id);
+    if (!item) {
+      events.emit('status:message', '商店道具資料錯誤');
+      return;
+    }
+    if (this.state.defense.totalGold < item.cost) {
       events.emit('status:message', '金幣不足');
       return;
     }
-    this.state.defense.totalGold -= shopItem.cost;
+    this.state.defense.totalGold -= item.cost;
 
     // Service effects
-    if (shopItem.effect === 'heal') {
-      this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + shopItem.effectValue);
-      events.emit('status:message', `恢復了 ${shopItem.effectValue} 生命值`);
-    } else if (shopItem.effect === 'repair_tower') {
-      this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + shopItem.effectValue);
-      events.emit('status:message', `修復守護塔 ${shopItem.effectValue} HP`);
-    } else if (shopItem.effect === 'turret') {
+    if (item.effect === 'heal') {
+      this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + item.effectValue);
+      events.emit('status:message', `恢復了 ${item.effectValue} 生命值`);
+    } else if (item.effect === 'repair_tower') {
+      this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + item.effectValue);
+      events.emit('status:message', `修復守護塔 ${item.effectValue} HP`);
+    } else if (item.effect === 'turret') {
       this._placeTurret();
       events.emit('status:message', '放置了自動砲塔');
-    } else if (shopItem.giveItemId) {
+    } else if (item.giveItemId) {
       // Give item to inventory
       if (this.inventory) {
-        this.inventory.addItem(shopItem.giveItemId, 1);
+        this.inventory.addItem(item.giveItemId, 1);
       }
     }
     events.emit('sound:click');

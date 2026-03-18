@@ -2,7 +2,8 @@ import { events } from '../core/EventBus.js';
 
 function defaultServerEndpoint() {
   const { hostname } = window.location;
-  return { host: hostname || '127.0.0.1', port: '8765' };
+  if (hostname === '10.0.0.100') return { host: '10.0.0.100', port: '8765' };
+  return { host: 'pb60.tailbf39d7.ts.net', port: '80' };
 }
 
 function trimText(value) {

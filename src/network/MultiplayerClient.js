@@ -55,7 +55,9 @@ function endpointToUrl(host, port) {
   if (safeHost.startsWith('http://') || safeHost.startsWith('https://')) {
     return `${safeHost.replace(/\/+$/, '')}:${safePort}`;
   }
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  let protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  if (safePort === '443') protocol = 'https:';
+  if (safePort === '80') protocol = 'http:';
   return `${protocol}//${safeHost}:${safePort}`;
 }
 

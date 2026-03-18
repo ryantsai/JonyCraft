@@ -49,6 +49,19 @@ export class MultiplayerHomelandMode {
     this._unsubs.forEach((unsub) => unsub());
     this._unsubs = [];
     this.cannonTowers.clear();
+    if (this.towerMesh) {
+      this.scene.enemyGroup.remove(this.towerMesh);
+      this.towerMesh = null;
+    }
+    if (this.towerHealthBar) {
+      this.scene.enemyGroup.remove(this.towerHealthBar);
+      this.towerHealthBar = null;
+    }
+    if (this.merchantNPC) {
+      this.scene.enemyGroup.remove(this.merchantNPC);
+      this.merchantNPC = null;
+      this.merchantPos = null;
+    }
   }
 
   update(dt) {
@@ -140,7 +153,13 @@ export class MultiplayerHomelandMode {
   }
 
   _buildTowerVisual() {
-    if (this.towerMesh) return;
+    if (this.towerMesh) {
+      this.towerMesh.position.set(this.center.x, this.center.y, this.center.z);
+      if (this.towerHealthBar) {
+        this.towerHealthBar.position.set(this.center.x, this.towerHealthBar.position.y, this.center.z);
+      }
+      return;
+    }
     const result = buildTowerVisual({
       world: this.world,
       scene: this.scene,

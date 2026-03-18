@@ -1,178 +1,68 @@
 # JonyCraft
 
-A first-person Minecraft-style voxel sandbox game built with [Three.js](https://threejs.org/) and [Kenney](https://kenney.nl/) voxel asset packs. All UI is in Traditional Chinese (繁體中文).
+JonyCraft 是一款以 **Three.js** 打造的第一人稱 voxel 沙盒動作遊戲（介面為繁體中文）。
+玩家可先選擇遊玩模式，再挑選惡魔果實獲得技能組，進入世界進行建造、戰鬥與保衛據點。
 
-## Quick Start
+## 快速開始
 
 ```bash
 npm install
-npm run dev       # Start dev server at http://localhost:5173
-npm run build     # Production build
-npm run preview   # Preview production build
+npm run dev       # 開發伺服器 http://localhost:5173
+npm run build     # 產生正式版
+npm run preview   # 預覽正式版
 ```
 
-## Game Modes
+## 目前可玩模式
 
-- **測試模式 (Test)** — Sandbox with combat, building, and exploration
-- **保衛家園 (Homeland Defense)** — Wave-based tower defense: protect the central fortress from escalating enemy waves, earn gold, purchase upgrades
+- **測試模式（Test）**：單人沙盒，含建造與戰鬥。
+- **保衛家園（Homeland Defense）**：單人波次防守，保護主塔並使用金幣在商店購買支援。
+- **多人連線（PvP / 多人保衛家園）**：透過 `MultiplayerClient` 同步遠端玩家、傷害與家園狀態。
 
-## Devil Fruit System
+## 核心玩法系統
 
-Before entering the world, players choose one of 10 Devil Fruits (inspired by Blox Fruits / One Piece). Each fruit grants 3–4 combat skills with unique stats and animations:
+- **惡魔果實系統**：10 種果實，各自綁定 3~4 個技能（傷害、範圍、冷卻、擊退、動畫風格）。
+- **敵人系統**：11 種敵人，行為由 `EnemyBehaviors` 分派（追擊、衝鋒、遠程、再生、爆炸等）。
+- **防守模式系統**：主塔血量、波次、金幣、商店、砲塔放置。
+- **投射物 / 特效系統**：`ProjectileSystem`、`ExplosionEffect`、`FruitVFX`、`ScreenEffects`。
+- **事件匯流排（EventBus）**：用事件串接 UI、戰鬥、音效、模式控制與多人同步。
 
-| Fruit | Skills | Style |
-|---|---|---|
-| 橡膠果實 (Rubber) | Pistol, Shotgun, Bazooka, Bell | Long-range stretchy punches |
-| 火焰果實 (Flame) | Fire Fist, Fire Pillar, Flame Emperor | Fire-tinted, screen shake |
-| 冰凍果實 (Ice) | Ice Spear, Ice Age, Ice Saber | Sword & punch, cyan particles |
-| 閃電果實 (Lightning) | Thunder Bolt, Lightning Rush, Thunder Dragon | Ultra-fast, bright flash |
-| 暗暗果實 (Dark) | Dark Pull, Black Hole, Liberation | Gravity pull, purple effects |
-| 光光果實 (Light) | Light Beam, Flash Step, Light Sword, Laser Rain | Fastest attacks, bright glow |
-| 震震果實 (Quake) | Quake Punch, Seismic Wave, Space Shatter | Heavy impact, strong shake |
-| 岩漿果實 (Magma) | Eruption, Meteor Volcano, Magma Hound | Red glow, large fist |
-| 沙沙果實 (Sand) | Desert Sword, Sand Trap, Sandstorm | Sword & punch mix |
-| 爆爆果實 (Bomb) | Bomb Punch, Land Mine, Big Explosion | Explosive flash, high damage |
+## 專案結構（精簡）
 
-Each skill has: damage multiplier, attack range, swing speed, cooldown, knockback strength, and particle effects.
-
-## Enemy Types (11)
-
-| Type | Behavior | Special |
-|---|---|---|
-| 殭屍 (Zombie) | Chase | Basic melee |
-| 骷髏射手 (Skeleton) | Ranged | Projectile attacks |
-| 史萊姆 (Slime) | Leap | Bouncing squash/stretch |
-| 巨人 (Giant) | Charge | High HP, charge attack |
-| 蜘蛛 (Spider) | Circle | Fast circling + dash |
-| 幽靈 (Ghost) | Teleport | Teleports near player |
-| 爆破者 (Creeper) | Explode | Fuse → explosion destroys blocks |
-| 巫師 (Wizard) | Ranged | Teleports away when close |
-| 石像 (Golem) | Regen | High HP/defense, regenerates |
-| 忍者 (Ninja) | Flee | Backstab, runs when facing |
-| 烈焰人 (Blaze) | Ranged | Burst-fire projectiles, floats |
-
-## Code Architecture
-
-Modular systems communicate through an event bus, designed for easy expansion.
-
-```
+```text
 src/
-├── main.js                    # Entry point — wires systems, runs game loop
-├── style.css                  # All CSS (HUD, overlays, mobile controls)
-│
-├── config/                    # Static definitions & constants
-│   ├── constants.js           # Physics, world size, combat, enemy tuning
-│   ├── assets.js              # Asset URL helper (handles Vite base path)
-│   ├── blocks.js              # Block type registry (faces, collision flags)
-│   ├── skills.js              # Default hotbar skill definitions
-│   ├── fruits.js              # 10 Devil Fruit definitions with skills & animStyle
-│   └── enemyTypes.js          # 11 enemy type definitions with spawn weights
-│
-├── core/                      # Shared infrastructure
-│   ├── EventBus.js            # Pub/sub: decouples systems
-│   └── GameState.js           # Central mutable state (player, combat, defense, fruit)
-│
-├── renderer/                  # Three.js rendering layer
-│   ├── SceneSetup.js          # Renderer, scene, camera, lights, shared geometries
-│   ├── TextureManager.js      # Cached texture loader (nearest-neighbor filtering)
-│   └── BlockMaterials.js      # Per-face materials for each block type
-│
-├── world/                     # Voxel world
-│   ├── World.js               # Block data store (Map), terrain generation, queries
-│   └── WorldRenderer.js       # Mesh creation/removal synced to world data
-│
-├── player/                    # Player systems
-│   ├── Player.js              # AABB movement, collision, gravity, spawn selection
-│   └── Targeting.js           # DDA voxel raycast + enemy target detection
-│
-├── combat/
-│   └── Combat.js              # Sword/punch/fruit attacks, block break/place, damage
-│
-├── enemies/                   # Enemy AI
-│   ├── Zombie.js              # Legacy zombie model builder
-│   ├── EnemyModel.js          # Generic enemy 3D model builder
-│   ├── EnemyBehaviors.js      # 9 AI behaviors (chase, charge, circle, leap, etc.)
-│   └── EnemyManager.js        # Spawn logic, AI dispatch, projectiles, defeat/cleanup
-│
-├── effects/                   # Visual effects
-│   ├── Particles.js           # Hit particle system (spawn, physics, cleanup)
-│   └── WeaponModels.js        # First-person weapons, per-fruit animations, shake/flash
-│
-├── input/                     # Input handling
-│   ├── InputManager.js        # Keyboard, mouse, pointer lock
-│   └── MobileControls.js      # Virtual gamepad (dual touch pads + buttons)
-│
-├── audio/
-│   └── SoundManager.js        # Sound effects loading and playback
-│
-├── modes/                     # Game mode controllers
-│   └── HomelandDefenseMode.js # Wave defense: fortress, turrets, shop, wave scaling
-│
-├── ui/                        # User interface
-│   ├── template.js            # HTML shell (canvas, HUD, defense scoreboard, start screen)
-│   ├── HUD.js                 # Hotbar, status bar, defense scoreboard, start screen
-│   └── FruitSelect.js         # Fruit selection overlay UI
-│
-└── testing/
-    └── TestingHooks.js        # Playwright automation (render_game_to_text, advanceTime)
+  main.js                       # 啟動與主迴圈、系統接線
+
+  config/                       # 靜態資料（常數、方塊、果實、敵人、商店等）
+  core/                         # GameState、EventBus、Inventory
+  renderer/                     # Three.js 場景/材質/貼圖
+  world/                        # 方塊資料與世界渲染
+  player/                       # 玩家移動與目標選取
+  combat/                       # 攻擊、放置、傷害計算
+  enemies/                      # 敵人生成、AI、模型
+  effects/                      # 粒子、武器動畫、爆炸、投射物
+  input/                        # 鍵鼠與行動端控制
+  ui/                           # HUD、模板、果實選單、多人大廳
+  modes/                        # GameMode、單人/多人保衛家園、砲塔系統
+  network/                      # 玩家身分、多人 client、遠端玩家
+  audio/                        # 音效管理
+  testing/                      # 自動化測試 hooks
 ```
 
-## System Communication
+## 常見擴充點
 
-Systems are decoupled via an **EventBus** (`src/core/EventBus.js`):
+- 新方塊：`src/config/blocks.js`
+- 新果實/技能：`src/config/fruits.js`、`src/config/skills.js`、`src/config/animStyles.js`
+- 新敵人/行為：`src/config/enemyTypes.js`、`src/enemies/EnemyBehaviors.js`
+- 新模式：`src/modes/` 新增控制器後在 `src/main.js` 接線
+- 新網路同步欄位：`src/network/MultiplayerClient.js` + 對應 `GameState`
 
-| Event | Emitted by | Consumed by |
-|---|---|---|
-| `block:changed` | World | WorldRenderer |
-| `hud:update` | Combat, EnemyManager, HomelandDefense | HUD |
-| `hotbar:rebuild` | InputManager | HUD |
-| `hotbar:scroll` | InputManager | HUD |
-| `game:enter` | InputManager, HUD | HUD |
-| `fruit:show` | HUD | FruitSelect |
-| `fruit:selected` | FruitSelect | main.js (activates mode) |
-| `combat:fruit-attack` | Combat | WeaponModels (shake, flash) |
-| `enemy:killed` | EnemyManager | HomelandDefenseMode (gold/kills) |
-| `shop:purchase` | HUD | HomelandDefenseMode |
-| `status:message` | HomelandDefense | HUD |
+## 自動化測試
 
-## Key Design Decisions
+- 測試動作腳本：根目錄 `test-actions*.json`
+- 測試 hooks：`window.render_game_to_text`、`window.advanceTime(ms)`（`src/testing/TestingHooks.js`）
 
-- **GameState** is the single source of truth for mutable game state. Includes `defense` state for tower defense mode and `modeController` for the active game mode.
-- **Mode Controller pattern**: `gameState.modeController` holds the active game mode instance. The main loop calls `modeController.update(dt)`. Modes can override enemy targets, scoring, and wave management.
-- **World** stores blocks in a `Map<string, string>` keyed by `"x,y,z"`. Emits change events so the renderer stays in sync.
-- **Fixed-timestep simulation** (`1000/60 ms`) ensures deterministic physics regardless of frame rate.
-- **Reusable Three.js vectors** avoid per-frame allocations in hot paths.
-- **Per-fruit animation modifiers** (`ANIM_MODS` in WeaponModels) control stretchMul, fistScale, shake, flashAlpha, swordGlow, arcTilt, swirl, and trail per fruit type.
+## 技術棧
 
-## Expansion Points
-
-| Feature | Where to add |
-|---|---|
-| New block types | `src/config/blocks.js` |
-| New skills/weapons | `src/config/skills.js` + `src/effects/WeaponModels.js` |
-| New Devil Fruits | `src/config/fruits.js` + add animStyle entry in `WeaponModels.ANIM_MODS` |
-| New enemy types | `src/config/enemyTypes.js` (define stats + behavior key) |
-| New enemy behaviors | `src/enemies/EnemyBehaviors.js` + register in `BEHAVIORS` map |
-| New game modes | `src/modes/` (new file) + button in `template.js` + activate in `main.js` |
-| Multiplayer networking | Hook into EventBus events + add network layer in `src/core/` |
-| Database / save-load | Serialize `World.blocks` + `GameState` in new `src/core/Persistence.js` |
-| Inventory system | New `src/player/Inventory.js` + wire to HUD |
-
-## Controls
-
-| Action | Desktop | Mobile |
-|---|---|---|
-| Move | WASD / Arrow Up/Down | Left stick |
-| Look | Mouse / Arrow Left/Right | Right stick |
-| Jump | Space | Jump button |
-| Use skill | Left click | Use button |
-| Place block | Right click (block skill) | Place button |
-| Switch skill | 1/2/3/4 or scroll wheel | Tap hotbar |
-| Fullscreen | F | — |
-
-## Tech Stack
-
-- **Three.js** r180 — 3D rendering
-- **Vite** — Dev server & bundler
-- **Playwright** — Automated visual testing
-- **Kenney Assets** — Voxel textures and sprites
+- Three.js
+- Vite
+- Playwright（測試）

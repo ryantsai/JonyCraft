@@ -1,157 +1,148 @@
-# JonyCraft
+# CLAUDE.md
 
-A first-person Minecraft-style voxel sandbox game built with Three.js and Kenney asset packs. Players select game modes from the start menu. All UI and text is in Traditional Chinese (繁體中文).
+本文件提供在 JonyCraft 專案中進行開發時的快速對齊資訊。
 
-## Tech Stack
-- **Three.js** (r180) for 3D rendering
-- **Vite** for dev server and build
-- **Playwright** for automated visual testing
-- Modular architecture with an event bus for decoupled system communication
+## 專案摘要
 
-## Kenney Assets Source
-The full Kenney asset library is available at `/home/ryan/Kenney`. Copy assets from there into `public/assets/kenney/` as needed.
+- 第一人稱 voxel 動作沙盒遊戲
+- UI 與遊戲內文字皆為 **繁體中文**
+- 架構為模組化 class + EventBus
+- 含單人與多人（PvP / Homeland）流程
 
-## Project Structure
+## 本地開發
+
+```bash
+npm install
+npm run dev
+npm run build
+npm run preview
 ```
+
+## 目前程式碼結構
+
+```text
 src/
-  main.js                  - Entry point: wires all systems, game loop
-  style.css                - HUD and overlay styles
+  main.js
+  style.css
 
   config/
-    constants.js           - All tuning constants (physics, world, combat, etc.)
-    assets.js              - Asset URL helper
-    blocks.js              - Block type definitions (faces, collision, transparency)
-    skills.js              - Default skill/hotbar definitions
-    fruits.js              - 10 Devil Fruit definitions with per-fruit combat skills & animStyle
-    enemyTypes.js          - 11 enemy type definitions (stats, behavior, model, spawn weight)
+    constants.js
+    assets.js
+    blocks.js
+    items.js
+    shopItems.js
+    skills.js
+    fruits.js
+    animStyles.js
+    enemyTypes.js
+    skins.js
 
   core/
-    EventBus.js            - Pub/sub event system for decoupled communication
-    GameState.js           - Central game state object (player, combat, defense, fruit)
+    EventBus.js
+    GameState.js
+    Inventory.js
 
   renderer/
-    SceneSetup.js          - Three.js renderer, scene, camera, lighting, groups
-    TextureManager.js      - Texture loading with caching
-    BlockMaterials.js      - Per-face materials for each block type
+    SceneSetup.js
+    TextureManager.js
+    BlockMaterials.js
 
   world/
-    World.js               - Voxel data store, terrain generation, block queries
-    WorldRenderer.js       - Block mesh syncing (create/remove/update meshes)
+    World.js
+    WorldRenderer.js
 
   player/
-    Player.js              - Movement, collision, spawn selection
-    Targeting.js           - DDA voxel raycast, enemy target detection
+    Player.js
+    Targeting.js
 
   combat/
-    Combat.js              - Unified attack logic via attack(), block break/place, damage
+    Combat.js
 
   enemies/
-    Zombie.js              - Zombie 3D model creation, tinting (legacy)
-    EnemyModel.js          - Generic enemy 3D model builder (used by all enemy types)
-    EnemyBehaviors.js      - Enemy AI behaviors (chase, charge, circle, leap, teleport, ranged, explode, regen, flee)
-    EnemyManager.js        - Spawning, AI dispatch, projectiles, respawn, defeat/clearAll
+    EnemyManager.js
+    EnemyBehaviors.js
+    EnemyModel.js
+    Zombie.js
 
   effects/
-    Particles.js           - Hit particle system
-    WeaponModels.js        - First-person weapon model building and animation
-    ScreenEffects.js       - Camera shake, flash overlay, swing burst (extracted from WeaponModels)
-    ProjectileSystem.js    - World-space projectile movement, collision, trail particles
-    FireFistSpawner.js     - Bridges combat events to ProjectileSystem for fire fist
-    FruitVFX.js            - Per-fruit VFX particle definitions and rendering
-    CooldownHUD.js         - Cooldown overlay on hotbar items
-
-  input/
-    InputManager.js        - Keyboard, mouse, pointer lock
-    MobileControls.js      - Virtual gamepad (touch pads + buttons)
-
-  audio/
-    SoundManager.js        - Sound effects loading and playback
-
-  config/
-    animStyles.js          - Per-fruit animation modifier data (ANIM_MODS)
+    WeaponModels.js
+    ScreenEffects.js
+    ProjectileSystem.js
+    ExplosionEffect.js
+    Particles.js
+    FruitVFX.js
+    FireFistSpawner.js
+    DarkPullSpawner.js
+    CooldownHUD.js
 
   modes/
-    GameMode.js            - Base class for game modes (provides no-op defaults)
-    HomelandDefenseMode.js - Wave-based tower defense mode (extends GameMode)
-    DefenseUtils.js        - Tower health bar rendering and fortress building
+    GameMode.js
+    HomelandDefenseMode.js
+    MultiplayerHomelandMode.js
+    DefenseUtils.js
+    CannonTowerSystem.js
+
+  network/
+    PlayerIdentity.js
+    MultiplayerClient.js
+    RemotePlayers.js
 
   ui/
-    template.js            - Game HTML shell template (canvas, HUD, defense scoreboard, start screen)
-    HUD.js                 - Hotbar, status bar, defense scoreboard, start screen
-    FruitSelect.js         - Fruit selection overlay UI
+    template.js
+    HUD.js
+    FruitSelect.js
+    SkinSelect.js
+    MultiplayerLobby.js
+
+  input/
+    InputManager.js
+    MobileControls.js
+
+  audio/
+    SoundManager.js
 
   testing/
-    TestingHooks.js        - Automation hooks (render_game_to_text, advanceTime)
-
-public/assets/kenney/      - Kenney voxel textures (tiles, items, particles, zombie, skills)
-test-actions*.json         - Playwright automation test scripts
-progress.md                - Development log and TODO list
-vite.config.js             - Vite config with BASE_PATH env support
+    TestingHooks.js
 ```
 
-## Key Architecture Patterns
-- **Event Bus**: Systems communicate via `events.emit()`/`events.on()` (e.g. `block:changed`, `hud:update`, `game:enter`, `combat:fruit-attack`, `enemy:killed`, `shop:purchase`). This enables adding multiplayer networking, database hooks, or new systems without modifying existing code.
-- **GameState**: Central state object shared by all systems. Includes `player`, `combat`, `defense`, `selectedFruit`, and `modeController`. Future multiplayer: becomes the authoritative client state synced with server.
-- **World**: Voxel data stored in a Map keyed by `"x,y,z"` strings. Emits change events so WorldRenderer stays in sync.
-- **Mode Controller**: `gameState.modeController` holds the active game mode instance (e.g. `HomelandDefenseMode`). The main loop calls `modeController.update(dt)` each frame. Modes can override enemy targets, add scoring, and manage waves.
-- Fixed-timestep game loop (`FIXED_STEP_MS = 1000/60`)
-- First-person camera with pointer lock controls
-- **Fruit System**: 10 devil fruits (Blox Fruits inspired), each granting 3-4 combat skills with unique stats (damage, range, cooldown, knockback, swingMs, animStyle). Each fruit has an `animStyle` that drives per-fruit animation modifiers (stretchMul, fistScale, shake, flash, swordGlow, arcTilt, swirl, trail). Players select a fruit before entering the world; skills replace the default hotbar.
-- **Enemy Type System**: 11 enemy types defined in `enemyTypes.js` (zombie, skeleton, slime, giant, spider, ghost, creeper, wizard, golem, ninja, blaze). Each has unique stats, behavior AI, and model colors. Weighted spawn table for random variety.
-- **Enemy Behaviors**: 9 AI behaviors in `EnemyBehaviors.js`: chase, charge, circle, leap, teleport, ranged, explode, regen, flee. Behaviors support defense mode by targeting the tower instead of the player.
-- Default skills: Sword, Rubber Punch, Dirt Block (before fruit selection)
-- AABB collision detection for player-world and enemy-world physics
-- Mobile virtual gamepad with dual touch pads
+## 關鍵設計約定
 
-## Commands
-- `npm run dev` - Start dev server
-- `npm run build` - Production build
-- `npm run preview` - Preview production build
+1. **EventBus 優先**
+   - 跨系統事件請走 `events.emit/on`，避免直接相互耦合。
 
-## Game Constants
-All tuning constants live in `src/config/constants.js`. Key ones:
-- `WORLD_SIZE_X/Z = 56`, `WORLD_HEIGHT = 10` - World dimensions
-- `MOVE_SPEED = 5.2`, `JUMP_SPEED = 7.6`, `GRAVITY = 22` - Player physics
-- `SWORD_RANGE = 3`, `PUNCH_RANGE = 6.2` - Combat ranges (default skills)
-- `ZOMBIE_SPEED = 1.12`, `ZOMBIE_MAX_HEALTH = 3` - Base zombie tuning
-- `INITIAL_ZOMBIE_COUNT = 5` - Default wave size
+2. **GameState 為共享狀態中心**
+   - 主要狀態：`player`、`combat`、`defense`、`selectedFruit`、`modeController`、`multiplayer`。
 
-## Testing
-- Automated tests use Playwright with JSON action scripts (`test-actions*.json`)
-- Game exposes `window.render_game_to_text` and `window.advanceTime(ms)` for automation
-- Tests verify movement, building, combat, knockback, and skill switching
+3. **模式控制器 (modeController)**
+   - `main.js` 每幀呼叫 `gameState.modeController?.update(dt)`。
+   - 新模式放 `src/modes/`，並在 `main.js` 接上切換流程。
 
-## Game Modes
-Players select a game mode from the start screen before entering the world:
-- **測試模式 (Test)** — Sandbox mode with zombies, combat, and building
-- **保衛家園 (Homeland Defense)** — Wave-based tower defense: protect the central fortress from escalating enemy waves. Features a shop system (heal, tower repair, turret purchase) funded by gold earned from kills. Waves scale enemy stats via `ENEMY_MULTIPLIER`.
+4. **戰鬥走 unified path**
+   - 技能資料定義在 config，`Combat.attack()` 統一路徑處理命中、傷害、擊退、VFX 觸發。
 
-## Workflow
-- All changes should be submitted as a PR via `gh` CLI and pushed to GitHub
-- Create a feature branch, commit, push, and open a PR using `gh pr create`
+5. **多人與單人可共用系統，權威來源要清楚**
+   - 多人保衛家園由 server 狀態為主（client 可做有限 optimistic UI）。
 
-## Language
-- All UI text and labels must be in **Traditional Chinese (繁體中文)**
-- Keep code identifiers, comments, and docs in English
+## 文件與內容規範
 
-## Development Guidelines
-- Each system is a class in its own file under the appropriate directory
-- New features should be added as new modules, wired in `src/main.js`
-- New game modes go in `src/modes/` and are activated via `gameState.modeController`
-- Use the EventBus for cross-system communication instead of direct coupling
-- Use Kenney assets from `public/assets/kenney/` for visual consistency
-- Maintain the automation testing hooks when modifying game state
-- Block textures support per-face definitions (`side`, `top`, `bottom`) or `all`
-- New enemy types go in `src/config/enemyTypes.js` with a behavior from `EnemyBehaviors.js`
-- New fruit definitions go in `src/config/fruits.js` with an `animStyle` key matching entries in `src/config/animStyles.js`
-- New game modes extend `GameMode` base class in `src/modes/GameMode.js`
-- New projectile types use `ProjectileSystem.spawn()` with a trail config
-- Combat uses a single unified `attack()` path — all skills (default + fruit) define full stats on the skill object
-- Update `progress.md` after significant changes
+- 遊戲內文案：繁體中文
+- 程式碼識別字、註解、技術文件：英文或中英混合皆可，但要一致
+- 新增功能時請同步更新：
+  - `README.md`（玩家/開發者可見的功能與架構摘要）
+  - `progress.md`（重大里程碑）
 
-## Multiplayer & Database Expansion Points
-- **GameState**: Add player ID, session management, server sync methods
-- **EventBus**: Hook network layer to relay events (block changes, combat, movement)
-- **World**: Add serialize/deserialize for save/load and chunk streaming
-- **EnemyManager**: Make server-authoritative for multiplayer consistency
-- **InputManager**: Forward inputs to server, apply server corrections
+## 常見修改入口
+
+- 新方塊：`src/config/blocks.js`
+- 新果實技能：`src/config/fruits.js`、`src/config/skills.js`、`src/config/animStyles.js`
+- 新敵人：`src/config/enemyTypes.js` + `src/enemies/EnemyBehaviors.js`
+- 新商城道具：`src/config/shopItems.js`
+- 新特效/投射物：`src/effects/`
+- 新多人同步欄位：`src/network/MultiplayerClient.js`
+
+## 測試與驗證
+
+- 先跑 `npm run build` 確認可編譯
+- 自動化腳本位於 `test-actions*.json`
+- 測試 hook 在 `src/testing/TestingHooks.js`
+

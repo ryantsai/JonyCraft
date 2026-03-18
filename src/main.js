@@ -150,16 +150,10 @@ events.on('fruit:selected', () => {
   gameState.defense.remoteAuthoritative = false;
   gameState.defense.status = 'idle';
   gameState.defense.turrets = [];
-
-  if (gameState.gameMode === 'homeland') {
-    world.generate({ flatTerrain: true, treeChanceThreshold: 0.9992 });
-    worldRenderer.buildAll();
-    enemyManager.clearAll();
-  } else {
-    world.generate({ flatTerrain: true, treeChanceThreshold: 0.998 });
-    worldRenderer.buildAll();
-    enemyManager.clearAll();
-  }
+  const treeChanceThreshold = gameState.gameMode === 'homeland' ? 0.9992 : 0.998;
+  world.generate({ flatTerrain: true, treeChanceThreshold });
+  worldRenderer.buildAll();
+  enemyManager.clearAll();
 
   hud.onFruitSelected();
   if (gameState.gameMode === 'homeland') {

@@ -75,6 +75,21 @@ export class HomelandDefenseMode extends GameMode {
     this._unsubs.forEach(unsub => unsub());
     this._unsubs = [];
     this.cannonTowers.clear();
+
+    // Remove tower visual and health bar from scene
+    if (this.towerMesh) {
+      this.scene.enemyGroup.remove(this.towerMesh);
+      this.towerMesh = null;
+    }
+    if (this.towerHealthBar) {
+      this.scene.enemyGroup.remove(this.towerHealthBar);
+      this.towerHealthBar = null;
+    }
+    if (this.merchantNPC) {
+      this.scene.enemyGroup.remove(this.merchantNPC);
+      this.merchantNPC = null;
+      this.merchantPos = null;
+    }
   }
 
   update(dt) {

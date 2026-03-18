@@ -156,7 +156,7 @@ events.on('fruit:selected', () => {
     worldRenderer.buildAll();
     enemyManager.clearAll();
   } else {
-    world.generate();
+    world.generate({ flatTerrain: true, treeChanceThreshold: 0.998 });
     worldRenderer.buildAll();
     enemyManager.clearAll();
   }

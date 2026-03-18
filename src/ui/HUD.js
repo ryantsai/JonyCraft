@@ -688,7 +688,11 @@ export class HUD {
   _closeMerchantShop() {
     this.merchantPanel.dataset.visible = 'false';
     this.state.shopOpen = false;
-    if (this.state.mode === 'playing') this.canvas.requestPointerLock?.();
+    // Delay pointer lock re-acquisition so the browser's built-in
+    // Escape-exits-pointer-lock doesn't immediately undo it.
+    if (this.state.mode === 'playing') {
+      setTimeout(() => this.canvas.requestPointerLock?.(), 50);
+    }
   }
 
   _rebuildMerchantShop() {

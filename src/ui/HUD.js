@@ -561,7 +561,37 @@ export class HUD {
       this.inventoryGrid.appendChild(slot);
     });
 
-    if (this.inventory.bag.length === 0) {
+    // Show equipped items (from hotbar) with an "equipped" badge
+    this.state.activeSkills.forEach((skill) => {
+      if (!skill._itemId) return; // skip fruit skills
+      const def = ITEMS[skill._itemId];
+      if (!def) return;
+
+      const slot = document.createElement('button');
+      slot.className = 'inventory-slot inventory-slot-equipped';
+      slot.type = 'button';
+      slot.style.setProperty('--rarity-color', RARITY_COLORS[def.rarity] || '#b0b0b0');
+
+      const icon = document.createElement('img');
+      icon.className = 'inventory-icon';
+      icon.src = def.icon;
+      icon.alt = def.name;
+
+      const name = document.createElement('span');
+      name.className = 'inventory-item-name';
+      name.textContent = def.name;
+
+      const badge = document.createElement('span');
+      badge.className = 'inventory-item-info inventory-equipped-badge';
+      badge.textContent = '已裝備';
+
+      slot.append(icon, name, badge);
+      slot.title = def.desc;
+      this.inventoryGrid.appendChild(slot);
+    });
+
+    const totalItems = this.inventory.bag.length + this.state.activeSkills.filter(s => s._itemId).length;
+    if (totalItems === 0) {
       const empty = document.createElement('div');
       empty.className = 'inventory-empty';
       empty.textContent = '背包是空的';

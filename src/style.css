@@ -157,17 +157,21 @@ body {
 
 .defense-scoreboard {
   position: absolute;
-  top: 92px;
-  right: 18px;
-  width: 280px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 217, 102, 0.35);
-  background: rgba(10, 17, 26, 0.75);
-  backdrop-filter: blur(10px);
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 260px;
+  padding: 8px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 217, 102, 0.4);
+  background: rgba(10, 17, 26, 0.8);
+  backdrop-filter: blur(12px);
   pointer-events: auto;
   display: none;
-  gap: 6px;
+  gap: 4px;
+  text-align: center;
+  z-index: 4;
 }
 
 .defense-scoreboard[data-visible='true'] {
@@ -175,44 +179,58 @@ body {
 }
 
 .defense-row {
-  font-size: 0.82rem;
-  color: rgba(244, 235, 212, 0.95);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: rgba(255, 240, 210, 0.95);
+  white-space: nowrap;
+}
+
+.defense-row span {
+  color: var(--gold-bright);
 }
 
 .player-health-bar {
   position: absolute;
-  top: 18px; right: 18px;
-  width: 220px;
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 14px;
-  background: rgba(9, 16, 24, 0.48);
-  backdrop-filter: blur(12px);
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(320px, 60vw);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .health-label {
-  font-size: 0.84rem;
-  margin-bottom: 6px;
-  color: rgba(255, 240, 240, 0.92);
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-bottom: 0;
+  color: rgba(255, 240, 240, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .health-track {
-  width: 100%; height: 10px;
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.12);
+  width: 100%; height: 8px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.4);
   overflow: hidden;
 }
 
 .health-fill {
   height: 100%;
-  border-radius: 5px;
-  background: linear-gradient(90deg, #e04040, #ff6b6b);
+  border-radius: 1px;
+  background: linear-gradient(180deg, #e04040, #c02020);
   transition: width 200ms ease;
 }
 
-.health-fill[data-high='true'] { background: linear-gradient(90deg, #40c040, #6bff6b); }
-.health-fill[data-mid='true'] { background: linear-gradient(90deg, #c0a030, #ffe060); }
+.health-fill[data-high='true'] { background: linear-gradient(180deg, #50d050, #30a030); }
+.health-fill[data-mid='true'] { background: linear-gradient(180deg, #d0a830, #b08820); }
 
 .homebase-hp {
   margin-top: 8px;
@@ -1187,7 +1205,7 @@ body {
 
 /* ── Responsive ── */
 @media (max-width: 720px) {
-  .defense-scoreboard { width: 200px; font-size: 0.72rem; top: 72px; right: 8px; padding: 8px; }
+  .defense-scoreboard { min-width: 200px; font-size: 0.76rem; padding: 6px 14px; }
   .status-bar { display: none !important; }
 
   .hotbar {
@@ -1207,9 +1225,8 @@ body {
   .start-panel { padding: 24px 20px 20px; }
 
   .player-health-bar {
-    top: 12px; right: 12px;
-    width: 160px;
-    padding: 8px 10px;
+    bottom: 128px;
+    width: min(260px, 55vw);
   }
 
   .crosshair { opacity: 0.75; }
@@ -1780,9 +1797,9 @@ body {
 }
 
 .defense-hint {
-  font-size: 0.72rem;
-  color: var(--gold);
-  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .touch-interact-btn {

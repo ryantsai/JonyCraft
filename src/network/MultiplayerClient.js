@@ -94,6 +94,7 @@ export class MultiplayerClient {
     this.pendingHomelandPurchases = [];
     this.pendingHomelandPlacements = [];
     this.pendingPvPAttacks = [];
+    this.pendingChatMessages = [];
     this.suppressBlockSync = false;
 
     const endpoint = defaultServerEndpoint();
@@ -104,6 +105,7 @@ export class MultiplayerClient {
 
   init() {
     events.on('multiplayer:leave', () => this.leaveSession());
+    events.on('multiplayer:chat:send', ({ text }) => this.queueChatMessage(text));
 
     events.on('block:changed', (change) => {
       if (!this.state.multiplayer.enabled || this.suppressBlockSync) return;
@@ -226,6 +228,13 @@ export class MultiplayerClient {
     this.pendingPvPAttacks.push(attack);
   }
 
+  queueChatMessage(text) {
+    const message = String(text ?? '').trim().slice(0, 500);
+    if (!message) return;
+    this.pendingChatMessages.push(message);
+    this.pendingChatMessages = this.pendingChatMessages.slice(-30);
+  }
+
   update(dt) {
     if (!this.state.multiplayer.enabled || !this.state.multiplayer.sessionId) return;
     if (!this.hasTimedOut && (performance.now() - this.lastServerTrafficAt) >= this.disconnectTimeoutMs) {
@@ -252,6 +261,7 @@ export class MultiplayerClient {
     const outboundHomelandPurchases = this.pendingHomelandPurchases.splice(0, this.pendingHomelandPurchases.length);
     const outboundHomelandPlacements = this.pendingHomelandPlacements.splice(0, this.pendingHomelandPlacements.length);
     const outboundPvPAttacks = this.pendingPvPAttacks.splice(0, this.pendingPvPAttacks.length);
+    const outboundChatMessages = this.pendingChatMessages.splice(0, this.pendingChatMessages.length);
     try {
       const payload = await this._post(`/api/sessions/${this.state.multiplayer.sessionId}/sync`, {
         playerName: this.state.playerName,
@@ -266,6 +276,8 @@ export class MultiplayerClient {
         pvpActions: {
           attacks: outboundPvPAttacks,
         },
+        sinceChatSeq: this.state.multiplayer.latestChatSeq,
+        chatMessages: outboundChatMessages,
       });
       this._applySync(payload);
     } catch (error) {
@@ -274,6 +286,7 @@ export class MultiplayerClient {
       this.pendingHomelandPurchases.unshift(...outboundHomelandPurchases);
       this.pendingHomelandPlacements.unshift(...outboundHomelandPlacements);
       this.pendingPvPAttacks.unshift(...outboundPvPAttacks);
+      this.pendingChatMessages.unshift(...outboundChatMessages);
       this.state.multiplayer.connectionStatus = 'error';
       if (String(error.message).includes('session not found')) {
         this._resetSessionState();
@@ -305,6 +318,10 @@ export class MultiplayerClient {
     this.state.multiplayer.connectionStatus = 'online';
     this.state.multiplayer.playerStats = [];
     this.state.multiplayer.pingMs = 0;
+    this.state.multiplayer.latestChatSeq = 0;
+    this.state.multiplayer.chatMessages = [];
+    this.state.multiplayer.chatCollapsed = false;
+    this.state.multiplayer.chatFocused = false;
     this.syncAccumulatorMs = 0;
     this.lastServerTrafficAt = performance.now();
     this.hasTimedOut = false;
@@ -312,6 +329,8 @@ export class MultiplayerClient {
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
     this.pendingHomelandPlacements = [];
+    this.pendingPvPAttacks = [];
+    this.pendingChatMessages = [];
     this.pendingImmediateSync = false;
   }
 
@@ -330,6 +349,20 @@ export class MultiplayerClient {
     }
 
     this.state.multiplayer.latestBlockSeq = payload.latestBlockSeq ?? this.state.multiplayer.latestBlockSeq;
+
+    if (Array.isArray(payload.chatMessages) && payload.chatMessages.length > 0) {
+      const normalized = payload.chatMessages
+        .map((entry) => ({
+          seq: Number(entry.seq || 0),
+          playerName: String(entry.playerName || '玩家').slice(0, 48),
+          message: String(entry.message || '').slice(0, 500),
+        }))
+        .filter((entry) => entry.seq > 0 && entry.message.length > 0);
+      if (normalized.length > 0) {
+        this.state.multiplayer.chatMessages = [...this.state.multiplayer.chatMessages, ...normalized].slice(-200);
+      }
+    }
+    this.state.multiplayer.latestChatSeq = payload.latestChatSeq ?? this.state.multiplayer.latestChatSeq;
 
     const others = (payload.players ?? []).filter((player) => player.name !== this.state.playerName);
     const selfPlayer = (payload.players ?? []).find((player) => player.name === this.state.playerName);
@@ -488,12 +521,17 @@ export class MultiplayerClient {
     this.state.multiplayer.playerStats = [];
     this.state.multiplayer.pingMs = 0;
     this.state.multiplayer.latestBlockSeq = 0;
+    this.state.multiplayer.latestChatSeq = 0;
+    this.state.multiplayer.chatMessages = [];
+    this.state.multiplayer.chatCollapsed = false;
+    this.state.multiplayer.chatFocused = false;
     this.state.multiplayer.sessionPlayerCount = 1;
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
     this.pendingHomelandPlacements = [];
     this.pendingPvPAttacks = [];
+    this.pendingChatMessages = [];
     this.pendingImmediateSync = false;
   }
 

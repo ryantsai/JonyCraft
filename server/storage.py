@@ -42,6 +42,8 @@ class SessionRecord:
     block_log: list[dict[str, Any]] = field(default_factory=list)
     world_overrides: dict[str, dict[str, Any]] = field(default_factory=dict)
     defense_state: dict[str, Any] = field(default_factory=dict)
+    chat_seq: int = 0
+    chat_log: list[dict[str, Any]] = field(default_factory=list)
     updated_at: float = field(default_factory=now_ts)
 
     def summary(self) -> dict[str, Any]:
@@ -136,6 +138,8 @@ class SQLiteSessionRepository(SessionRepository):
                 block_log=state.get("block_log", []),
                 world_overrides=state.get("world_overrides", {}),
                 defense_state=state.get("defense_state", {}),
+                chat_seq=int(state.get("chat_seq", 0) or 0),
+                chat_log=state.get("chat_log", []),
                 players=players_by_session.get(row["session_id"], {}),
             )
         return sessions
@@ -147,6 +151,8 @@ class SQLiteSessionRepository(SessionRepository):
                 "block_log": session.block_log,
                 "world_overrides": session.world_overrides,
                 "defense_state": session.defense_state,
+                "chat_seq": session.chat_seq,
+                "chat_log": session.chat_log,
             }
         )
         self._conn.execute(

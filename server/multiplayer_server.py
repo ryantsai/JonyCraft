@@ -25,6 +25,8 @@ from storage import (
 IDLE_PLAYER_SECONDS = 15
 EMPTY_SESSION_SECONDS = 45
 MAX_EVENT_LOG = 800
+MAX_CHAT_LOG = 200
+MAX_CHAT_LENGTH = 500
 MOVEMENT_PERSIST_INTERVAL_SECONDS = 1.0
 HOMELAND_PERSIST_INTERVAL_SECONDS = 0.75
 DEFAULT_DATABASE = Path(__file__).with_name("multiplayer_state.sqlite3")
@@ -74,6 +76,7 @@ class SessionStore:
 
     def _save_locked(self, session: SessionRecord) -> None:
         session.block_log = session.block_log[-MAX_EVENT_LOG:]
+        session.chat_log = session.chat_log[-MAX_CHAT_LOG:]
         self._repository.save_session(session)
 
     def _cleanup_locked(self) -> None:
@@ -199,10 +202,29 @@ class SessionStore:
             if session.mode == "test":
                 process_pvp_actions(session, player_name, pvp_actions, player.last_seen)
 
+            raw_chat_messages = payload.get("chatMessages") or []
+            had_chat_messages = False
+            if isinstance(raw_chat_messages, list):
+                for message in raw_chat_messages:
+                    text = self._sanitize_chat_message(message)
+                    if not text:
+                        continue
+                    had_chat_messages = True
+                    session.chat_seq += 1
+                    session.chat_log.append(
+                        {
+                            "seq": session.chat_seq,
+                            "playerName": player_name,
+                            "message": text,
+                            "sentAt": player.last_seen,
+                        }
+                    )
+
             should_persist = (
                 had_block_changes
                 or had_homeland_actions
                 or had_pvp_actions
+                or had_chat_messages
                 or (player.last_seen - session.updated_at) >= MOVEMENT_PERSIST_INTERVAL_SECONDS
             )
             if should_persist:
@@ -211,6 +233,8 @@ class SessionStore:
             since_seq = int(payload.get("sinceBlockSeq") or 0)
             world_state = list(session.world_overrides.values()) if since_seq <= 0 else []
             block_ops = [event for event in session.block_log if event["seq"] > since_seq]
+            since_chat_seq = int(payload.get("sinceChatSeq") or 0)
+            chat_messages = [event for event in session.chat_log if int(event.get("seq") or 0) > since_chat_seq]
 
             response = {
                 "session": session.summary(),
@@ -218,6 +242,8 @@ class SessionStore:
                 "worldState": world_state,
                 "blockOps": block_ops,
                 "latestBlockSeq": session.block_seq,
+                "chatMessages": chat_messages,
+                "latestChatSeq": session.chat_seq,
                 "serverTime": player.last_seen,
             }
             if session.mode == "homeland":
@@ -295,6 +321,13 @@ class SessionStore:
         state.setdefault("attackReadyAt", 0.0)
         state.setdefault("respawnUntil", 0.0)
         return state
+
+    @staticmethod
+    def _sanitize_chat_message(message: Any) -> str:
+        if message is None:
+            return ""
+        text = str(message).replace("\r", " ").replace("\n", " ").strip()
+        return text[:MAX_CHAT_LENGTH]
 
     @staticmethod
     def _normalize_block_op(op: Any, player_name: str) -> dict[str, Any] | None:

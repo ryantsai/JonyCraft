@@ -83,6 +83,10 @@ export class GameState {
       serverPort: '443',
       sessions: [],
       latestBlockSeq: 0,
+      latestChatSeq: 0,
+      chatMessages: [],
+      chatFocused: false,
+      chatCollapsed: false,
       connectionStatus: 'offline',
     };
   }

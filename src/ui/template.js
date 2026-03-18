@@ -7,6 +7,17 @@ export const gameTemplate = `
     <canvas class="game-canvas" aria-label="JonyCraft 像素沙盒"></canvas>
     <div class="hud">
       <div class="crosshair" aria-hidden="true"></div>
+      <div id="multiplayer-chat" class="multiplayer-chat" data-visible="false" data-collapsed="false" aria-label="多人聊天視窗">
+        <button id="multiplayer-chat-collapsed" class="multiplayer-chat-collapsed" type="button" aria-label="開啟聊天">💬</button>
+        <div class="multiplayer-chat-panel">
+          <div class="multiplayer-chat-header">
+            <span class="multiplayer-chat-title">聊天（按 <kbd>T</kbd> 輸入）</span>
+            <button id="multiplayer-chat-toggle" class="multiplayer-chat-toggle" type="button" aria-label="隱藏聊天">－</button>
+          </div>
+          <div id="multiplayer-chat-log" class="multiplayer-chat-log" aria-live="polite"></div>
+          <input id="multiplayer-chat-input" class="multiplayer-chat-input" type="text" maxlength="500" placeholder="按 Enter 發送訊息（最多 500 字）" />
+        </div>
+      </div>
       <div id="multiplayer-scoreboard" class="multiplayer-scoreboard" data-visible="false" aria-label="多人分數板">
         <div class="multiplayer-scoreboard-header">
           <span>多人分數板</span>

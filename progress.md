@@ -227,3 +227,13 @@ TODO
   - browser verification at `http://127.0.0.1:4173` confirmed `window.__app.multiplayer.getServerEndpoint()` returns `{ host: '10.0.0.100', port: '8765' }`
   - browser verification also confirmed `.status-bar` and `#status-message` are no longer present in the DOM
   - bundled `develop-web-game` Playwright client completed successfully against `http://127.0.0.1:4173` with `test-actions.json`
+
+2026-03-18
+- 新增多人模式聊天系統（Roblox 風格 UI）：
+  - `src/ui/template.js` / `src/style.css` / `src/ui/HUD.js` 新增左上半透明聊天窗、`T` 快捷鍵聚焦、輸入框、可折疊為聊天圖示、聚焦時滾輪瀏覽歷史訊息。
+  - 聊天窗顯示約 15 則訊息高度、支援捲動；前端輸入與顯示皆限制每則訊息最多 500 字元。
+  - 多人記分板與 Ping 移至右上並縮窄，版面更接近 Roblox HUD 風格。
+- 多人同步與伺服器緩衝升級：
+  - `src/network/MultiplayerClient.js` 新增聊天送出佇列、`sinceChatSeq` 增量同步、200 則本地緩衝。
+  - `server/multiplayer_server.py` / `server/storage.py` 新增聊天室持久化欄位（`chat_seq`、`chat_log`），伺服器端同樣限制每則 500 字與 200 則緩衝。
+  - 新加入玩家首次同步可取得目前聊天室緩衝歷史。

@@ -298,6 +298,28 @@ export class EnemyManager {
       }
     }
 
+    // --- Turret collision (cylindrical push-out) ---
+    const turrets = this.state.defense?.turrets;
+    if (turrets) {
+      const TURRET_RADIUS = 0.9;
+      const TURRET_HEIGHT = 2.8;
+      for (let i = 0; i < turrets.length; i += 1) {
+        const t = turrets[i];
+        const tBottom = t.y ?? 0;
+        const tTop = tBottom + TURRET_HEIGHT;
+        if (pos.y >= tTop || pos.y + h <= tBottom) continue;
+        const dx = pos.x - t.x;
+        const dz = pos.z - t.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        const minDist = r + TURRET_RADIUS;
+        if (dist < minDist && dist > 0.001) {
+          const push = (minDist - dist) / dist;
+          pos.x += dx * push;
+          pos.z += dz * push;
+        }
+      }
+    }
+
     // --- Gravity ---
     enemy.velocityY -= ENEMY_GRAVITY * dt;
     enemy.velocityY = Math.max(enemy.velocityY, -24);

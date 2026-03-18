@@ -30,6 +30,7 @@ import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
 import { HomelandDefenseMode } from './modes/HomelandDefenseMode.js';
 import { MultiplayerHomelandMode } from './modes/MultiplayerHomelandMode.js';
+import { CannonTowerSystem } from './modes/CannonTowerSystem.js';
 import { ensurePlayerName } from './network/PlayerIdentity.js';
 import { MultiplayerClient } from './network/MultiplayerClient.js';
 import { RemotePlayers } from './network/RemotePlayers.js';
@@ -95,6 +96,9 @@ const multiplayerHomelandMode = new MultiplayerHomelandMode(
 );
 multiplayerHomelandMode.setInventory(inventory);
 multiplayer.attachHomelandMode(multiplayerHomelandMode);
+const globalCannonTowers = new CannonTowerSystem(gameState, world, scene, enemyManager, projectileSystem);
+globalCannonTowers.setInventory(inventory);
+combat.setCannonTowers(globalCannonTowers);
 
 // --- Wire events ---
 events.on('block:changed', (data) => worldRenderer.onBlockChanged(data));
@@ -212,6 +216,7 @@ function stepSimulation(deltaMs) {
         enemyManager.update(dt);
       }
       gameState.modeController?.update?.(dt);
+      if (!gameState.modeController) globalCannonTowers.update(dt);
       inventory.update(dt);
     }
     multiplayer.update(dt);

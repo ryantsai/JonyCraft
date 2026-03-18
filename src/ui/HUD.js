@@ -500,14 +500,40 @@ export class HUD {
   _openInventory() {
     if (this.state.shopOpen || this.state.mode === 'paused') return;
     this.state.inventoryOpen = true;
-    this.inventoryPanel.dataset.visible = 'true';
     document.exitPointerLock?.();
+
+    // In test mode, show the debug panel with all sections expanded instead of inventory
+    if (this.state.gameMode === 'test') {
+      this.debugPanel.dataset.visible = 'true';
+      this.debugFruitGrid.dataset.visible = 'true';
+      this.debugSkinGrid.dataset.visible = 'true';
+      this.debugItemGrid.dataset.visible = 'true';
+      this.debugFruitBtn.dataset.open = 'true';
+      this.debugSkinBtn.dataset.open = 'true';
+      this.debugItemBtn.dataset.open = 'true';
+      this._updateDebugFruitSelection();
+      this._updateDebugSkinSelection();
+      return;
+    }
+
+    this.inventoryPanel.dataset.visible = 'true';
     this._rebuildInventoryPanel();
   }
 
   _closeInventory() {
     this.state.inventoryOpen = false;
     this.inventoryPanel.dataset.visible = 'false';
+
+    // Collapse debug panel sections when closing in test mode
+    if (this.state.gameMode === 'test') {
+      this.debugFruitGrid.dataset.visible = 'false';
+      this.debugSkinGrid.dataset.visible = 'false';
+      this.debugItemGrid.dataset.visible = 'false';
+      this.debugFruitBtn.dataset.open = 'false';
+      this.debugSkinBtn.dataset.open = 'false';
+      this.debugItemBtn.dataset.open = 'false';
+    }
+
     if (this.state.mode === 'playing' && !this.state.shopOpen) {
       this.canvas.requestPointerLock?.();
     }

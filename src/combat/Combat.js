@@ -15,10 +15,15 @@ export class CombatSystem {
     this.particles = particles;
     this.multiplayer = multiplayerClient;
     this.remotePlayers = null;
+    this.cannonTowers = null;
   }
 
   setRemotePlayers(remotePlayers) {
     this.remotePlayers = remotePlayers;
+  }
+
+  setCannonTowers(cannonTowerSystem) {
+    this.cannonTowers = cannonTowerSystem;
   }
 
   /**
@@ -158,7 +163,14 @@ export class CombatSystem {
   }
 
   handleDeployable() {
-    this.state.modeController?.tryPlaceDeployable?.(this.state.getSelectedSkill());
+    const skill = this.state.getSelectedSkill();
+    if (this.state.modeController?.tryPlaceDeployable) {
+      this.state.modeController.tryPlaceDeployable(skill);
+      return;
+    }
+    if (this.cannonTowers && skill?.deployableType === 'cannon_tower') {
+      this.cannonTowers.tryPlaceSelectedTower();
+    }
   }
 
   _shouldUseServerHomelandAttack() {

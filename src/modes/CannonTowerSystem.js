@@ -127,6 +127,7 @@ export class CannonTowerSystem {
     this.preview = {
       group: new THREE.Group(),
       fallback: createFallbackTower(),
+      glbLoaded: false,
       valid: false,
       visible: false,
       cell: null,
@@ -136,6 +137,18 @@ export class CannonTowerSystem {
     this.preview.group.visible = false;
     this.preview.group.renderOrder = 40;
     this.scene.enemyGroup.add(this.preview.group);
+
+    // Async load GLB for preview ghost
+    ensureCannonTowerTemplate()
+      .then((template) => {
+        const model = template.clone(true);
+        setGhostTint(model, '#7efc8a', 0.38);
+        this.preview.group.clear();
+        this.preview.group.add(model);
+        this.preview.fallback = model;
+        this.preview.glbLoaded = true;
+      })
+      .catch(() => { /* keep fallback */ });
   }
 
   setInventory(inventory) {
@@ -214,7 +227,6 @@ export class CannonTowerSystem {
     const selected = this.state.getSelectedSkill?.();
     const shouldShow = Boolean(
       this.state.mode === 'playing' &&
-      this.state.defense.enabled &&
       !this.state.shopOpen &&
       !this.state.inventoryOpen &&
       selected?.kind === 'deployable' &&
@@ -378,8 +390,8 @@ export class CannonTowerSystem {
         const model = template.clone(true);
         group.add(model);
       })
-      .catch(() => {
-        // Leave fallback tower in place if the GLB cannot be loaded.
+      .catch((err) => {
+        console.error('Failed to load cannon tower GLB:', err);
       });
 
     return {

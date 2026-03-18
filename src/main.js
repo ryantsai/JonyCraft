@@ -28,6 +28,7 @@ import { TestingHooks } from './testing/TestingHooks.js';
 import { Inventory } from './core/Inventory.js';
 import { SoundManager } from './audio/SoundManager.js';
 import { gameTemplate } from './ui/template.js';
+import { ALL_ITEM_IDS } from './config/items.js';
 import { HomelandDefenseMode } from './modes/HomelandDefenseMode.js';
 import { MultiplayerHomelandMode } from './modes/MultiplayerHomelandMode.js';
 import { CannonTowerSystem } from './modes/CannonTowerSystem.js';
@@ -184,6 +185,8 @@ events.on('fruit:selected', () => {
   } else {
     gameState.modeController = null;
     enemyManager.spawnWave();
+    // Give all items in test mode
+    ALL_ITEM_IDS.forEach((id) => inventory.addItem(id, 1));
   }
 });
 

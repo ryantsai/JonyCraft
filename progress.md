@@ -198,6 +198,13 @@ TODO
 - Verification:
   - `npm run build` passes after the cannon tower changes
   - `python -m py_compile server/homeland_sim.py server/multiplayer_server.py` passes
+- Updated multiplayer default endpoint selection for internet-hosted builds:
+  - `src/network/MultiplayerClient.js` now defaults to `10.0.0.100:8765` only when the page itself is served from `10.0.0.100`
+  - local dev on `localhost` / `127.0.0.1` still defaults to the matching local host on port `8765`
+  - all other hosts now default to `pb60.tailbf39d7.ts.net:443`
+  - `src/core/GameState.js` now initializes the lobby fields to `pb60.tailbf39d7.ts.net` and port `443`
+- Verification:
+  - `npm run build` passes after the multiplayer default endpoint update
   - bundled `develop-web-game` Playwright client still runs against the updated app at `output/web-game-cannon-client-final`
   - direct Playwright verification confirmed:
     - purchased cannon tower appears in inventory state before equip
@@ -208,3 +215,15 @@ TODO
     - placed tower model: `output/cannon-tower-placed.png`
     - firing pass: `output/cannon-tower-shot.png`
     - post-fix runtime verification: `output/cannon-tower-verified.png`
+- Updated multiplayer endpoint defaults and removed the top-left status HUD:
+  - `src/network/MultiplayerClient.js` now maps `localhost` / `127.0.0.1` to the LAN server default `10.0.0.100:8765`
+  - page loads from `10.0.0.100` still default to `10.0.0.100:8765`
+  - all other hosts still default to `pb60.tailbf39d7.ts.net:443`
+  - removed the `status-bar` DOM/CSS from `src/ui/template.js` and `src/style.css`
+  - simplified `src/ui/HUD.js` so it no longer renders pointer/target/enemy debug text in the top-left
+  - `src/main.js` now falls back to an alert on bootstrap failure instead of writing to the removed status node
+- Verification:
+  - `npm run build` passes after the localhost-default + HUD cleanup
+  - browser verification at `http://127.0.0.1:4173` confirmed `window.__app.multiplayer.getServerEndpoint()` returns `{ host: '10.0.0.100', port: '8765' }`
+  - browser verification also confirmed `.status-bar` and `#status-message` are no longer present in the DOM
+  - bundled `develop-web-game` Playwright client completed successfully against `http://127.0.0.1:4173` with `test-actions.json`

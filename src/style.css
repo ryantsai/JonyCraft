@@ -67,23 +67,6 @@ body {
 .crosshair::before { left: 11px; top: 0; width: 2px; height: 24px; }
 .crosshair::after { top: 11px; left: 0; width: 24px; height: 2px; }
 
-.status-bar {
-  position: absolute;
-  top: 18px; left: 18px;
-  display: grid;
-  gap: 6px;
-  max-width: min(640px, calc(100vw - 36px));
-  padding: 12px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
-  background: rgba(9, 16, 24, 0.48);
-  backdrop-filter: blur(12px);
-  line-height: 1.25;
-}
-
-#status-message { font-size: 0.94rem; }
-#status-coords { color: rgba(236, 244, 255, 0.82); font-size: 0.84rem; }
-
 .multiplayer-scoreboard {
   position: absolute;
   top: 108px;
@@ -1303,7 +1286,6 @@ body {
 /* ── Responsive ── */
 @media (max-width: 720px) {
   .defense-scoreboard { font-size: 0.7rem; padding: 5px 12px; }
-  .status-bar { display: none !important; }
 
   .hotbar {
     width: calc(100vw - 16px);

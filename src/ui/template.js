@@ -7,10 +7,6 @@ export const gameTemplate = `
     <canvas class="game-canvas" aria-label="JonyCraft 像素沙盒"></canvas>
     <div class="hud">
       <div class="crosshair" aria-hidden="true"></div>
-      <div class="status-bar">
-        <div id="status-message">正在載入 Kenney 像素資源...</div>
-        <div id="status-coords"></div>
-      </div>
       <div id="multiplayer-scoreboard" class="multiplayer-scoreboard" data-visible="false" aria-label="多人分數板">
         <div class="multiplayer-scoreboard-header">
           <span>多人分數板</span>

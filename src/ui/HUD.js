@@ -5,7 +5,7 @@ import { ITEMS, ALL_ITEM_IDS, RARITY_COLORS } from '../config/items.js';
 import { SHOP_ITEMS } from '../config/shopItems.js';
 
 /**
- * HUD: hotbar, status bar, and start screen management.
+ * HUD: hotbar, scoreboards, and start screen management.
  */
 export class HUD {
   constructor(gameState, canvas, enemyManager) {
@@ -15,8 +15,6 @@ export class HUD {
     this.inventory = null; // set via setInventory()
 
     this.hotbar = document.querySelector('#hotbar');
-    this.statusMessage = document.querySelector('#status-message');
-    this.statusCoords = document.querySelector('#status-coords');
     this.startScreen = document.querySelector('#start-screen');
     this.homeScreen = document.querySelector('#menu-home-screen');
     this.singleplayerScreen = document.querySelector('#singleplayer-screen');
@@ -98,7 +96,6 @@ export class HUD {
     events.on('hotbar:rebuild', () => this.rebuildHotbar());
     events.on('hud:update', () => this.update());
     events.on('game:enter', () => this.enterWorld());
-    events.on('status:message', (message) => { this.statusMessage.textContent = message; });
     events.on('multiplayer:session-ready', () => this.enterJoinedSession());
     events.on('multiplayer:lobby:closed', () => this.showHomeScreen());
     events.on('multiplayer:disconnected', ({ message }) => this.showDisconnectedScreen(message));
@@ -216,25 +213,7 @@ export class HUD {
   }
   update() {
     const player = this.state.player;
-    const selected = this.state.getSelectedSkill().name;
-    const target = this.state.target
-      ? `${this.state.target.block.type} @ ${this.state.target.block.x},${this.state.target.block.y},${this.state.target.block.z}`
-      : '無';
     const alive = this.enemies.getAlive().length;
-    const et = this.state.enemyTarget;
-    const enemyName = et?.typeDef?.name || '敵人';
-    const zombieText = et
-      ? ` | 目標：${enemyName} HP ${Math.ceil(et.health)}/${et.maxHealth} | 敵人 ${alive}`
-      : alive > 0
-        ? ` | 敵人存活 ${alive}`
-        : ` | 已擊殺 ${this.state.combat.kills}`;
-    const pointer = document.pointerLockElement === this.canvas ? '指標鎖定' : '滑鼠自由';
-    const fruitLabel = this.state.selectedFruit ? ` [${this.state.selectedFruit.name}]` : '';
-    const multiplayerText = this.state.multiplayer.enabled
-      ? ` | 房間：${this.state.multiplayer.sessionName} (${this.state.multiplayer.sessionPlayerCount}人)`
-      : '';
-    this.statusMessage.textContent = `${fruitLabel} 已選：${selected} | 目標：${target}${zombieText}${multiplayerText} | ${pointer}`;
-    this.statusCoords.textContent = `XYZ ${player.position.x.toFixed(1)} / ${player.position.y.toFixed(1)} / ${player.position.z.toFixed(1)}`;
 
     const hpRatio = player.hp / player.maxHp;
     this.hpText.textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
@@ -300,8 +279,6 @@ export class HUD {
 
   setReady() {
     this.showHomeScreen();
-    this.statusMessage.textContent = '先選擇單人或多人，再進入下一步。';
-    this.statusCoords.textContent = '準備就緒';
   }
 
   showHomeScreen() {

@@ -297,5 +297,5 @@ window.addEventListener('resize', () => scene.resize());
 
 init().catch((error) => {
   console.error(error);
-  document.querySelector('#status-message').textContent = '載入 JonyCraft 資源失敗。';
+  window.alert('載入 JonyCraft 資源失敗，請重新整理頁面後再試一次。');
 });

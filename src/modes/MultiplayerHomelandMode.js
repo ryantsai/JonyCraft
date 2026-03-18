@@ -98,27 +98,32 @@ export class MultiplayerHomelandMode {
 
   _purchaseShopItem(shopItem) {
     if (!this.state.defense.enabled) return;
-    if (this.state.defense.totalGold < shopItem.cost) {
+    const item = SHOP_ITEMS.find(candidate => candidate.id === shopItem?.id);
+    if (!item) {
+      events.emit('status:message', '商店道具資料錯誤');
+      return;
+    }
+    if (this.state.defense.totalGold < item.cost) {
       events.emit('status:message', '金幣不足');
       return;
     }
     // Send purchase to server — server deducts gold authoritatively.
     // Optimistic client-side deduction so UI feels responsive; server state
     // will overwrite on next sync via applyServerState().
-    this.multiplayer.queueHomelandPurchase(shopItem.id);
-    this.state.defense.totalGold -= shopItem.cost;
+    this.multiplayer.queueHomelandPurchase(item.id);
+    this.state.defense.totalGold -= item.cost;
 
     // Service effects are applied server-side (heal HP, repair tower, turret).
     // Inventory items are client-authoritative — add immediately, synced via snapshot.
-    if (shopItem.effect === 'heal') {
-      events.emit('status:message', `恢復了 ${shopItem.effectValue} 生命值`);
-    } else if (shopItem.effect === 'repair_tower') {
-      events.emit('status:message', `修復守護塔 ${shopItem.effectValue} HP`);
-    } else if (shopItem.effect === 'turret') {
+    if (item.effect === 'heal') {
+      events.emit('status:message', `恢復了 ${item.effectValue} 生命值`);
+    } else if (item.effect === 'repair_tower') {
+      events.emit('status:message', `修復守護塔 ${item.effectValue} HP`);
+    } else if (item.effect === 'turret') {
       events.emit('status:message', '放置了自動砲塔');
-    } else if (shopItem.giveItemId) {
+    } else if (item.giveItemId) {
       if (this.inventory) {
-        this.inventory.addItem(shopItem.giveItemId, 1);
+        this.inventory.addItem(item.giveItemId, 1);
       }
     }
     events.emit('sound:click');

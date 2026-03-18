@@ -9,6 +9,19 @@ import { getAnimMod } from '../config/animStyles.js';
 import { FruitVFX } from './FruitVFX.js';
 import { updateCooldownHUD } from './CooldownHUD.js';
 
+function tintDarkPullModel(root) {
+  root.traverse((child) => {
+    if (!child.isMesh || !child.material) return;
+    const materials = Array.isArray(child.material) ? child.material : [child.material];
+    materials.forEach((material) => {
+      if (material.color) material.color.setHex(0x1a1026);
+      if ('emissive' in material && material.emissive) material.emissive.setHex(0x12001c);
+      if ('roughness' in material) material.roughness = 0.92;
+      if ('metalness' in material) material.metalness = 0.02;
+    });
+  });
+}
+
 /**
  * Builds and animates held weapon/skill 3D models in first person.
  * Supports per-fruit color tinting and animation modifiers.
@@ -16,7 +29,7 @@ import { updateCooldownHUD } from './CooldownHUD.js';
  * Screen effects, projectiles, and cooldown HUD are handled by
  * ScreenEffects, ProjectileSystem, and CooldownHUD respectively.
  *
- * Weapon types: sword, punch, cast, slam, uppercut, clap, fire_fist, dirt
+ * Weapon types: sword, punch, cast, slam, uppercut, clap, fire_fist, dark_pull, dirt
  */
 export class WeaponModels {
   constructor(sceneSetup, textureManager, blockMaterials) {
@@ -49,6 +62,7 @@ export class WeaponModels {
     this._buildFireFist();
     this._buildFirePillar();
     this._buildFlameEmperor();
+    this._buildDarkPull();
     this._buildDirtSkill();
     this._fruitVFX.build();
   }
@@ -91,6 +105,8 @@ export class WeaponModels {
       this._animateFirePillar(combat, swingMs, mod, gameState);
     } else if (wt === 'flame_emperor') {
       this._animateFlameEmperor(combat, swingMs, mod, gameState);
+    } else if (wt === 'dark_pull') {
+      this._animateDarkPull(combat, swingMs, mod, gameState);
     } else if (wt === 'dirt') {
       this.models.dirt.group.position.set(0.58, -0.56, -0.72);
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
@@ -855,6 +871,79 @@ export class WeaponModels {
       // Animate burning VFX around the fireball
       this._updateFlameEmperorBurn(m, t);
     }
+  }
+
+  // ── Dark Pull: GLB cloud idle at the bottom-right, then lunges on cast ──
+
+  _buildDarkPull() {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+
+    this.models.dark_pull = {
+      group,
+      glbModel: null,
+      glbLoaded: false,
+      glbBaseScale: new THREE.Vector3(1, 1, 1),
+      idleTime: 0,
+    };
+
+    const loader = new GLTFLoader();
+    loader.load(assetUrl('assets/firstperson/skills/darkfruit/dark_pull.glb'), (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const s = 1.02 / maxDim;
+      model.scale.set(s, s, s);
+
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+      tintDarkPullModel(model);
+
+      group.add(model);
+      this.models.dark_pull.glbModel = model;
+      this.models.dark_pull.glbBaseScale.copy(model.scale);
+      this.models.dark_pull.glbLoaded = true;
+    });
+  }
+
+  _animateDarkPull(combat, swingMs, mod, gameState) {
+    const m = this.models.dark_pull;
+    if (!m) return;
+
+    m.idleTime += 0.016;
+    const t = m.idleTime;
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+    const surge = phase > 0 ? Math.sin(Math.min(1, phase) * Math.PI) : 0;
+    const driftX = Math.sin(t * 1.45) * 0.02;
+    const driftY = Math.cos(t * 1.15) * 0.018;
+    const rollWave = Math.sin(t * 1.8) * 0.05;
+
+    m.group.position.set(
+      0.42 - surge * 0.16 + driftX * 0.6,
+      -0.5 + driftY * 0.6 + surge * 0.08,
+      -0.82 - surge * 0.1,
+    );
+    m.group.rotation.set(
+      0.12 - surge * 0.12 + rollWave * 0.25,
+      -0.25 + surge * 0.18,
+      -0.16 - surge * 0.08 + rollWave * 0.45,
+    );
+
+    if (m.glbModel) {
+      const pulse = 1 + Math.sin(t * 2.1) * 0.06;
+      const stretch = 1 + surge * (0.9 + mod.swirl);
+      const flatten = 0.8 - surge * 0.28;
+      const widen = 1 + surge * 0.45;
+      m.glbModel.scale.set(
+        m.glbBaseScale.x * pulse * stretch,
+        m.glbBaseScale.y * pulse * Math.max(0.35, flatten),
+        m.glbBaseScale.z * pulse * widen,
+      );
+    }
+
+    m.group.visible = gameState.mode === 'playing';
   }
 
   _updateFlameEmperorBurn(m, t) {

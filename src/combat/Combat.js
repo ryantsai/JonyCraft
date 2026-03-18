@@ -60,6 +60,7 @@ export class CombatSystem {
       if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
       else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
       else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
+      else if (skill.weaponType === 'dark_pull') events.emit('combat:dark-pull-cast');
       this._queueHomelandAttack({
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
@@ -73,6 +74,7 @@ export class CombatSystem {
       if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
       else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
       else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
+      else if (skill.weaponType === 'dark_pull') events.emit('combat:dark-pull-cast');
       this._queuePvPAttack({
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
@@ -106,6 +108,10 @@ export class CombatSystem {
     // Fire pillar — AOE centered on player, handled by FireFistSpawner
     if (skill.weaponType === 'fire_pillar') {
       events.emit('combat:fire-pillar-cast');
+      return;
+    }
+    if (skill.weaponType === 'dark_pull') {
+      events.emit('combat:dark-pull-cast');
       return;
     }
 

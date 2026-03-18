@@ -273,7 +273,7 @@ export const FRUITS = [
         damage: 1,
         particleColor: 'purple',
         particleCount: 14,
-        weaponType: 'cast',
+        weaponType: 'dark_pull',
       },
       {
         id: 'black_hole',

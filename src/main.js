@@ -17,6 +17,7 @@ import { ScreenEffects } from './effects/ScreenEffects.js';
 import { ProjectileSystem } from './effects/ProjectileSystem.js';
 import { ExplosionEffect } from './effects/ExplosionEffect.js';
 import { FireFistSpawner } from './effects/FireFistSpawner.js';
+import { DarkPullSpawner } from './effects/DarkPullSpawner.js';
 import { CombatSystem } from './combat/Combat.js';
 import { InputManager } from './input/InputManager.js';
 import { MobileControls } from './input/MobileControls.js';
@@ -83,6 +84,9 @@ const fireFistSpawner = new FireFistSpawner(gameState, scene, weaponModels, proj
 fireFistSpawner.setEnemyManager(enemyManager);
 fireFistSpawner.setExplosionEffect(explosionEffect);
 fireFistSpawner.setWorld(world);
+const darkPullSpawner = new DarkPullSpawner(
+  gameState, scene, weaponModels, targeting, enemyManager, particles, world,
+);
 const soundManager = new SoundManager(gameState);
 const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
 homelandMode.setInventory(inventory);
@@ -186,6 +190,7 @@ function stepSimulation(deltaMs) {
     screenEffects.update(dt);
     projectileSystem.update(dt);
     fireFistSpawner.update(dt);
+    darkPullSpawner.update(dt);
     explosionEffect.update(dt);
     particles.update(dt);
     if (gameState.mode === 'playing') {
@@ -251,6 +256,7 @@ async function init() {
   multiplayerLobby.init();
   screenEffects.init();
   fireFistSpawner.init();
+  darkPullSpawner.init();
   soundManager.init();
   inputManager.init();
   mobileControls.init();

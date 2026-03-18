@@ -157,3 +157,28 @@ TODO
   - WeaponModels.js reduced from ~1450 lines to ~600 lines (weapon building + animation only)
   - Updated main.js to wire ScreenEffects, ProjectileSystem, and FireFistSpawner
   - Updated CLAUDE.md with new file structure and development guidelines
+
+2026-03-18
+- Reworked Dark fruit `dark_pull` into a dedicated weapon/effect path instead of the generic `cast` animation:
+  - changed `src/config/fruits.js` so `dark_pull` uses `weaponType: 'dark_pull'`
+  - updated `src/combat/Combat.js` to emit a new `combat:dark-pull-cast` event in singleplayer, multiplayer homeland, and PvP flows
+- Added a first-person Dark Pull GLB presentation in `src/effects/WeaponModels.js`:
+  - loads `public/assets/firstperson/skills/darkfruit/dark_pull.glb`
+  - tints it into a dark purple/black look
+  - keeps it visible in the lower-right while selected, with a small hover pulse and cast lunge
+- Added `src/effects/DarkPullSpawner.js` and wired it through `src/main.js`:
+  - spawns a ground-hugging dark cloud/puddle that travels toward the current enemy or forward direction
+  - spreads wider as it moves, then leaves a short-lived impact puddle on contact / range end
+  - applies pull-to-player force based on the skill's negative knockback magnitude instead of pushing enemies away
+  - keeps multiplayer behavior visual-only for the new local puddle effect so it does not double-apply damage on top of server/PvP combat paths
+- Verification:
+  - `npm run build` passes after the dark pull changes
+  - direct Playwright verification confirmed the skill flow visually with screenshots:
+    - idle held model visible bottom-right: `output/dark-pull-setup.png`
+    - ground-spread cast frame: `output/dark-pull-cast-verified.png`
+    - mid-impact puddle frame: `output/dark-pull-impact-mid.png`
+  - direct Playwright state checks after firing showed `selectedSkill: "dark_pull"`, active cooldowns during cast, and enemy `knockbackZ` / `knockbackX` values moving toward the player instead of away
+  - bundled `develop-web-game` client still runs against the app (`output/web-game-dark-pull-client/shot-0.png` / `state-0.json`), but its single-selector startup flow still stops at the mode menu, so dark-pull-specific visual validation for now depends on the direct Playwright session above
+
+TODO
+- If you want cleaner automated regression coverage for fruit-specific skills, add a URL/debug hook that can preselect play style + mode + fruit so the bundled `develop-web-game` client can enter the world without multiple DOM clicks.

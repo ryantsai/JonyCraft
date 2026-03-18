@@ -57,7 +57,7 @@ function pickDefenseEntry(enemy, targetPos, dt, ctx) {
   if (!center) return targetPos;
 
   if (!enemy.flankAnchor || enemy.flankAnchorTimer <= 0) {
-    const gateOffset = 6;
+    const gateOffset = 9;
     const gateChoices = [
       [0, -gateOffset],
       [0, gateOffset],

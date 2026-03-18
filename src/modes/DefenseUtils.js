@@ -141,26 +141,118 @@ export function buildTowerVisual({ world, scene, center, defense }) {
   return { towerMesh: placeholder, towerHealthBar: healthBar };
 }
 
+/**
+ * Build the fortress walls around the center. Bigger base (19×19).
+ * 4 gates at cardinal directions, each 3 blocks wide.
+ */
 export function buildFortress(world, centerX, centerZ) {
   const cx = Math.floor(centerX);
   const cz = Math.floor(centerZ);
   const ground = Math.floor(world.getTerrainSurfaceY(cx, cz) - 1);
-  for (let x = -6; x <= 6; x += 1) {
-    for (let z = -6; z <= 6; z += 1) {
+  const HALF = 9; // ±9 → 19×19
+  for (let x = -HALF; x <= HALF; x += 1) {
+    for (let z = -HALF; z <= HALF; z += 1) {
       const ax = cx + x;
       const az = cz + z;
       for (let y = ground + 1; y <= ground + 3; y += 1) {
-        const onOuterWall = Math.abs(x) === 6 || Math.abs(z) === 6;
+        const onOuterWall = Math.abs(x) === HALF || Math.abs(z) === HALF;
         const isGate = (
-          (z === -6 && Math.abs(x) <= 1) ||
-          (z === 6 && Math.abs(x) <= 1) ||
-          (x === -6 && Math.abs(z) <= 1) ||
-          (x === 6 && Math.abs(z) <= 1)
+          (z === -HALF && Math.abs(x) <= 1) ||
+          (z === HALF && Math.abs(x) <= 1) ||
+          (x === -HALF && Math.abs(z) <= 1) ||
+          (x === HALF && Math.abs(z) <= 1)
         );
         if (onOuterWall && !isGate) {
           world.setBlock(ax, y, az, 'brick');
         }
       }
+      // Stone floor inside the fortress
+      if (Math.abs(x) < HALF && Math.abs(z) < HALF) {
+        world.setBlock(ax, ground, az, 'stone');
+      }
     }
   }
+}
+
+/**
+ * Build a merchant NPC model inside the fortress.
+ * Returns { group, position } — a Three.js group and its world position.
+ */
+export function buildMerchantNPC(scene, world, centerX, centerZ) {
+  const ground = world.getTerrainSurfaceY(centerX + 5, centerZ - 5);
+  const merchantPos = new THREE.Vector3(
+    Math.floor(centerX) + 5.5,
+    ground,
+    Math.floor(centerZ) - 5.5,
+  );
+
+  const group = new THREE.Group();
+  group.position.copy(merchantPos);
+
+  // Body
+  const bodyGeo = new THREE.BoxGeometry(0.6, 0.7, 0.35);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 }); // brown robe
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.85;
+  group.add(body);
+
+  // Head
+  const headGeo = new THREE.BoxGeometry(0.45, 0.45, 0.45);
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xf5c6a0 }); // skin tone
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.y = 1.45;
+  group.add(head);
+
+  // Hat (merchant cap)
+  const hatGeo = new THREE.BoxGeometry(0.55, 0.2, 0.55);
+  const hatMat = new THREE.MeshStandardMaterial({ color: 0xffd966 }); // gold cap
+  const hat = new THREE.Mesh(hatGeo, hatMat);
+  hat.position.y = 1.78;
+  group.add(hat);
+
+  // Arms
+  const armGeo = new THREE.BoxGeometry(0.2, 0.55, 0.25);
+  const armMat = new THREE.MeshStandardMaterial({ color: 0x7a3d10 });
+  const leftArm = new THREE.Mesh(armGeo, armMat);
+  leftArm.position.set(-0.45, 0.85, 0);
+  group.add(leftArm);
+  const rightArm = new THREE.Mesh(armGeo, armMat);
+  rightArm.position.set(0.45, 0.85, 0);
+  group.add(rightArm);
+
+  // Legs
+  const legGeo = new THREE.BoxGeometry(0.22, 0.5, 0.25);
+  const legMat = new THREE.MeshStandardMaterial({ color: 0x5a3510 });
+  const leftLeg = new THREE.Mesh(legGeo, legMat);
+  leftLeg.position.set(-0.16, 0.25, 0);
+  group.add(leftLeg);
+  const rightLeg = new THREE.Mesh(legGeo, legMat);
+  rightLeg.position.set(0.16, 0.25, 0);
+  group.add(rightLeg);
+
+  // Name label sprite
+  const labelCanvas = document.createElement('canvas');
+  labelCanvas.width = 256;
+  labelCanvas.height = 48;
+  const ctx = labelCanvas.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.roundRect(0, 0, 256, 48, 8);
+  ctx.fill();
+  ctx.fillStyle = '#ffd966';
+  ctx.font = 'bold 26px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('商人 [E]', 128, 24);
+  const labelTexture = new THREE.CanvasTexture(labelCanvas);
+  labelTexture.minFilter = THREE.LinearFilter;
+  const labelSprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: labelTexture, depthTest: false }),
+  );
+  labelSprite.scale.set(2.4, 0.45, 1);
+  labelSprite.position.y = 2.2;
+  group.add(labelSprite);
+
+  scene.enemyGroup.add(group);
+
+  return { group, position: merchantPos };
 }

@@ -179,26 +179,6 @@ body {
   color: rgba(244, 235, 212, 0.95);
 }
 
-.defense-shop {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.defense-shop-btn {
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 217, 102, 0.3);
-  background: rgba(255, 217, 102, 0.08);
-  color: #fff3cc;
-  font: inherit;
-  font-size: 0.74rem;
-  cursor: pointer;
-}
-
-
 .player-health-bar {
   position: absolute;
   top: 18px; right: 18px;
@@ -1207,7 +1187,7 @@ body {
 
 /* ── Responsive ── */
 @media (max-width: 720px) {
-  .defense-scoreboard { display: none !important; }
+  .defense-scoreboard { width: 200px; font-size: 0.72rem; top: 72px; right: 8px; padding: 8px; }
   .status-bar { display: none !important; }
 
   .hotbar {
@@ -1226,52 +1206,7 @@ body {
 
   .start-panel { padding: 24px 20px 20px; }
 
-  
-.defense-scoreboard {
-  position: absolute;
-  top: 92px;
-  right: 18px;
-  width: 280px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 217, 102, 0.35);
-  background: rgba(10, 17, 26, 0.75);
-  backdrop-filter: blur(10px);
-  pointer-events: auto;
-  display: none;
-  gap: 6px;
-}
-
-.defense-scoreboard[data-visible='true'] {
-  display: grid;
-}
-
-.defense-row {
-  font-size: 0.82rem;
-  color: rgba(244, 235, 212, 0.95);
-}
-
-.defense-shop {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.defense-shop-btn {
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 217, 102, 0.3);
-  background: rgba(255, 217, 102, 0.08);
-  color: #fff3cc;
-  font: inherit;
-  font-size: 0.74rem;
-  cursor: pointer;
-}
-
-
-.player-health-bar {
+  .player-health-bar {
     top: 12px; right: 12px;
     width: 160px;
     padding: 8px 10px;
@@ -1717,6 +1652,145 @@ body {
   font-size: 0.62rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MERCHANT SHOP PANEL
+   ══════════════════════════════════════════════════════════ */
+
+.merchant-shop-panel {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(480px, calc(100vh - 80px));
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 217, 102, 0.35);
+  background: rgba(9, 16, 24, 0.92);
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 10;
+}
+
+.merchant-shop-panel[data-visible='true'] {
+  display: flex;
+}
+
+.merchant-shop-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.merchant-shop-title {
+  font-size: 1rem;
+  font-weight: 900;
+  color: var(--gold-bright);
+  flex: 0;
+  white-space: nowrap;
+}
+
+.merchant-gold-label {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.merchant-close-btn {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.merchant-shop-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  overflow-y: auto;
+  max-height: 360px;
+}
+
+.merchant-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 217, 102, 0.2);
+  border-radius: 10px;
+  background: rgba(16, 24, 36, 0.7);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-align: left;
+}
+
+.merchant-item:hover {
+  background: rgba(255, 217, 102, 0.08);
+  border-color: rgba(255, 217, 102, 0.4);
+}
+
+.merchant-item[data-affordable='false'] {
+  opacity: 0.45;
+}
+
+.merchant-item-icon {
+  width: 32px; height: 32px;
+  image-rendering: pixelated;
+  flex-shrink: 0;
+}
+
+.merchant-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.merchant-item-name {
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.merchant-item-desc {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+}
+
+.merchant-item-cost {
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--gold);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.defense-hint {
+  font-size: 0.72rem;
+  color: var(--gold);
+  margin-top: 4px;
+}
+
+.touch-interact-btn {
+  display: none;
+}
+
+.touch-interact-btn[data-visible='true'] {
+  display: block;
 }
 
 /* ══════════════════════════════════════════════════════════

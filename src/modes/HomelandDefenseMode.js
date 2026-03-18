@@ -3,7 +3,8 @@ import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
 import { GameMode } from './GameMode.js';
-import { updateTowerHealthBar, buildFortress, buildTowerCollision, buildTowerVisual } from './DefenseUtils.js';
+import { updateTowerHealthBar, buildFortress, buildTowerCollision, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
+import { MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -31,6 +32,13 @@ export class HomelandDefenseMode extends GameMode {
     this.turrets = [];
     this._turretTick = 0;
     this._unsubs = [];
+    this.merchantNPC = null;
+    this.merchantPos = null;
+    this.inventory = null;
+  }
+
+  setInventory(inventory) {
+    this.inventory = inventory;
   }
 
   activate(context) {
@@ -50,11 +58,13 @@ export class HomelandDefenseMode extends GameMode {
     buildFortress(this.world, this.center.x, this.center.z);
     buildTowerCollision(this.world, this.center.x, this.center.z);
     this._buildTowerVisual();
+    this._buildMerchant();
     this.startNextWave();
 
     this._unsubs.push(
       events.on('enemy:killed', ({ enemy }) => this._onEnemyKilled(enemy)),
-      events.on('shop:purchase', ({ item }) => this.purchase(item)),
+      events.on('merchant:interact', () => this._onMerchantInteract()),
+      events.on('merchant:purchase', ({ shopItem }) => this._purchaseShopItem(shopItem)),
     );
   }
 
@@ -132,16 +142,57 @@ export class HomelandDefenseMode extends GameMode {
     this.state.defense.totalGold += gold;
   }
 
-  purchase(item) {
-    if (!this.state.defense.enabled) return;
-    const costs = { heal: 15, tower: 25, turret: 40 };
-    const cost = costs[item];
-    if (!cost || this.state.defense.totalGold < cost) return;
-    this.state.defense.totalGold -= cost;
+  _buildMerchant() {
+    if (this.merchantNPC) return;
+    const result = buildMerchantNPC(this.scene, this.world, this.center.x, this.center.z);
+    this.merchantNPC = result.group;
+    this.merchantPos = result.position;
+  }
 
-    if (item === 'heal') this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + 45);
-    if (item === 'tower') this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + 80);
-    if (item === 'turret') this._placeTurret();
+  _isNearMerchant() {
+    if (!this.merchantPos) return false;
+    const p = this.state.player.position;
+    const dx = p.x - this.merchantPos.x;
+    const dz = p.z - this.merchantPos.z;
+    return dx * dx + dz * dz < MERCHANT_INTERACT_RANGE * MERCHANT_INTERACT_RANGE;
+  }
+
+  _onMerchantInteract() {
+    if (!this.state.defense.enabled) return;
+    if (!this._isNearMerchant()) {
+      events.emit('status:message', '離商人太遠了');
+      return;
+    }
+    events.emit('merchant:open');
+  }
+
+  _purchaseShopItem(shopItem) {
+    if (!this.state.defense.enabled) return;
+    if (this.state.defense.totalGold < shopItem.cost) {
+      events.emit('status:message', '金幣不足');
+      return;
+    }
+    this.state.defense.totalGold -= shopItem.cost;
+
+    // Service effects
+    if (shopItem.effect === 'heal') {
+      this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + shopItem.effectValue);
+      events.emit('status:message', `恢復了 ${shopItem.effectValue} 生命值`);
+    } else if (shopItem.effect === 'repair_tower') {
+      this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + shopItem.effectValue);
+      events.emit('status:message', `修復守護塔 ${shopItem.effectValue} HP`);
+    } else if (shopItem.effect === 'turret') {
+      this._placeTurret();
+      events.emit('status:message', '放置了自動砲塔');
+    } else if (shopItem.giveItemId) {
+      // Give item to inventory
+      if (this.inventory) {
+        this.inventory.addItem(shopItem.giveItemId, 1);
+      }
+    }
+    events.emit('sound:click');
+    events.emit('hud:update');
+    events.emit('merchant:refreshShop');
   }
 
   _placeTurret() {

@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { events } from '../core/EventBus.js';
-import { updateTowerHealthBar, buildFortress, buildTowerVisual } from './DefenseUtils.js';
+import { updateTowerHealthBar, buildFortress, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
+import { SHOP_ITEMS, MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
 
 export class MultiplayerHomelandMode {
   constructor(gameState, world, enemyManager, scene, multiplayerClient) {
@@ -15,7 +16,14 @@ export class MultiplayerHomelandMode {
     this.towerMesh = null;
     this.towerHealthBar = null;
     this.turretMeshes = new Map();
-    this._unsubscribeShop = null;
+    this._unsubs = [];
+    this.merchantNPC = null;
+    this.merchantPos = null;
+    this.inventory = null;
+  }
+
+  setInventory(inventory) {
+    this.inventory = inventory;
   }
 
   activate() {
@@ -24,10 +32,12 @@ export class MultiplayerHomelandMode {
     this.state.defense.status = 'waiting';
     this._buildFortress();
     this._buildTowerVisual();
-    if (!this._unsubscribeShop) {
-      this._unsubscribeShop = events.on('shop:purchase', ({ item }) => {
-        this.multiplayer.queueHomelandPurchase(item);
-      });
+    this._buildMerchant();
+    if (this._unsubs.length === 0) {
+      this._unsubs.push(
+        events.on('merchant:interact', () => this._onMerchantInteract()),
+        events.on('merchant:purchase', ({ shopItem }) => this._purchaseShopItem(shopItem)),
+      );
     }
   }
 
@@ -60,6 +70,60 @@ export class MultiplayerHomelandMode {
 
     this._buildTowerVisual();
     this._syncTurretVisuals();
+  }
+
+  _buildMerchant() {
+    if (this.merchantNPC) return;
+    const result = buildMerchantNPC(this.scene, this.world, this.center.x, this.center.z);
+    this.merchantNPC = result.group;
+    this.merchantPos = result.position;
+  }
+
+  _isNearMerchant() {
+    if (!this.merchantPos) return false;
+    const p = this.state.player.position;
+    const dx = p.x - this.merchantPos.x;
+    const dz = p.z - this.merchantPos.z;
+    return dx * dx + dz * dz < MERCHANT_INTERACT_RANGE * MERCHANT_INTERACT_RANGE;
+  }
+
+  _onMerchantInteract() {
+    if (!this.state.defense.enabled) return;
+    if (!this._isNearMerchant()) {
+      events.emit('status:message', '離商人太遠了');
+      return;
+    }
+    events.emit('merchant:open');
+  }
+
+  _purchaseShopItem(shopItem) {
+    if (!this.state.defense.enabled) return;
+    if (this.state.defense.totalGold < shopItem.cost) {
+      events.emit('status:message', '金幣不足');
+      return;
+    }
+    // Send purchase to server — server deducts gold authoritatively.
+    // Optimistic client-side deduction so UI feels responsive; server state
+    // will overwrite on next sync via applyServerState().
+    this.multiplayer.queueHomelandPurchase(shopItem.id);
+    this.state.defense.totalGold -= shopItem.cost;
+
+    // Service effects are applied server-side (heal HP, repair tower, turret).
+    // Inventory items are client-authoritative — add immediately, synced via snapshot.
+    if (shopItem.effect === 'heal') {
+      events.emit('status:message', `恢復了 ${shopItem.effectValue} 生命值`);
+    } else if (shopItem.effect === 'repair_tower') {
+      events.emit('status:message', `修復守護塔 ${shopItem.effectValue} HP`);
+    } else if (shopItem.effect === 'turret') {
+      events.emit('status:message', '放置了自動砲塔');
+    } else if (shopItem.giveItemId) {
+      if (this.inventory) {
+        this.inventory.addItem(shopItem.giveItemId, 1);
+      }
+    }
+    events.emit('sound:click');
+    events.emit('hud:update');
+    events.emit('merchant:refreshShop');
   }
 
   _buildTowerVisual() {

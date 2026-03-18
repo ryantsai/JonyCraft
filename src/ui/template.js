@@ -27,11 +27,7 @@ export const gameTemplate = `
       <div id="defense-scoreboard" class="defense-scoreboard" data-visible="false" aria-label="保衛家園記分板">
         <div class="defense-row">波次 <span id="def-wave">1</span> · 倒數 <span id="def-timer">60</span>s</div>
         <div class="defense-row">總擊殺 <span id="def-kills">0</span> · 金幣 <span id="def-gold">0</span></div>
-        <div class="defense-shop">
-          <button class="defense-shop-btn" data-shop-item="heal" type="button">+45 生命 (15金)</button>
-          <button class="defense-shop-btn" data-shop-item="tower" type="button">修復塔 (25金)</button>
-          <button class="defense-shop-btn" data-shop-item="turret" type="button">自動砲塔 (40金)</button>
-        </div>
+        <div class="defense-hint">找到商人按 E 購買道具</div>
       </div>
       <div class="player-health-bar" aria-label="生命值">
         <div class="health-label">❤ <span id="hp-text">100 / 100</span></div>
@@ -55,6 +51,14 @@ export const gameTemplate = `
         <div id="inventory-grid" class="inventory-grid"></div>
         <div class="inventory-hint">點擊道具裝備至技能欄 · 右鍵卸除技能欄道具</div>
       </div>
+      <div id="merchant-shop-panel" class="merchant-shop-panel" data-visible="false">
+        <div class="merchant-shop-header">
+          <span class="merchant-shop-title">商人</span>
+          <span id="merchant-gold-label" class="merchant-gold-label">金幣: 0</span>
+          <button id="merchant-close-btn" class="merchant-close-btn" type="button">✕</button>
+        </div>
+        <div id="merchant-shop-grid" class="merchant-shop-grid"></div>
+      </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">
         <div class="stick-cluster">
@@ -66,6 +70,7 @@ export const gameTemplate = `
           <button id="touch-jump" type="button">跳躍</button>
           <button id="touch-primary" type="button">使用</button>
           <button id="touch-secondary" type="button">放置</button>
+          <button id="touch-interact" type="button" class="touch-interact-btn" data-visible="false">互動</button>
         </div>
         <button id="touch-fullscreen" class="mobile-fullscreen-btn" type="button">⛶</button>
       </div>
@@ -180,6 +185,10 @@ export const gameTemplate = `
             <div class="control-item">
               <kbd>Tab / I</kbd>
               <span>背包</span>
+            </div>
+            <div class="control-item">
+              <kbd>E</kbd>
+              <span>互動</span>
             </div>
           </div>
         </div>

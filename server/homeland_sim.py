@@ -200,10 +200,35 @@ def process_attack(session: SessionRecord, player_name: str, attack: dict[str, A
         _award_enemy_defeat(player.state, defense, enemy)
 
 
+# Shop item definitions mirroring client shopItems.js
+# Items with effect are services (applied server-side).
+# Items with giveItemId are inventory items (applied client-side via snapshot sync).
+SHOP_COSTS: dict[str, int] = {
+    "heal": 15,
+    "tower": 25,
+    "turret": 40,
+    "buy_potion_hp": 20,
+    "buy_potion_hp_large": 40,
+    "buy_crystal_power": 35,
+    "buy_feather_swift": 25,
+    "buy_blast_orb": 30,
+    "buy_shield_scroll": 45,
+    "buy_hammer": 80,
+    "buy_spear": 60,
+    "buy_bow": 70,
+}
+
+# Items that only deduct gold server-side; the client adds to inventory via snapshot sync
+SHOP_ITEM_ONLY = {
+    "buy_potion_hp", "buy_potion_hp_large", "buy_crystal_power",
+    "buy_feather_swift", "buy_blast_orb", "buy_shield_scroll",
+    "buy_hammer", "buy_spear", "buy_bow",
+}
+
+
 def process_purchase(session: SessionRecord, player_name: str, purchase: str) -> None:
     defense = ensure_homeland_state(session)
-    costs = {"heal": 15, "tower": 25, "turret": 40}
-    cost = costs.get(purchase)
+    cost = SHOP_COSTS.get(purchase)
     if cost is None or defense["totalGold"] < cost:
         return
     defense["totalGold"] -= cost
@@ -211,6 +236,10 @@ def process_purchase(session: SessionRecord, player_name: str, purchase: str) ->
     if buyer is not None:
         buyer.state.setdefault("scoreGold", 0)
         buyer.state["scoreGold"] = max(0, float(buyer.state["scoreGold"]) - cost)
+
+    # Inventory items: gold deducted server-side, item added client-side
+    if purchase in SHOP_ITEM_ONLY:
+        return
 
     if purchase == "tower":
         defense["towerHp"] = min(defense["towerMaxHp"], defense["towerHp"] + 80)
@@ -232,10 +261,11 @@ def process_purchase(session: SessionRecord, player_name: str, purchase: str) ->
         return
 
     if purchase == "heal":
-        for player in session.players.values():
-            player.state.setdefault("serverMaxHp", 100.0)
-            player.state.setdefault("serverHp", player.state["serverMaxHp"])
-            player.state["serverHp"] = min(player.state["serverMaxHp"], player.state["serverHp"] + 45)
+        # Heal only the buyer, not all players
+        if buyer is not None:
+            buyer.state.setdefault("serverMaxHp", 100.0)
+            buyer.state.setdefault("serverHp", buyer.state["serverMaxHp"])
+            buyer.state["serverHp"] = min(buyer.state["serverMaxHp"], buyer.state["serverHp"] + 45)
 
 
 def process_actions(session: SessionRecord, player_name: str, actions: dict[str, Any], server_time: float) -> None:

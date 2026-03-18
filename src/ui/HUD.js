@@ -2,6 +2,7 @@ import { events } from '../core/EventBus.js';
 import { FRUITS } from '../config/fruits.js';
 import { SKINS } from '../config/skins.js';
 import { ITEMS, ALL_ITEM_IDS, RARITY_COLORS } from '../config/items.js';
+import { SHOP_ITEMS } from '../config/shopItems.js';
 
 /**
  * HUD: hotbar, status bar, and start screen management.
@@ -46,6 +47,10 @@ export class HUD {
     this.defTimer = document.querySelector('#def-timer');
     this.defKills = document.querySelector('#def-kills');
     this.defGold = document.querySelector('#def-gold');
+    this.merchantPanel = document.querySelector('#merchant-shop-panel');
+    this.merchantGrid = document.querySelector('#merchant-shop-grid');
+    this.merchantCloseBtn = document.querySelector('#merchant-close-btn');
+    this.merchantGoldLabel = document.querySelector('#merchant-gold-label');
     this.disconnectTimer = null;
   }
 
@@ -104,11 +109,11 @@ export class HUD {
     this.rebuildHotbar();
     this.showHomeScreen();
 
-    document.querySelectorAll('.defense-shop-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        events.emit('sound:click');
-        events.emit('shop:purchase', { item: btn.dataset.shopItem });
-      });
+    events.on('merchant:open', () => this._openMerchantShop());
+    events.on('merchant:refreshShop', () => this._rebuildMerchantShop());
+    this.merchantCloseBtn.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._closeMerchantShop();
     });
 
     this._initDebugPanel();
@@ -220,6 +225,12 @@ export class HUD {
     // Show debug panel only in test mode while playing
     const showDebug = this.state.mode === 'playing' && this.state.gameMode === 'test';
     this.debugPanel.dataset.visible = showDebug ? 'true' : 'false';
+
+    // Show mobile interact button in homeland mode
+    const touchInteract = document.querySelector('#touch-interact');
+    if (touchInteract) {
+      touchInteract.dataset.visible = this.state.defense.enabled ? 'true' : 'false';
+    }
 
     const defense = this.state.defense;
     this.defenseBoard.dataset.visible = defense.enabled ? 'true' : 'false';
@@ -503,6 +514,57 @@ export class HUD {
       empty.textContent = '背包是空的';
       this.inventoryGrid.appendChild(empty);
     }
+  }
+
+  _openMerchantShop() {
+    this.merchantPanel.dataset.visible = 'true';
+    this._rebuildMerchantShop();
+  }
+
+  _closeMerchantShop() {
+    this.merchantPanel.dataset.visible = 'false';
+  }
+
+  _rebuildMerchantShop() {
+    if (this.merchantPanel.dataset.visible !== 'true') return;
+    const gold = this.state.defense.totalGold;
+    this.merchantGoldLabel.textContent = `金幣: ${gold}`;
+    this.merchantGrid.textContent = '';
+
+    SHOP_ITEMS.forEach((shopItem) => {
+      const card = document.createElement('button');
+      card.className = 'merchant-item';
+      card.type = 'button';
+      const canAfford = gold >= shopItem.cost;
+      card.dataset.affordable = canAfford ? 'true' : 'false';
+
+      const icon = document.createElement('img');
+      icon.className = 'merchant-item-icon';
+      icon.src = shopItem.icon;
+      icon.alt = shopItem.name;
+
+      const info = document.createElement('div');
+      info.className = 'merchant-item-info';
+
+      const name = document.createElement('span');
+      name.className = 'merchant-item-name';
+      name.textContent = shopItem.name;
+
+      const desc = document.createElement('span');
+      desc.className = 'merchant-item-desc';
+      desc.textContent = shopItem.desc;
+
+      const cost = document.createElement('span');
+      cost.className = 'merchant-item-cost';
+      cost.textContent = `${shopItem.cost} 金`;
+
+      info.append(name, desc);
+      card.append(icon, info, cost);
+      card.addEventListener('click', () => {
+        events.emit('merchant:purchase', { shopItem });
+      });
+      this.merchantGrid.appendChild(card);
+    });
   }
 
   _renderMultiplayerStats(players) {

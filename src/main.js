@@ -60,12 +60,12 @@ const projectileSystem = new ProjectileSystem(scene, particles, enemyManager, wo
 projectileSystem.setExplosionEffect(explosionEffect);
 const multiplayer = new MultiplayerClient(gameState, world);
 const combat = new CombatSystem(gameState, world, targeting, enemyManager, particles, multiplayer);
+const inventory = new Inventory(gameState, world);
+inventory.setEnemyManager(enemyManager);
 const inputManager = new InputManager(gameState, canvas, combat);
+inputManager.setInventory(inventory);
 // Wire remote players for PvP targeting after remotePlayers is created below
 const mobileControls = new MobileControls(inputManager, combat, gameState);
-const inventory = new Inventory(gameState, world);
-inputManager.setInventory(inventory);
-inventory.setEnemyManager(enemyManager);
 const hud = new HUD(gameState, canvas, enemyManager);
 hud.setInventory(inventory);
 const fruitSelect = new FruitSelect(gameState);
@@ -85,9 +85,11 @@ fireFistSpawner.setExplosionEffect(explosionEffect);
 fireFistSpawner.setWorld(world);
 const soundManager = new SoundManager(gameState);
 const homelandMode = new HomelandDefenseMode(gameState, world, enemyManager, scene);
+homelandMode.setInventory(inventory);
 const multiplayerHomelandMode = new MultiplayerHomelandMode(
   gameState, world, enemyManager, scene, multiplayer,
 );
+multiplayerHomelandMode.setInventory(inventory);
 multiplayer.attachHomelandMode(multiplayerHomelandMode);
 
 // --- Wire events ---

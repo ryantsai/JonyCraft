@@ -41,6 +41,11 @@ export class InputManager {
         events.emit('inventory:toggle');
       }
 
+      // Interact with nearby NPC (merchant)
+      if (event.code === 'KeyE') {
+        events.emit('merchant:interact');
+      }
+
       if (event.code === 'KeyF') this._toggleFullscreen();
       if (
         event.code === 'Enter' &&

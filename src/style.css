@@ -417,6 +417,13 @@ body {
   border-color: rgba(110, 198, 255, 0.85);
 }
 
+.hotbar-item[data-empty='true'] {
+  background: rgba(16, 25, 34, 0.5);
+  border-color: rgba(255, 255, 255, 0.06);
+  cursor: default;
+  pointer-events: none;
+}
+
 .hotbar-item { position: relative; overflow: hidden; }
 
 .slot-number { font-size: 0.58rem; color: rgba(255, 246, 214, 0.86); position: relative; z-index: 1; }

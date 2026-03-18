@@ -96,7 +96,6 @@ export class HUD {
     });
 
     events.on('hotbar:rebuild', () => this.rebuildHotbar());
-    events.on('hotbar:scroll', (delta) => this.moveSelection(delta));
     events.on('hud:update', () => this.update());
     events.on('game:enter', () => this.enterWorld());
     events.on('status:message', (message) => { this.statusMessage.textContent = message; });
@@ -141,62 +140,59 @@ export class HUD {
   rebuildHotbar() {
     const skills = this.state.activeSkills;
     this.hotbar.textContent = '';
-    skills.forEach((skill, index) => {
+    for (let index = 0; index < 9; index++) {
+      const skill = skills[index];
       const item = document.createElement('button');
       item.className = 'hotbar-item';
       item.type = 'button';
       item.dataset.selected = String(index === this.state.selectedIndex);
-      if (skill._itemId) item.dataset.isItem = 'true';
-      item.style.setProperty('--icon', `url("${skill.icon}")`);
 
       const slotNum = document.createElement('span');
       slotNum.className = 'slot-number';
-      slotNum.textContent = index < 9 ? String(index + 1) : '0';
+      slotNum.textContent = String(index + 1);
 
-      const slotName = document.createElement('span');
-      slotName.className = 'slot-name';
-      slotName.textContent = skill.name;
+      if (skill) {
+        if (skill._itemId) item.dataset.isItem = 'true';
+        item.style.setProperty('--icon', `url("${skill.icon}")`);
 
-      if (skill.kind === 'attack' && skill.damage !== undefined) {
-        const stats = document.createElement('span');
-        stats.className = 'skill-stats';
-        stats.textContent = `ATK ${skill.damage} · 範圍 ${skill.range} · CD ${skill.cooldownMs}ms`;
-        item.appendChild(stats);
-      }
+        const slotName = document.createElement('span');
+        slotName.className = 'slot-name';
+        slotName.textContent = skill.name;
 
-      // Show uses count for consumable items
-      if (skill.kind === 'consumable' && skill._uses !== undefined && skill._uses !== Infinity) {
-        const uses = document.createElement('span');
-        uses.className = 'slot-uses';
-        uses.textContent = `×${skill._uses}`;
-        item.appendChild(uses);
-      }
-
-      item.append(slotNum, slotName);
-      item.addEventListener('click', () => {
-        this.state.selectedIndex = index;
-        events.emit('sound:click');
-        this.rebuildHotbar();
-        this.update();
-      });
-      // Right-click to unequip items
-      item.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (skill._itemId && this.inventory) {
-          this.inventory.unequipFromHotbar(index);
+        if (skill.kind === 'attack' && skill.damage !== undefined) {
+          const stats = document.createElement('span');
+          stats.className = 'skill-stats';
+          stats.textContent = `ATK ${skill.damage} · 範圍 ${skill.range} · CD ${skill.cooldownMs}ms`;
+          item.appendChild(stats);
         }
-      });
+
+        if (skill.kind === 'consumable' && skill._uses !== undefined && skill._uses !== Infinity) {
+          const uses = document.createElement('span');
+          uses.className = 'slot-uses';
+          uses.textContent = `×${skill._uses}`;
+          item.appendChild(uses);
+        }
+
+        item.append(slotNum, slotName);
+        item.addEventListener('click', () => {
+          this.state.selectedIndex = index;
+          events.emit('sound:click');
+          this.rebuildHotbar();
+          this.update();
+        });
+        item.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          if (skill._itemId && this.inventory) {
+            this.inventory.unequipFromHotbar(index);
+          }
+        });
+      } else {
+        item.dataset.empty = 'true';
+        item.appendChild(slotNum);
+      }
       this.hotbar.appendChild(item);
-    });
+    }
   }
-
-  moveSelection(delta) {
-    const total = this.state.activeSkills.length;
-    this.state.selectedIndex = (this.state.selectedIndex + delta + total) % total;
-    this.rebuildHotbar();
-    this.update();
-  }
-
   update() {
     const player = this.state.player;
     const selected = this.state.getSelectedSkill().name;

@@ -2,7 +2,7 @@ import { events } from './EventBus.js';
 import { ITEMS, LOOT_TABLES } from '../config/items.js';
 import { MOVE_SPEED, PLAYER_MAX_HP, WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 
-const MAX_HOTBAR_SLOTS = 10;
+const MAX_HOTBAR_SLOTS = 9;
 
 /**
  * Inventory system. Manages the player's bag of collected items,

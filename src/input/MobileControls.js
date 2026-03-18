@@ -1,3 +1,5 @@
+import { events } from '../core/EventBus.js';
+
 /**
  * Virtual gamepad for mobile devices: move pad, swipe-to-look, action buttons.
  */
@@ -43,6 +45,13 @@ export class MobileControls {
       if (this.state.getSelectedSkill().kind === 'block') this.combat.handlePlace();
     });
 
+    const touchInteract = document.querySelector('#touch-interact');
+    if (touchInteract) {
+      this._bindHold(touchInteract, () => {
+        events.emit('merchant:interact');
+      });
+    }
+
     const fullscreenBtn = document.querySelector('#touch-fullscreen');
     const doc = document.documentElement;
     const canFullscreen = doc.requestFullscreen || doc.webkitRequestFullscreen;
@@ -79,7 +88,7 @@ export class MobileControls {
     document.addEventListener('touchstart', (e) => {
       if (this.state.mode !== 'playing' || activeId !== null) return;
       // Ignore touches that land on interactive mobile controls
-      const el = e.target.closest('.touch-pad, .mobile-actions, .defense-scoreboard, .hotbar, .start-screen');
+      const el = e.target.closest('.touch-pad, .mobile-actions, .defense-scoreboard, .hotbar, .start-screen, .merchant-shop-panel, .inventory-panel');
       if (el) return;
       const t = e.changedTouches[0];
       activeId = t.identifier;

@@ -14,6 +14,11 @@ export class CombatSystem {
     this.enemies = enemyManager;
     this.particles = particles;
     this.multiplayer = multiplayerClient;
+    this.remotePlayers = null;
+  }
+
+  setRemotePlayers(remotePlayers) {
+    this.remotePlayers = remotePlayers;
   }
 
   /**
@@ -28,6 +33,7 @@ export class CombatSystem {
     if (!skill || skill.kind !== 'attack') return;
 
     combat.cooldown = skill.cooldownMs;
+    combat.attackSeq = (combat.attackSeq || 0) + 1;
 
     // Drive the correct weapon animation
     if (skill.weaponType === 'sword') {
@@ -48,6 +54,46 @@ export class CombatSystem {
       });
     }
 
+    // In multiplayer homeland, all attacks go through the server
+    if (this._shouldUseServerHomelandAttack()) {
+      // Still emit VFX events for fire skills so local player sees effects
+      if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
+      else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
+      else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
+      this._queueHomelandAttack({
+        range: skill.range,
+        damageMultiplier: skill.damage ?? 1,
+        cooldownMs: skill.cooldownMs,
+      });
+      return;
+    }
+
+    // PvP attack in multiplayer test mode
+    if (this._shouldUsePvPAttack()) {
+      if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
+      else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
+      else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
+      this._queuePvPAttack({
+        range: skill.range,
+        damageMultiplier: skill.damage ?? 1,
+        cooldownMs: skill.cooldownMs,
+        knockbackStrength: skill.knockback,
+        particleColor: skill.particleColor,
+        particleCount: skill.particleCount,
+      });
+      // Also try to hit local enemies (mobs in test mode)
+      if (!['fire_fist', 'flame_emperor', 'fire_pillar'].includes(skill.weaponType)) {
+        this._attackEnemy({
+          range: skill.range,
+          knockbackStrength: skill.knockback,
+          particleColor: skill.particleColor,
+          particleCount: skill.particleCount,
+          damageMultiplier: skill.damage ?? 1,
+        });
+      }
+      return;
+    }
+
     // Projectile-based weapon types — damage is handled by the projectile on hit
     if (skill.weaponType === 'fire_fist') {
       events.emit('combat:fire-fist-shoot');
@@ -60,15 +106,6 @@ export class CombatSystem {
     // Fire pillar — AOE centered on player, handled by FireFistSpawner
     if (skill.weaponType === 'fire_pillar') {
       events.emit('combat:fire-pillar-cast');
-      return;
-    }
-
-    if (this._shouldUseServerHomelandAttack()) {
-      this._queueHomelandAttack({
-        range: skill.range,
-        damageMultiplier: skill.damage ?? 1,
-        cooldownMs: skill.cooldownMs,
-      });
       return;
     }
 
@@ -116,6 +153,77 @@ export class CombatSystem {
 
   _shouldUseServerHomelandAttack() {
     return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'homeland';
+  }
+
+  _shouldUsePvPAttack() {
+    return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'test';
+  }
+
+  _queuePvPAttack({ range, damageMultiplier, cooldownMs, knockbackStrength, particleColor, particleCount }) {
+    if (!this.remotePlayers) return;
+    const playerPos = this.state.player.position;
+    const forward = new THREE.Vector3(
+      -Math.sin(this.state.player.yaw), 0, -Math.cos(this.state.player.yaw),
+    );
+    let bestTarget = null;
+    let bestAvatar = null;
+    let bestScore = -Infinity;
+
+    this.remotePlayers.avatars.forEach((avatar, name) => {
+      if (avatar.isDead) return;
+      const toTarget = new THREE.Vector3().subVectors(avatar.root.position, playerPos);
+      const distance = toTarget.length();
+      if (distance > range + 1.0) return;
+      toTarget.y = 0;
+      if (toTarget.lengthSq() < 0.001) {
+        bestTarget = name;
+        bestAvatar = avatar;
+        bestScore = Infinity;
+        return;
+      }
+      toTarget.normalize();
+      const facing = forward.dot(toTarget);
+      const score = facing * 10 - distance;
+      if (facing > 0.2 && score > bestScore) {
+        bestScore = score;
+        bestTarget = name;
+        bestAvatar = avatar;
+      }
+    });
+
+    if (!bestTarget) return;
+
+    // Apply knockback visually on the remote avatar
+    if (bestAvatar && knockbackStrength) {
+      const away = new THREE.Vector3().subVectors(bestAvatar.root.position, playerPos);
+      away.y = 0;
+      if (away.lengthSq() < 0.001) {
+        away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
+      }
+      away.normalize();
+      const kbDir = knockbackStrength < 0 ? -1 : 1;
+      const kbMag = Math.abs(knockbackStrength);
+      this.remotePlayers.applyKnockback(bestTarget, away, kbMag * kbDir);
+    }
+
+    // Spawn hit particles on target
+    if (bestAvatar && particleColor) {
+      events.emit('sound:hit');
+      this.particles.spawn(
+        bestAvatar.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
+        particleColor, particleCount ?? 6,
+      );
+    }
+
+    const skill = this.state.getSelectedSkill();
+    this.multiplayer?.queuePvPAttack({
+      targetPlayer: bestTarget,
+      range,
+      damageMultiplier,
+      cooldownMs,
+      knockback: knockbackStrength ?? 0,
+      weaponType: skill?.weaponType ?? '',
+    });
   }
 
   _queueHomelandAttack({ range, damageMultiplier, cooldownMs }) {

@@ -12,6 +12,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from homeland_sim import ensure_homeland_state, process_actions, tick_homeland_session
+from pvp_sim import process_pvp_actions, tick_pvp_session
 from storage import (
     PlayerRecord,
     SQLiteSessionRepository,
@@ -189,9 +190,15 @@ class SessionStore:
                     player.last_seen,
                 )
 
+            pvp_actions = payload.get("pvpActions") or {}
+            had_pvp_actions = bool(pvp_actions.get("attacks"))
+            if session.mode == "test":
+                process_pvp_actions(session, player_name, pvp_actions, player.last_seen)
+
             should_persist = (
                 had_block_changes
                 or had_homeland_actions
+                or had_pvp_actions
                 or (player.last_seen - session.updated_at) >= MOVEMENT_PERSIST_INTERVAL_SECONDS
             )
             if should_persist:
@@ -224,6 +231,8 @@ class SessionStore:
                     tick_homeland_session(session, dt, current)
                     if (current - session.updated_at) >= HOMELAND_PERSIST_INTERVAL_SECONDS:
                         self._save_locked(session)
+                elif session.mode == "test":
+                    tick_pvp_session(session, current)
 
     def _require_locked(self, session_id: str) -> SessionRecord:
         session = self._sessions.get(session_id)
@@ -250,10 +259,33 @@ class SessionStore:
                 "fruitId": clamp_text(incoming.get("fruitId"), "", 24),
                 "selectedSkillId": clamp_text(incoming.get("selectedSkillId"), "", 32),
                 "skinId": clamp_text(incoming.get("skinId"), "", 24),
+                "isAttacking": bool(incoming.get("isAttacking", False)),
+                "attackSkillId": clamp_text(incoming.get("attackSkillId"), "", 32),
+                "attackSeq": max(0, int(incoming.get("attackSeq") or state.get("attackSeq") or 0)),
                 "hp": float(incoming.get("hp") or state.get("hp") or 100.0),
                 "maxHp": float(incoming.get("maxHp") or state.get("maxHp") or 100.0),
             }
         )
+        # Inventory state — client-authoritative, passed through for persistence
+        inv = incoming.get("inventoryState")
+        if isinstance(inv, dict):
+            sanitized_inv: dict[str, Any] = {"ver": max(0, int(inv.get("ver") or 0))}
+            if isinstance(inv.get("bag"), list):
+                sanitized_inv["bag"] = [
+                    {"id": clamp_text(e.get("id"), "", 32), "u": e.get("u", -1)}
+                    for e in inv["bag"]
+                    if isinstance(e, dict) and e.get("id")
+                ][:64]  # cap bag size
+            if isinstance(inv.get("hotbar"), list):
+                sanitized_inv["hotbar"] = [
+                    {"id": clamp_text(e.get("id"), "", 32), "u": e.get("u", -1)}
+                    for e in inv["hotbar"]
+                    if isinstance(e, dict) and e.get("id")
+                ][:10]  # cap hotbar size
+            state["inventoryState"] = sanitized_inv
+        else:
+            state.setdefault("inventoryState", None)
+
         state.setdefault("serverHp", state.get("maxHp", 100.0))
         state.setdefault("serverMaxHp", state.get("maxHp", 100.0))
         state.setdefault("attackReadyAt", 0.0)

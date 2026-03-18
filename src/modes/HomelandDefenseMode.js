@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { SPAWN_TABLE } from '../config/enemyTypes.js';
 import { events } from '../core/EventBus.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { GameMode } from './GameMode.js';
-import { createTowerHealthBar, updateTowerHealthBar, buildFortress, buildTowerCollision } from './DefenseUtils.js';
+import { updateTowerHealthBar, buildFortress, buildTowerCollision, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
+import { SHOP_ITEMS, MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
 
 const WAVE_DURATION = 100;
 const ENEMY_MULTIPLIER = 1.18;
@@ -32,6 +32,13 @@ export class HomelandDefenseMode extends GameMode {
     this.turrets = [];
     this._turretTick = 0;
     this._unsubs = [];
+    this.merchantNPC = null;
+    this.merchantPos = null;
+    this.inventory = null;
+  }
+
+  setInventory(inventory) {
+    this.inventory = inventory;
   }
 
   activate(context) {
@@ -51,11 +58,13 @@ export class HomelandDefenseMode extends GameMode {
     buildFortress(this.world, this.center.x, this.center.z);
     buildTowerCollision(this.world, this.center.x, this.center.z);
     this._buildTowerVisual();
+    this._buildMerchant();
     this.startNextWave();
 
     this._unsubs.push(
       events.on('enemy:killed', ({ enemy }) => this._onEnemyKilled(enemy)),
-      events.on('shop:purchase', ({ item }) => this.purchase(item)),
+      events.on('merchant:interact', () => this._onMerchantInteract()),
+      events.on('merchant:purchase', ({ shopItem }) => this._purchaseShopItem(shopItem)),
     );
   }
 
@@ -116,59 +125,14 @@ export class HomelandDefenseMode extends GameMode {
 
   _buildTowerVisual() {
     if (this.towerMesh) return;
-    const y = this.world.getTerrainSurfaceY(this.center.x, this.center.z);
-    this.center.y = y;
-
-    const placeholder = new THREE.Group();
-    placeholder.position.set(this.center.x, y, this.center.z);
-    this.scene.enemyGroup.add(placeholder);
-    this.towerMesh = placeholder;
-
-    this.towerHealthBar = createTowerHealthBar();
-    this.towerHealthBar.position.set(this.center.x, y + 8, this.center.z);
-    this.scene.enemyGroup.add(this.towerHealthBar);
-    updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
-
-    const loader = new GLTFLoader();
-    loader.load('assets/buildings/homebase/tower.glb', (gltf) => {
-      const model = gltf.scene;
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const maxDim = Math.max(size.x, size.y, size.z);
-      const s = 8 / maxDim;
-      model.scale.set(s, s, s);
-      const scaledBox = new THREE.Box3().setFromObject(model);
-      const center = scaledBox.getCenter(new THREE.Vector3());
-      model.position.x -= center.x;
-      model.position.y -= scaledBox.min.y;
-      model.position.z -= center.z;
-
-      placeholder.add(model);
-      const finalBox = new THREE.Box3().setFromObject(placeholder);
-      this.towerHealthBar.position.y = finalBox.max.y + 1;
-
-      // Load Luffy mascot on top of the tower
-      loader.load('assets/npc/luffy.glb', (luffyGltf) => {
-        const luffy = luffyGltf.scene;
-        const lBox = new THREE.Box3().setFromObject(luffy);
-        const lSize = lBox.getSize(new THREE.Vector3());
-        const lMax = Math.max(lSize.x, lSize.y, lSize.z);
-        const ls = 2.5 / lMax;
-        luffy.scale.set(ls, ls, ls);
-        const lScaled = new THREE.Box3().setFromObject(luffy);
-        const lCenter = lScaled.getCenter(new THREE.Vector3());
-        const towerHeight = finalBox.max.y - finalBox.min.y;
-        const roofY = finalBox.min.y + towerHeight * 0.67 - placeholder.position.y;
-        luffy.position.x -= lCenter.x;
-        luffy.position.y = roofY - lScaled.min.y;
-        luffy.position.z -= lCenter.z + 1.5;
-        placeholder.add(luffy);
-
-        // Raise health bar above mascot
-        const topBox = new THREE.Box3().setFromObject(placeholder);
-        this.towerHealthBar.position.y = topBox.max.y + 2.5;
-      });
+    const result = buildTowerVisual({
+      world: this.world,
+      scene: this.scene,
+      center: this.center,
+      defense: this.state.defense,
     });
+    this.towerMesh = result.towerMesh;
+    this.towerHealthBar = result.towerHealthBar;
   }
 
   _onEnemyKilled(enemy) {
@@ -178,16 +142,62 @@ export class HomelandDefenseMode extends GameMode {
     this.state.defense.totalGold += gold;
   }
 
-  purchase(item) {
-    if (!this.state.defense.enabled) return;
-    const costs = { heal: 15, tower: 25, turret: 40 };
-    const cost = costs[item];
-    if (!cost || this.state.defense.totalGold < cost) return;
-    this.state.defense.totalGold -= cost;
+  _buildMerchant() {
+    if (this.merchantNPC) return;
+    const result = buildMerchantNPC(this.scene, this.world, this.center.x, this.center.z);
+    this.merchantNPC = result.group;
+    this.merchantPos = result.position;
+  }
 
-    if (item === 'heal') this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + 45);
-    if (item === 'tower') this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + 80);
-    if (item === 'turret') this._placeTurret();
+  _isNearMerchant() {
+    if (!this.merchantPos) return false;
+    const p = this.state.player.position;
+    const dx = p.x - this.merchantPos.x;
+    const dz = p.z - this.merchantPos.z;
+    return dx * dx + dz * dz < MERCHANT_INTERACT_RANGE * MERCHANT_INTERACT_RANGE;
+  }
+
+  _onMerchantInteract() {
+    if (!this.state.defense.enabled) return;
+    if (!this._isNearMerchant()) {
+      events.emit('status:message', '離商人太遠了');
+      return;
+    }
+    events.emit('merchant:open');
+  }
+
+  _purchaseShopItem(shopItem) {
+    if (!this.state.defense.enabled) return;
+    const item = SHOP_ITEMS.find(candidate => candidate.id === shopItem?.id);
+    if (!item) {
+      events.emit('status:message', '商店道具資料錯誤');
+      return;
+    }
+    if (this.state.defense.totalGold < item.cost) {
+      events.emit('status:message', '金幣不足');
+      return;
+    }
+    this.state.defense.totalGold -= item.cost;
+
+    // Service effects
+    if (item.effect === 'heal') {
+      this.state.player.hp = Math.min(this.state.player.maxHp, this.state.player.hp + item.effectValue);
+      events.emit('status:message', `恢復了 ${item.effectValue} 生命值`);
+    } else if (item.effect === 'repair_tower') {
+      this.state.defense.towerHp = Math.min(this.state.defense.towerMaxHp, this.state.defense.towerHp + item.effectValue);
+      events.emit('status:message', `修復守護塔 ${item.effectValue} HP`);
+    } else if (item.effect === 'turret') {
+      this._placeTurret();
+      events.emit('status:message', '放置了自動砲塔');
+    } else if (item.giveItemId) {
+      // Give item to inventory
+      if (this.inventory) {
+        this.inventory.addItem(item.giveItemId, 1);
+      }
+    }
+    events.emit('sound:click');
+    events.emit('hud:update');
+    events.emit('merchant:refreshShop');
   }
 
   _placeTurret() {

@@ -75,6 +75,7 @@ export class MultiplayerClient {
     this.remotePlayers = null;
     this.enemyManager = null;
     this.homelandMode = null;
+    this.inventory = null;
     this.syncAccumulatorMs = 0;
     this.syncIntervalMs = 60;
     this.syncInFlight = false;
@@ -85,6 +86,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingPvPAttacks = [];
     this.suppressBlockSync = false;
 
     const endpoint = defaultServerEndpoint();
@@ -124,6 +126,10 @@ export class MultiplayerClient {
 
   attachHomelandMode(homelandMode) {
     this.homelandMode = homelandMode;
+  }
+
+  attachInventory(inventory) {
+    this.inventory = inventory;
   }
 
   setPlayerName(name) {
@@ -203,6 +209,10 @@ export class MultiplayerClient {
     this.pendingHomelandPurchases.push(item);
   }
 
+  queuePvPAttack(attack) {
+    this.pendingPvPAttacks.push(attack);
+  }
+
   update(dt) {
     if (!this.state.multiplayer.enabled || !this.state.multiplayer.sessionId) return;
     if (!this.hasTimedOut && (performance.now() - this.lastServerTrafficAt) >= this.disconnectTimeoutMs) {
@@ -227,6 +237,7 @@ export class MultiplayerClient {
     const outboundBlockOps = this.pendingBlockOps.splice(0, this.pendingBlockOps.length);
     const outboundHomelandAttacks = this.pendingHomelandAttacks.splice(0, this.pendingHomelandAttacks.length);
     const outboundHomelandPurchases = this.pendingHomelandPurchases.splice(0, this.pendingHomelandPurchases.length);
+    const outboundPvPAttacks = this.pendingPvPAttacks.splice(0, this.pendingPvPAttacks.length);
     try {
       const payload = await this._post(`/api/sessions/${this.state.multiplayer.sessionId}/sync`, {
         playerName: this.state.playerName,
@@ -237,12 +248,16 @@ export class MultiplayerClient {
           attacks: outboundHomelandAttacks,
           purchases: outboundHomelandPurchases,
         },
+        pvpActions: {
+          attacks: outboundPvPAttacks,
+        },
       });
       this._applySync(payload);
     } catch (error) {
       this.pendingBlockOps.unshift(...outboundBlockOps);
       this.pendingHomelandAttacks.unshift(...outboundHomelandAttacks);
       this.pendingHomelandPurchases.unshift(...outboundHomelandPurchases);
+      this.pendingPvPAttacks.unshift(...outboundPvPAttacks);
       this.state.multiplayer.connectionStatus = 'error';
       if (String(error.message).includes('session not found')) {
         this._resetSessionState();
@@ -305,6 +320,39 @@ export class MultiplayerClient {
       this.state.player.hp = Number(selfPlayer.serverHp);
       this.state.player.maxHp = Number(selfPlayer.serverMaxHp ?? this.state.player.maxHp);
     }
+
+    // Restore inventory from server on first sync / reconnect
+    if (selfPlayer?.inventoryState && this.inventory) {
+      this.inventory.restoreFromSync(selfPlayer.inventoryState);
+    }
+    // PvP knockback: server tells us we got hit
+    if (selfPlayer?.lastHitAt !== undefined) {
+      const hitAt = Number(selfPlayer.lastHitAt);
+      if (hitAt > (this._lastHitHandled ?? 0)) {
+        this._lastHitHandled = hitAt;
+        events.emit('pvp:knockback', {
+          fromX: Number(selfPlayer.lastHitFromX ?? 0),
+          fromZ: Number(selfPlayer.lastHitFromZ ?? 0),
+          knockback: Number(selfPlayer.lastHitKnockback ?? 0),
+          weaponType: selfPlayer.lastHitWeapon ?? '',
+        });
+      }
+    }
+
+    // PvP respawn: server tells us where to spawn after death
+    if (selfPlayer?.respawnX !== undefined && selfPlayer?.respawnZ !== undefined) {
+      const respawnUntil = Number(selfPlayer.respawnUntil ?? 0);
+      const serverTime = Number(payload.serverTime ?? 0);
+      if (respawnUntil > 0 && respawnUntil > serverTime - 2.5 && !this._lastRespawnHandled) {
+        this._lastRespawnHandled = respawnUntil;
+        events.emit('pvp:respawn', {
+          x: Number(selfPlayer.respawnX),
+          z: Number(selfPlayer.respawnZ),
+        });
+      } else if (respawnUntil <= serverTime) {
+        this._lastRespawnHandled = null;
+      }
+    }
     this.state.multiplayer.playerStats = (payload.players ?? [])
       .map((player) => ({
         name: player.name,
@@ -351,7 +399,7 @@ export class MultiplayerClient {
 
   _snapshotPlayer() {
     const player = this.state.player;
-    return {
+    const snapshot = {
       x: Number(player.position.x.toFixed(2)),
       y: Number(player.position.y.toFixed(2)),
       z: Number(player.position.z.toFixed(2)),
@@ -368,7 +416,18 @@ export class MultiplayerClient {
       fruitId: this.state.selectedFruit?.id ?? '',
       selectedSkillId: this.state.getSelectedSkill()?.id ?? '',
       skinId: this.state.selectedSkin?.id ?? '',
+      // Attack state for remote animation & VFX
+      isAttacking: this.state.combat.punchTime > 0 || this.state.combat.swordSwingTime > 0,
+      attackSkillId: this.state.getSelectedSkill()?.id ?? '',
+      attackSeq: this.state.combat.attackSeq || 0,
     };
+
+    // Include inventory state for persistence
+    if (this.inventory) {
+      snapshot.inventoryState = this.inventory.snapshotForSync();
+    }
+
+    return snapshot;
   }
 
   async _post(path, payload) {
@@ -416,6 +475,7 @@ export class MultiplayerClient {
     this.pendingBlockOps = [];
     this.pendingHomelandAttacks = [];
     this.pendingHomelandPurchases = [];
+    this.pendingPvPAttacks = [];
     this.pendingImmediateSync = false;
   }
 

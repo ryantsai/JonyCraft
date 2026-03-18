@@ -1,58 +1,8 @@
 import * as THREE from 'three';
 import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../config/constants.js';
 import { events } from '../core/EventBus.js';
-
-function createTowerHealthBar() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 160;
-  canvas.height = 20;
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.minFilter = THREE.LinearFilter;
-  const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
-  const sprite = new THREE.Sprite(material);
-  sprite.scale.set(3.2, 0.4, 1);
-  sprite.userData.canvas = canvas;
-  sprite.userData.texture = texture;
-  return sprite;
-}
-
-function updateTowerHealthBar(sprite, hp, maxHp) {
-  if (!sprite) return;
-  const canvas = sprite.userData.canvas;
-  const ctx = canvas.getContext('2d');
-  const ratio = Math.max(0, hp / maxHp);
-  const w = canvas.width;
-  const h = canvas.height;
-  const barW = 108;
-  const barH = 14;
-  const barX = 2;
-  const barY = 3;
-
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.beginPath();
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-  ctx.roundRect(barX, barY, barW, barH, 5);
-  ctx.fill();
-
-  if (ratio > 0) {
-    ctx.beginPath();
-    const fillW = Math.round((barW - 2) * ratio);
-    ctx.fillStyle = ratio > 0.5 ? '#4ae04a' : ratio > 0.25 ? '#e0c030' : '#e04040';
-    ctx.roundRect(barX + 1, barY + 1, fillW, barH - 2, 4);
-    ctx.fill();
-  }
-
-  const hpVal = Math.max(0, Math.ceil(hp));
-  const maxVal = Math.round(maxHp);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 12px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`${hpVal}/${maxVal}`, barX + barW + 4, barY + barH / 2);
-
-  sprite.userData.texture.needsUpdate = true;
-}
+import { updateTowerHealthBar, buildFortress, buildTowerVisual, buildMerchantNPC } from './DefenseUtils.js';
+import { SHOP_ITEMS, MERCHANT_INTERACT_RANGE } from '../config/shopItems.js';
 
 export class MultiplayerHomelandMode {
   constructor(gameState, world, enemyManager, scene, multiplayerClient) {
@@ -66,7 +16,14 @@ export class MultiplayerHomelandMode {
     this.towerMesh = null;
     this.towerHealthBar = null;
     this.turretMeshes = new Map();
-    this._unsubscribeShop = null;
+    this._unsubs = [];
+    this.merchantNPC = null;
+    this.merchantPos = null;
+    this.inventory = null;
+  }
+
+  setInventory(inventory) {
+    this.inventory = inventory;
   }
 
   activate() {
@@ -75,21 +32,18 @@ export class MultiplayerHomelandMode {
     this.state.defense.status = 'waiting';
     this._buildFortress();
     this._buildTowerVisual();
-    if (!this._unsubscribeShop) {
-      this._unsubscribeShop = events.on('shop:purchase', ({ item }) => {
-        this.multiplayer.queueHomelandPurchase(item);
-      });
+    this._buildMerchant();
+    if (this._unsubs.length === 0) {
+      this._unsubs.push(
+        events.on('merchant:interact', () => this._onMerchantInteract()),
+        events.on('merchant:purchase', ({ shopItem }) => this._purchaseShopItem(shopItem)),
+      );
     }
   }
 
   update() {
     if (!this.state.defense.enabled) return;
     this._syncTurretVisuals();
-    if (this.towerMesh) {
-      const ratio = Math.max(0.35, this.state.defense.towerHp / Math.max(1, this.state.defense.towerMaxHp));
-      this.towerMesh.scale.y = 0.8 + ratio * 0.4;
-      this.towerMesh.position.y = this.center.y + (2.75 * this.towerMesh.scale.y);
-    }
     updateTowerHealthBar(this.towerHealthBar, this.state.defense.towerHp, this.state.defense.towerMaxHp);
   }
 
@@ -118,45 +72,79 @@ export class MultiplayerHomelandMode {
     this._syncTurretVisuals();
   }
 
+  _buildMerchant() {
+    if (this.merchantNPC) return;
+    const result = buildMerchantNPC(this.scene, this.world, this.center.x, this.center.z);
+    this.merchantNPC = result.group;
+    this.merchantPos = result.position;
+  }
+
+  _isNearMerchant() {
+    if (!this.merchantPos) return false;
+    const p = this.state.player.position;
+    const dx = p.x - this.merchantPos.x;
+    const dz = p.z - this.merchantPos.z;
+    return dx * dx + dz * dz < MERCHANT_INTERACT_RANGE * MERCHANT_INTERACT_RANGE;
+  }
+
+  _onMerchantInteract() {
+    if (!this.state.defense.enabled) return;
+    if (!this._isNearMerchant()) {
+      events.emit('status:message', '離商人太遠了');
+      return;
+    }
+    events.emit('merchant:open');
+  }
+
+  _purchaseShopItem(shopItem) {
+    if (!this.state.defense.enabled) return;
+    const item = SHOP_ITEMS.find(candidate => candidate.id === shopItem?.id);
+    if (!item) {
+      events.emit('status:message', '商店道具資料錯誤');
+      return;
+    }
+    if (this.state.defense.totalGold < item.cost) {
+      events.emit('status:message', '金幣不足');
+      return;
+    }
+    // Send purchase to server — server deducts gold authoritatively.
+    // Optimistic client-side deduction so UI feels responsive; server state
+    // will overwrite on next sync via applyServerState().
+    this.multiplayer.queueHomelandPurchase(item.id);
+    this.state.defense.totalGold -= item.cost;
+
+    // Service effects are applied server-side (heal HP, repair tower, turret).
+    // Inventory items are client-authoritative — add immediately, synced via snapshot.
+    if (item.effect === 'heal') {
+      events.emit('status:message', `恢復了 ${item.effectValue} 生命值`);
+    } else if (item.effect === 'repair_tower') {
+      events.emit('status:message', `修復守護塔 ${item.effectValue} HP`);
+    } else if (item.effect === 'turret') {
+      events.emit('status:message', '放置了自動砲塔');
+    } else if (item.giveItemId) {
+      if (this.inventory) {
+        this.inventory.addItem(item.giveItemId, 1);
+      }
+    }
+    events.emit('sound:click');
+    events.emit('hud:update');
+    events.emit('merchant:refreshShop');
+  }
+
   _buildTowerVisual() {
     if (this.towerMesh) return;
-    const geom = new THREE.CylinderGeometry(1.2, 1.6, 5.5, 12);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xbca77f, roughness: 0.85 });
-    this.towerMesh = new THREE.Mesh(geom, mat);
-    const y = this.world.getTerrainSurfaceY(this.center.x, this.center.z);
-    this.center.y = y;
-    this.towerMesh.position.set(this.center.x, y + 2.75, this.center.z);
-    this.scene.enemyGroup.add(this.towerMesh);
-
-    if (!this.towerHealthBar) {
-      this.towerHealthBar = createTowerHealthBar();
-      this.towerHealthBar.position.set(this.center.x, y + 6.2, this.center.z);
-      this.scene.enemyGroup.add(this.towerHealthBar);
-    }
+    const result = buildTowerVisual({
+      world: this.world,
+      scene: this.scene,
+      center: this.center,
+      defense: this.state.defense,
+    });
+    this.towerMesh = result.towerMesh;
+    this.towerHealthBar = result.towerHealthBar;
   }
 
   _buildFortress() {
-    const cx = Math.floor(this.center.x);
-    const cz = Math.floor(this.center.z);
-    const ground = Math.floor(this.world.getTerrainSurfaceY(cx, cz) - 1);
-    for (let x = -6; x <= 6; x += 1) {
-      for (let z = -6; z <= 6; z += 1) {
-        const ax = cx + x;
-        const az = cz + z;
-        for (let y = ground + 1; y <= ground + 3; y += 1) {
-          const onOuterWall = Math.abs(x) === 6 || Math.abs(z) === 6;
-          const isGate = (
-            (z === -6 && Math.abs(x) <= 1) ||
-            (z === 6 && Math.abs(x) <= 1) ||
-            (x === -6 && Math.abs(z) <= 1) ||
-            (x === 6 && Math.abs(z) <= 1)
-          );
-          if (onOuterWall && !isGate) {
-            this.world.setBlock(ax, y, az, 'brick');
-          }
-        }
-      }
-    }
+    buildFortress(this.world, this.center.x, this.center.z);
   }
 
   _syncTurretVisuals() {

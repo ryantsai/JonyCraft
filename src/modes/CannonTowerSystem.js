@@ -266,9 +266,18 @@ export class CannonTowerSystem {
 
   _getPlacementCandidate() {
     const target = this.state.target;
-    if (!target?.placeAt) return null;
+    if (!target?.block) return null;
 
-    const { x, y, z } = target.placeAt;
+    // Place tower on TOP of the hit block (not using placeAt which can aim sideways)
+    const bx = target.block.x;
+    const bz = target.block.z;
+    let by = target.block.y;
+    // Walk up to find the surface — the first empty block above the hit block
+    while (this.world.getBlock(bx, by + 1, bz)) by += 1;
+    const x = bx;
+    const y = by + 1;
+    const z = bz;
+
     const yaw = this.state.player.yaw;
     const position = new THREE.Vector3(x + 0.5, y, z + 0.5);
     const cell = { x, y, z };

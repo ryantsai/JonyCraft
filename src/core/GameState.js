@@ -19,6 +19,7 @@ export class GameState {
     this.modeController = null;
     this.started = false;
     this.shopOpen = false;
+    this.inventoryOpen = false;
     this.useManualClock = false;
     this.selectedIndex = 0;
     this.playerName = 'Player';

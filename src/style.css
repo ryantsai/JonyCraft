@@ -160,33 +160,33 @@ body {
   top: 10px;
   left: 50%;
   transform: translateX(-50%);
-  width: auto;
-  min-width: 260px;
-  padding: 8px 20px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 217, 102, 0.4);
-  background: rgba(10, 17, 26, 0.8);
-  backdrop-filter: blur(12px);
-  pointer-events: auto;
+  padding: 6px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 217, 102, 0.35);
+  background: rgba(10, 17, 26, 0.75);
+  backdrop-filter: blur(10px);
+  pointer-events: none;
   display: none;
-  gap: 4px;
-  text-align: center;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 240, 210, 0.92);
   z-index: 4;
 }
 
 .defense-scoreboard[data-visible='true'] {
-  display: grid;
+  display: flex;
 }
 
-.defense-row {
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: rgba(255, 240, 210, 0.95);
-  white-space: nowrap;
-}
-
-.defense-row span {
+.defense-scoreboard span span {
   color: var(--gold-bright);
+}
+
+.defense-sep {
+  margin: 0 8px;
+  opacity: 0.4;
 }
 
 .player-health-bar {
@@ -206,12 +206,37 @@ body {
   gap: 2px;
 }
 
+.health-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+}
+
 .health-label {
   font-size: 0.72rem;
   font-weight: 700;
   margin-bottom: 0;
   color: rgba(255, 240, 240, 0.85);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.defense-stats {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--gold);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  display: none;
+}
+
+.defense-stats[data-visible='true'] {
+  display: inline;
+}
+
+.defense-stats span {
+  color: var(--gold-bright);
 }
 
 .health-track {
@@ -1221,7 +1246,7 @@ body {
 
 /* ── Responsive ── */
 @media (max-width: 720px) {
-  .defense-scoreboard { min-width: 200px; font-size: 0.76rem; padding: 6px 14px; }
+  .defense-scoreboard { font-size: 0.7rem; padding: 5px 12px; }
   .status-bar { display: none !important; }
 
   .hotbar {
@@ -1884,11 +1909,7 @@ body {
   white-space: nowrap;
 }
 
-.defense-hint {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
+
 
 .touch-interact-btn {
   display: none;

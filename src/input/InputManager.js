@@ -35,10 +35,12 @@ export class InputManager {
         events.emit('hotbar:rebuild');
       }
 
-      // Toggle inventory panel with Tab or I
-      if (event.code === 'Tab' || event.code === 'KeyI') {
+      // Hold Tab to open inventory
+      if (event.code === 'Tab') {
         event.preventDefault();
-        events.emit('inventory:toggle');
+        if (!this.state.inventoryOpen) {
+          events.emit('inventory:open');
+        }
       }
 
       // Interact with nearby NPC (merchant) — also closes shop if open
@@ -72,6 +74,14 @@ export class InputManager {
 
     window.addEventListener('keyup', (event) => {
       this.keyState.delete(event.code);
+
+      // Release Tab to close inventory
+      if (event.code === 'Tab') {
+        event.preventDefault();
+        if (this.state.inventoryOpen) {
+          events.emit('inventory:close');
+        }
+      }
     });
 
     window.addEventListener('wheel', (event) => {
@@ -95,12 +105,12 @@ export class InputManager {
     });
 
     this.canvas.addEventListener('click', () => {
-      if (!this.state.started || this.state.shopOpen) return;
+      if (!this.state.started || this.state.shopOpen || this.state.inventoryOpen) return;
       this.canvas.requestPointerLock?.();
     });
 
     this.canvas.addEventListener('mousedown', (event) => {
-      if (this.state.mode !== 'playing' || this.state.shopOpen) return;
+      if (this.state.mode !== 'playing' || this.state.shopOpen || this.state.inventoryOpen) return;
       if (event.button === 0) {
         this.primaryHeld = true;
         this.triggerPrimaryAction();

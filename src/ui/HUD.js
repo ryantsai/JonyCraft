@@ -27,6 +27,12 @@ export class HUD {
     this.multiplayerScoreboard = document.querySelector('#multiplayer-scoreboard');
     this.multiplayerPingLabel = document.querySelector('#multiplayer-ping-label');
     this.multiplayerRows = document.querySelector('#multiplayer-scoreboard-rows');
+    this.multiplayerChat = document.querySelector('#multiplayer-chat');
+    this.multiplayerChatLog = document.querySelector('#multiplayer-chat-log');
+    this.multiplayerChatInput = document.querySelector('#multiplayer-chat-input');
+    this.multiplayerChatToggle = document.querySelector('#multiplayer-chat-toggle');
+    this.multiplayerChatCollapsed = document.querySelector('#multiplayer-chat-collapsed');
+    this._lastRenderedChatSeq = -1;
     this._lastPingUpdate = 0;
     this._lastPingValue = 0;
     this._cachedPlayerPings = new Map();
@@ -107,6 +113,66 @@ export class HUD {
       events.emit('sound:click');
       this._closeInventory();
     });
+
+    this.multiplayerChatToggle.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._setChatCollapsed(true);
+      this._blurChatInput({ restorePointerLock: true });
+    });
+
+    this.multiplayerChatCollapsed.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._setChatCollapsed(false);
+      this._focusChatInput();
+    });
+
+    this.multiplayerChatInput.addEventListener('focus', () => {
+      if (this.state.playStyle !== 'multiplayer' || !this.state.multiplayer.enabled) return;
+      this.state.multiplayer.chatFocused = true;
+      this._setChatCollapsed(false);
+      document.exitPointerLock?.();
+    });
+
+    this.multiplayerChatInput.addEventListener('blur', () => {
+      this.state.multiplayer.chatFocused = false;
+      if (this.state.mode === 'playing' && !this.state.shopOpen && !this.state.inventoryOpen) {
+        this.canvas.requestPointerLock?.();
+      }
+    });
+
+    this.multiplayerChatInput.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.code === 'Enter') {
+        event.preventDefault();
+        this._submitChatInput();
+      } else if (event.code === 'Escape') {
+        event.preventDefault();
+        this._blurChatInput({ restorePointerLock: true });
+      }
+    });
+
+    this.multiplayerChatInput.addEventListener('input', () => {
+      if (this.multiplayerChatInput.value.length > 500) {
+        this.multiplayerChatInput.value = this.multiplayerChatInput.value.slice(0, 500);
+      }
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'KeyT') return;
+      if (this.state.playStyle !== 'multiplayer' || !this.state.multiplayer.enabled || this.state.mode !== 'playing') return;
+      if (event.repeat) return;
+      if (document.activeElement === this.multiplayerChatInput) return;
+      event.preventDefault();
+      this._setChatCollapsed(false);
+      this._focusChatInput();
+    });
+
+    this.multiplayerChatLog.addEventListener('wheel', (event) => {
+      if (document.activeElement !== this.multiplayerChatInput) return;
+      event.stopPropagation();
+      event.preventDefault();
+      this.multiplayerChatLog.scrollTop += event.deltaY;
+    }, { passive: false });
 
     this.rebuildHotbar();
     this.showHomeScreen();
@@ -222,6 +288,19 @@ export class HUD {
     this.hpFill.dataset.mid = (hpRatio > 0.25 && hpRatio <= 0.5) ? 'true' : 'false';
 
     const multiplayer = this.state.multiplayer;
+    const showChat = multiplayer.enabled;
+    this.multiplayerChat.dataset.visible = showChat ? 'true' : 'false';
+    if (!showChat && document.activeElement === this.multiplayerChatInput) {
+      this._blurChatInput({ restorePointerLock: false });
+    }
+    if (showChat) {
+      this.multiplayerChat.dataset.collapsed = multiplayer.chatCollapsed ? 'true' : 'false';
+      this._renderChatMessages(multiplayer.chatMessages);
+    } else {
+      this.multiplayerChatLog.textContent = '';
+      this._lastRenderedChatSeq = -1;
+    }
+
     const showScoreboard = multiplayer.enabled && multiplayer.playerStats.length > 0;
     this.multiplayerScoreboard.dataset.visible = showScoreboard ? 'true' : 'false';
     if (showScoreboard) {
@@ -712,6 +791,60 @@ export class HUD {
       });
       this.merchantGrid.appendChild(card);
     });
+  }
+
+  _focusChatInput() {
+    if (!this.multiplayerChatInput) return;
+    this.state.multiplayer.chatFocused = true;
+    this.multiplayerChatInput.focus();
+    this.multiplayerChatInput.select();
+  }
+
+  _blurChatInput({ restorePointerLock }) {
+    this.state.multiplayer.chatFocused = false;
+    this.multiplayerChatInput.blur();
+    if (restorePointerLock && this.state.mode === 'playing' && !this.state.shopOpen && !this.state.inventoryOpen) {
+      this.canvas.requestPointerLock?.();
+    }
+  }
+
+  _setChatCollapsed(collapsed) {
+    this.state.multiplayer.chatCollapsed = Boolean(collapsed);
+    this.multiplayerChat.dataset.collapsed = this.state.multiplayer.chatCollapsed ? 'true' : 'false';
+  }
+
+  _submitChatInput() {
+    if (this.state.playStyle !== 'multiplayer' || !this.state.multiplayer.enabled) return;
+    const text = this.multiplayerChatInput.value.trim().slice(0, 500);
+    if (!text) return;
+    events.emit('multiplayer:chat:send', { text });
+    this.multiplayerChatInput.value = '';
+  }
+
+  _renderChatMessages(messages) {
+    const lastSeq = messages.length > 0 ? Number(messages[messages.length - 1].seq || 0) : 0;
+    const shouldAutoScroll = this._lastRenderedChatSeq < 0
+      || this.multiplayerChatLog.scrollTop + this.multiplayerChatLog.clientHeight >= this.multiplayerChatLog.scrollHeight - 18;
+    if (lastSeq === this._lastRenderedChatSeq) return;
+
+    this.multiplayerChatLog.textContent = '';
+    messages.forEach((entry) => {
+      const row = document.createElement('div');
+      row.className = 'multiplayer-chat-msg';
+
+      const name = document.createElement('strong');
+      name.textContent = `${entry.playerName || '玩家'}: `;
+
+      const message = document.createElement('span');
+      message.textContent = String(entry.message || '').slice(0, 500);
+      row.append(name, message);
+      this.multiplayerChatLog.appendChild(row);
+    });
+
+    this._lastRenderedChatSeq = lastSeq;
+    if (shouldAutoScroll) {
+      this.multiplayerChatLog.scrollTop = this.multiplayerChatLog.scrollHeight;
+    }
   }
 
   _renderMultiplayerStats(players) {

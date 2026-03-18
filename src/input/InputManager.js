@@ -22,6 +22,7 @@ export class InputManager {
 
   init() {
     window.addEventListener('keydown', (event) => {
+      if (this._isTypingIntoUI()) return;
       if (CONTROL_KEYS.includes(event.code)) this.keyState.add(event.code);
 
       // Hotbar slots 1-9
@@ -74,6 +75,7 @@ export class InputManager {
 
     window.addEventListener('keyup', (event) => {
       this.keyState.delete(event.code);
+      if (this._isTypingIntoUI()) return;
 
       // Release Tab to close inventory
       if (event.code === 'Tab') {
@@ -161,5 +163,11 @@ export class InputManager {
       const doc = document.documentElement;
       (doc.requestFullscreen || doc.webkitRequestFullscreen)?.call(doc);
     }
+  }
+
+  _isTypingIntoUI() {
+    if (this.state.multiplayer?.chatFocused) return true;
+    const active = document.activeElement;
+    return Boolean(active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA'));
   }
 }

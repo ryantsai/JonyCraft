@@ -89,7 +89,7 @@ export class GameState {
 
   selectFruit(fruit) {
     this.selectedFruit = fruit;
-    this.activeSkills = fruit.skills;
+    this.activeSkills = [...fruit.skills];
     this.selectedIndex = 0;
   }
 

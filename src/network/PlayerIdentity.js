@@ -1,15 +1,17 @@
 const PLAYER_NAME_COOKIE = 'jonycraft_player_name';
 
 const ADJECTIVES = [
-  'Amber', 'Blaze', 'Cloud', 'Crimson', 'Dawn', 'Echo', 'Frost', 'Golden',
-  'Jade', 'Lucky', 'Merry', 'Nova', 'Pixel', 'River', 'Silver', 'Sunny',
-  'Swift', 'Vivid', 'Wild', 'Zephyr',
+  '奶油', '暴走', '佛系', '暗黑', '有感', '社畜', '爆炸', '魔法',
+  '躺平', '傳說', '鹹魚', '閃亮', '熱血', '迷因', '量子', '超級',
+  '怒吼', '邊緣', '肝帝', '歐皇', '非洲', '神秘', '狂暴', '優雅',
+  '搞笑', '冰霜', '雷電', '混沌', '無敵', '光速',
 ];
 
 const NOUNS = [
-  'Badger', 'Boar', 'Builder', 'Comet', 'Fox', 'Golem', 'Miner', 'Otter',
-  'Panda', 'Pilot', 'Ranger', 'Rider', 'Scout', 'Shark', 'Slime', 'Sprite',
-  'Tiger', 'Voyager', 'Warden', 'Wolf',
+  '小僧', '筆電', '柴犬', '勇者', '水母', '布丁', '馬鈴薯', '倉鼠',
+  '吐司', '企鵝', '河豚', '珍奶', '鯊魚', '海苔', '貓頭鷹', '竹輪',
+  '狐狸', '樹懶', '魔王', '忍者', '菜雞', '老司機', '鍵盤俠', '肉包',
+  '蘑菇', '刺蝟', '飯糰', '烏龜', '大俠', '拉麵',
 ];
 
 function readCookie(name) {
@@ -29,8 +31,7 @@ function randomFrom(list) {
 }
 
 function generatePlayerName() {
-  const number = Math.floor(10 + Math.random() * 90);
-  return `${randomFrom(ADJECTIVES)}${randomFrom(NOUNS)}${number}`;
+  return `${randomFrom(ADJECTIVES)}${randomFrom(NOUNS)}`;
 }
 
 export function ensurePlayerName() {
@@ -46,4 +47,18 @@ export function rerollPlayerName() {
   const created = generatePlayerName();
   writeCookie(PLAYER_NAME_COOKIE, created);
   return created;
+}
+
+export function savePlayerName(name) {
+  const trimmed = name.trim().slice(0, 32);
+  if (!trimmed) return ensurePlayerName();
+  writeCookie(PLAYER_NAME_COOKIE, trimmed);
+  return trimmed;
+}
+
+export function uniquifyPlayerName(name, existingNames) {
+  if (!existingNames.includes(name)) return name;
+  let suffix = 1;
+  while (existingNames.includes(`${name}-${suffix}`)) suffix += 1;
+  return `${name}-${suffix}`;
 }

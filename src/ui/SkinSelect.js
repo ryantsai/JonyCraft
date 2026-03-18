@@ -47,8 +47,8 @@ export class SkinSelect {
 
     const canvas = document.createElement('canvas');
     canvas.className = 'skin-preview-canvas';
-    canvas.width = 180;
-    canvas.height = 220;
+    canvas.width = 140;
+    canvas.height = 170;
 
     const previewName = document.createElement('div');
     previewName.className = 'skin-preview-name';
@@ -97,9 +97,9 @@ export class SkinSelect {
 
     this.previewScene = new THREE.Scene();
 
-    this.previewCamera = new THREE.PerspectiveCamera(35, 180 / 220, 0.1, 50);
-    this.previewCamera.position.set(0, 1.2, 3.5);
-    this.previewCamera.lookAt(0, 0.8, 0);
+    this.previewCamera = new THREE.PerspectiveCamera(35, 140 / 170, 0.1, 50);
+    this.previewCamera.position.set(0, 1.4, 3.3);
+    this.previewCamera.lookAt(0, 0.9, 0);
 
     const ambient = new THREE.HemisphereLight(0xeef7ff, 0x7a684d, 1.6);
     this.previewScene.add(ambient);

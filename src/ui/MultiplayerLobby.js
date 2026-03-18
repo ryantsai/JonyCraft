@@ -1,5 +1,5 @@
 import { events } from '../core/EventBus.js';
-import { rerollPlayerName } from '../network/PlayerIdentity.js';
+import { rerollPlayerName, savePlayerName, uniquifyPlayerName } from '../network/PlayerIdentity.js';
 import { SkinSelect } from './SkinSelect.js';
 
 function suggestedSessionName(playerName) {
@@ -102,12 +102,23 @@ export class MultiplayerLobby {
     const identity = el('div', 'multiplayer-identity');
     const pill = el('div', 'multiplayer-pill');
     pill.append(el('span', 'pill-label', '玩家名稱'));
-    const playerName = el('strong', null, 'Player');
+    const nameRow = el('div', 'multiplayer-name-row');
+    const playerName = document.createElement('input');
+    playerName.type = 'text';
     playerName.id = 'multiplayer-player-name';
-    pill.appendChild(playerName);
-    const rerollBtn = btn('multiplayer-ghost-btn', '重新隨機');
+    playerName.className = 'multiplayer-name-input';
+    playerName.maxLength = 32;
+    playerName.spellcheck = false;
+    playerName.autocomplete = 'off';
+    const rerollBtn = document.createElement('button');
+    rerollBtn.type = 'button';
     rerollBtn.id = 'multiplayer-reroll';
-    identity.append(pill, rerollBtn);
+    rerollBtn.className = 'multiplayer-name-random-btn';
+    rerollBtn.textContent = '🎲';
+    rerollBtn.title = '隨機名稱';
+    nameRow.append(playerName, rerollBtn);
+    pill.appendChild(nameRow);
+    identity.appendChild(pill);
     mainCol.appendChild(identity);
 
     // Endpoint
@@ -202,6 +213,16 @@ export class MultiplayerLobby {
       this._renderIdentity();
     });
 
+    const commitName = () => {
+      const name = savePlayerName(this.playerNameEl.value);
+      this.multiplayer.setPlayerName(name);
+      this._renderIdentity();
+    };
+    this.playerNameEl.addEventListener('blur', commitName);
+    this.playerNameEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); this.playerNameEl.blur(); }
+    });
+
     this.hostModeButtons.forEach((button) => {
       button.addEventListener('click', () => {
         if (this.busy) return;
@@ -234,7 +255,7 @@ export class MultiplayerLobby {
   }
 
   _renderIdentity() {
-    this.playerNameEl.textContent = this.state.playerName;
+    this.playerNameEl.value = this.state.playerName;
   }
 
   _renderHostMode() {
@@ -289,6 +310,11 @@ export class MultiplayerLobby {
           events.emit('sound:click');
           this._setStatus(`正在加入 ${session.name}...`);
           this.multiplayer.setServerEndpoint(this.serverHostInput.value, this.serverPortInput.value);
+          const uniqueName = uniquifyPlayerName(this.state.playerName, session.players ?? []);
+          if (uniqueName !== this.state.playerName) {
+            this.multiplayer.setPlayerName(uniqueName);
+            this._renderIdentity();
+          }
           await this.multiplayer.joinSession(session.id);
           this.hide();
           events.emit('multiplayer:session-ready');

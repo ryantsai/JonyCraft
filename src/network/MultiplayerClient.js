@@ -8,7 +8,7 @@ function defaultServerEndpoint() {
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return { host: '10.0.0.100', port: '8765' };
   }
-  return { host: 'pb60.tailbf39d7.ts.net', port: '443' };
+  return { host: 'pb60.tailbf39d7.ts.net', port: '80' };
 }
 
 function trimText(value) {

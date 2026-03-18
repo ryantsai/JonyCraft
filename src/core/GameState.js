@@ -80,7 +80,7 @@ export class GameState {
       pingMs: 0,
       serverUrl: '',
       serverHost: 'pb60.tailbf39d7.ts.net',
-      serverPort: '443',
+      serverPort: '80',
       sessions: [],
       latestBlockSeq: 0,
       latestChatSeq: 0,

@@ -381,7 +381,7 @@ class MultiplayerHandler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_OPTIONS(self) -> None:  # noqa: N802
-        self._send_json(204, {})
+        self._send_preflight()
 
     def do_GET(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
@@ -483,6 +483,20 @@ class MultiplayerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         if status != 204:
             self.wfile.write(body)
+
+    def _send_preflight(self) -> None:
+        origin = self.headers.get("Origin") or "*"
+        request_headers = self.headers.get("Access-Control-Request-Headers", "").strip()
+        allow_headers = request_headers or "Content-Type"
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", allow_headers)
+        self.send_header("Access-Control-Allow-Credentials", "true")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.send_header("Vary", "Origin, Access-Control-Request-Headers")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
 
 def run_server(host: str, port: int, database_path: str | Path) -> None:

@@ -59,6 +59,13 @@ export const gameTemplate = `
         </div>
         <div id="merchant-shop-grid" class="merchant-shop-grid"></div>
       </div>
+      <div id="pause-menu" class="pause-menu" data-visible="false">
+        <div class="pause-panel">
+          <h2 class="pause-title">遊戲暫停</h2>
+          <button id="pause-resume-btn" class="pause-btn" type="button">繼續遊戲</button>
+          <button id="pause-quit-btn" class="pause-btn pause-btn-quit" type="button">返回主選單</button>
+        </div>
+      </div>
       <div id="hotbar" class="hotbar" aria-label="技能欄"></div>
       <div id="mobile-controls" class="mobile-controls" aria-label="虛擬搖桿">
         <div class="stick-cluster">
@@ -72,6 +79,7 @@ export const gameTemplate = `
           <button id="touch-secondary" type="button">放置</button>
           <button id="touch-interact" type="button" class="touch-interact-btn" data-visible="false">互動</button>
         </div>
+        <button id="touch-pause" class="mobile-pause-btn" type="button">⏸</button>
         <button id="touch-fullscreen" class="mobile-fullscreen-btn" type="button">⛶</button>
       </div>
     </div>

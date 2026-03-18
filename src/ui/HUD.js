@@ -51,6 +51,9 @@ export class HUD {
     this.merchantGrid = document.querySelector('#merchant-shop-grid');
     this.merchantCloseBtn = document.querySelector('#merchant-close-btn');
     this.merchantGoldLabel = document.querySelector('#merchant-gold-label');
+    this.pauseMenu = document.querySelector('#pause-menu');
+    this.pauseResumeBtn = document.querySelector('#pause-resume-btn');
+    this.pauseQuitBtn = document.querySelector('#pause-quit-btn');
     this.disconnectTimer = null;
   }
 
@@ -109,7 +112,20 @@ export class HUD {
     this.rebuildHotbar();
     this.showHomeScreen();
 
+    events.on('pause:toggle', () => this._togglePause());
+    events.on('pause:resume', () => this._resumeGame());
+    events.on('pause:quit', () => this._quitToMenu());
+    this.pauseResumeBtn.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._resumeGame();
+    });
+    this.pauseQuitBtn.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._quitToMenu();
+    });
+
     events.on('merchant:open', () => this._openMerchantShop());
+    events.on('merchant:close', () => this._closeMerchantShop());
     events.on('merchant:refreshShop', () => this._rebuildMerchantShop());
     this.merchantCloseBtn.addEventListener('click', () => {
       events.emit('sound:click');
@@ -516,13 +532,65 @@ export class HUD {
     }
   }
 
+  _togglePause() {
+    if (this.state.mode !== 'playing' && this.state.mode !== 'paused') return;
+    if (this.state.mode === 'paused') {
+      this._resumeGame();
+    } else {
+      this._pauseGame();
+    }
+  }
+
+  _pauseGame() {
+    if (this.state.mode !== 'playing') return;
+    // Close shop/inventory first if open
+    if (this.state.shopOpen) this._closeMerchantShop();
+    this._toggleInventory(false);
+
+    this.state.mode = 'paused';
+    this.pauseMenu.dataset.visible = 'true';
+    document.exitPointerLock?.();
+  }
+
+  _resumeGame() {
+    if (this.state.mode !== 'paused') return;
+    this.state.mode = 'playing';
+    this.pauseMenu.dataset.visible = 'false';
+    this.canvas.requestPointerLock?.();
+  }
+
+  _quitToMenu() {
+    this.pauseMenu.dataset.visible = 'false';
+    this.state.mode = 'menu';
+    this.state.shopOpen = false;
+    this._closeMerchantShop();
+    this._toggleInventory(false);
+
+    // Leave multiplayer session if connected
+    if (this.state.multiplayer.enabled) {
+      events.emit('multiplayer:leave');
+    }
+
+    // Deactivate current mode controller
+    this.state.modeController?.deactivate?.();
+    this.state.modeController = null;
+    this.state.defense.enabled = false;
+    this.state.started = false;
+
+    this.showHomeScreen();
+  }
+
   _openMerchantShop() {
     this.merchantPanel.dataset.visible = 'true';
+    this.state.shopOpen = true;
+    document.exitPointerLock?.();
     this._rebuildMerchantShop();
   }
 
   _closeMerchantShop() {
     this.merchantPanel.dataset.visible = 'false';
+    this.state.shopOpen = false;
+    this.canvas.requestPointerLock?.();
   }
 
   _rebuildMerchantShop() {

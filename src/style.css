@@ -1147,6 +1147,22 @@ body {
 
 .mobile-controls[data-visible='true'] .mobile-fullscreen-btn { display: block; }
 
+.mobile-pause-btn {
+  position: absolute;
+  bottom: 14px; right: 66px;
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(11, 17, 23, 0.65);
+  color: #f4f7ff;
+  font-size: 1.2rem;
+  line-height: 1;
+  pointer-events: auto;
+  display: none;
+}
+
+.mobile-controls[data-visible='true'] .mobile-pause-btn { display: block; }
+
 .ios-fullscreen-prompt {
   position: fixed;
   inset: 0;
@@ -1669,6 +1685,78 @@ body {
   font-size: 0.62rem;
   color: var(--text-muted);
   text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════
+   PAUSE MENU
+   ══════════════════════════════════════════════════════════ */
+
+.pause-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: none;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+
+.pause-menu[data-visible='true'] {
+  display: grid;
+}
+
+.pause-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 36px 48px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 217, 102, 0.3);
+  background: rgba(10, 17, 26, 0.92);
+  backdrop-filter: blur(16px);
+  min-width: 240px;
+}
+
+.pause-title {
+  margin: 0 0 6px;
+  font-family: var(--font-body);
+  font-size: 1.3rem;
+  font-weight: 900;
+  color: var(--gold-bright);
+  letter-spacing: 0.04em;
+}
+
+.pause-btn {
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 217, 102, 0.3);
+  background: rgba(255, 217, 102, 0.1);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.pause-btn:hover {
+  background: rgba(255, 217, 102, 0.2);
+  border-color: rgba(255, 217, 102, 0.5);
+  transform: translateY(-1px);
+}
+
+.pause-btn-quit {
+  border-color: rgba(255, 100, 100, 0.3);
+  background: rgba(255, 100, 100, 0.08);
+  color: #ff9090;
+}
+
+.pause-btn-quit:hover {
+  background: rgba(255, 100, 100, 0.18);
+  border-color: rgba(255, 100, 100, 0.5);
 }
 
 /* ══════════════════════════════════════════════════════════

@@ -96,6 +96,8 @@ export class MultiplayerClient {
   }
 
   init() {
+    events.on('multiplayer:leave', () => this.leaveSession());
+
     events.on('block:changed', (change) => {
       if (!this.state.multiplayer.enabled || this.suppressBlockSync) return;
       this.pendingBlockOps.push({

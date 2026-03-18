@@ -41,9 +41,22 @@ export class InputManager {
         events.emit('inventory:toggle');
       }
 
-      // Interact with nearby NPC (merchant)
+      // Interact with nearby NPC (merchant) — also closes shop if open
       if (event.code === 'KeyE') {
-        events.emit('merchant:interact');
+        if (this.state.shopOpen) {
+          events.emit('merchant:close');
+        } else {
+          events.emit('merchant:interact');
+        }
+      }
+
+      // Escape: close shop first, then toggle pause
+      if (event.code === 'Escape') {
+        if (this.state.shopOpen) {
+          events.emit('merchant:close');
+        } else if (this.state.mode === 'playing' || this.state.mode === 'paused') {
+          events.emit('pause:toggle');
+        }
       }
 
       if (event.code === 'KeyF') this._toggleFullscreen();
@@ -82,12 +95,12 @@ export class InputManager {
     });
 
     this.canvas.addEventListener('click', () => {
-      if (!this.state.started) return;
+      if (!this.state.started || this.state.shopOpen) return;
       this.canvas.requestPointerLock?.();
     });
 
     this.canvas.addEventListener('mousedown', (event) => {
-      if (this.state.mode !== 'playing') return;
+      if (this.state.mode !== 'playing' || this.state.shopOpen) return;
       if (event.button === 0) {
         this.primaryHeld = true;
         this.triggerPrimaryAction();

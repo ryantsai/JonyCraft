@@ -18,6 +18,7 @@ export class GameState {
     this.gameMode = 'homeland';
     this.modeController = null;
     this.started = false;
+    this.shopOpen = false;
     this.useManualClock = false;
     this.selectedIndex = 0;
     this.playerName = 'Player';

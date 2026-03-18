@@ -138,10 +138,16 @@ export class CannonTowerSystem {
     this.preview.group.renderOrder = 40;
     this.scene.enemyGroup.add(this.preview.group);
 
-    // Async load GLB for preview ghost
+    // Async load GLB for preview ghost (clone materials so template stays opaque)
     ensureCannonTowerTemplate()
       .then((template) => {
         const model = template.clone(true);
+        model.traverse((child) => {
+          if (!child.isMesh) return;
+          child.material = Array.isArray(child.material)
+            ? child.material.map((m) => m.clone())
+            : child.material.clone();
+        });
         setGhostTint(model, '#7efc8a', 0.38);
         this.preview.group.clear();
         this.preview.group.add(model);

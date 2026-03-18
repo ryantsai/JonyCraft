@@ -190,6 +190,22 @@ export class HUD {
         item.dataset.empty = 'true';
         item.appendChild(slotNum);
       }
+
+      // Drop target for drag-and-drop from inventory
+      const canDrop = !skill || skill._itemId; // fruit skills can't be replaced
+      if (canDrop) {
+        item.addEventListener('dragover', (e) => { e.preventDefault(); item.dataset.dragover = 'true'; });
+        item.addEventListener('dragleave', () => { item.dataset.dragover = 'false'; });
+        item.addEventListener('drop', (e) => {
+          e.preventDefault();
+          item.dataset.dragover = 'false';
+          const bagIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+          if (!isNaN(bagIdx) && this.inventory) {
+            this.inventory.equipToSlot(bagIdx, index);
+          }
+        });
+      }
+
       this.hotbar.appendChild(item);
     }
   }
@@ -532,6 +548,16 @@ export class HUD {
           events.emit('sound:click');
         }
       });
+
+      // Drag support for equipping to specific hotbar slot
+      if (def.kind !== 'passive') {
+        slot.draggable = true;
+        slot.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', String(index));
+          e.dataTransfer.effectAllowed = 'move';
+        });
+      }
+
       this.inventoryGrid.appendChild(slot);
     });
 
@@ -601,7 +627,7 @@ export class HUD {
   _closeMerchantShop() {
     this.merchantPanel.dataset.visible = 'false';
     this.state.shopOpen = false;
-    this.canvas.requestPointerLock?.();
+    if (this.state.mode === 'playing') this.canvas.requestPointerLock?.();
   }
 
   _rebuildMerchantShop() {

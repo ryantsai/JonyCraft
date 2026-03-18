@@ -281,7 +281,7 @@ class SessionStore:
                     {"id": clamp_text(e.get("id"), "", 32), "u": e.get("u", -1)}
                     for e in inv["hotbar"]
                     if isinstance(e, dict) and e.get("id")
-                ][:10]  # cap hotbar size
+                ][:9]  # cap hotbar size
             state["inventoryState"] = sanitized_inv
         else:
             state.setdefault("inventoryState", None)

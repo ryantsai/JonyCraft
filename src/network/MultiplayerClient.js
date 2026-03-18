@@ -8,7 +8,7 @@ function defaultServerEndpoint() {
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return { host: '10.0.0.100', port: '8765' };
   }
-  return { host: 'pb60.tailbf39d7.ts.net', port: '80' };
+  return { host: 'pb60.tailbf39d7.ts.net', port: '443' };
 }
 
 function trimText(value) {
@@ -55,7 +55,9 @@ function endpointToUrl(host, port) {
   if (safeHost.startsWith('http://') || safeHost.startsWith('https://')) {
     return `${safeHost.replace(/\/+$/, '')}:${safePort}`;
   }
-  const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  let protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+  if (safePort === '443') protocol = 'https:';
+  if (safePort === '80') protocol = 'http:';
   return `${protocol}//${safeHost}:${safePort}`;
 }
 

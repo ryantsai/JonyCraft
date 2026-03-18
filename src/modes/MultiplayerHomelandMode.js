@@ -41,6 +41,11 @@ export class MultiplayerHomelandMode {
     }
   }
 
+  deactivate() {
+    this._unsubs.forEach((unsub) => unsub());
+    this._unsubs = [];
+  }
+
   update() {
     if (!this.state.defense.enabled) return;
     this._syncTurretVisuals();

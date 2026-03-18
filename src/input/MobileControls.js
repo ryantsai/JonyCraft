@@ -52,6 +52,13 @@ export class MobileControls {
       });
     }
 
+    const touchPause = document.querySelector('#touch-pause');
+    if (touchPause) {
+      touchPause.addEventListener('click', () => {
+        events.emit('pause:toggle');
+      });
+    }
+
     const fullscreenBtn = document.querySelector('#touch-fullscreen');
     const doc = document.documentElement;
     const canFullscreen = doc.requestFullscreen || doc.webkitRequestFullscreen;

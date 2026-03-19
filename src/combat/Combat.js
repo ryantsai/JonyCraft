@@ -2,10 +2,21 @@ import * as THREE from 'three';
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from '../config/constants.js';
 import { events } from '../core/EventBus.js';
 
-/**
- * Combat system: handles attacks, block break/place, and damage application.
- * All attack skills (default + fruit) follow a single unified path via attack().
- */
+// Projectile weapon types that emit their own VFX events and handle damage via ProjectileSystem
+const PROJECTILE_WEAPON_EVENTS = {
+  fire_fist: 'combat:fire-fist-shoot',
+  flame_emperor: 'combat:flame-emperor-shoot',
+  fire_pillar: 'combat:fire-pillar-cast',
+  dark_pull: 'combat:dark-pull-cast',
+  light_beam: 'combat:light-beam-shoot',
+};
+
+// Reusable vectors to avoid per-frame allocations
+const _forward = new THREE.Vector3();
+const _toTarget = new THREE.Vector3();
+const _away = new THREE.Vector3();
+const _particleOffset = new THREE.Vector3(0, 1.1, 0);
+
 export class CombatSystem {
   constructor(gameState, world, targeting, enemyManager, particles, multiplayerClient = null) {
     this.state = gameState;
@@ -61,12 +72,7 @@ export class CombatSystem {
 
     // In multiplayer homeland, all attacks go through the server
     if (this._shouldUseServerHomelandAttack()) {
-      // Still emit VFX events for fire skills so local player sees effects
-      if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
-      else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
-      else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
-      else if (skill.weaponType === 'dark_pull') events.emit('combat:dark-pull-cast');
-      else if (skill.weaponType === 'light_beam') events.emit('combat:light-beam-shoot');
+      this._emitProjectileVFX(skill.weaponType);
       this._queueHomelandAttack({
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
@@ -77,11 +83,7 @@ export class CombatSystem {
 
     // PvP attack in multiplayer test mode
     if (this._shouldUsePvPAttack()) {
-      if (skill.weaponType === 'fire_fist') events.emit('combat:fire-fist-shoot');
-      else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
-      else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
-      else if (skill.weaponType === 'dark_pull') events.emit('combat:dark-pull-cast');
-      else if (skill.weaponType === 'light_beam') events.emit('combat:light-beam-shoot');
+      this._emitProjectileVFX(skill.weaponType);
       this._queuePvPAttack({
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
@@ -103,28 +105,8 @@ export class CombatSystem {
       return;
     }
 
-    // Projectile-based weapon types — damage is handled by the projectile on hit
-    if (skill.weaponType === 'fire_fist') {
-      events.emit('combat:fire-fist-shoot');
-      return;
-    }
-    if (skill.weaponType === 'flame_emperor') {
-      events.emit('combat:flame-emperor-shoot');
-      return;
-    }
-    // Fire pillar — AOE centered on player, handled by FireFistSpawner
-    if (skill.weaponType === 'fire_pillar') {
-      events.emit('combat:fire-pillar-cast');
-      return;
-    }
-    if (skill.weaponType === 'dark_pull') {
-      events.emit('combat:dark-pull-cast');
-      return;
-    }
-    if (skill.weaponType === 'light_beam') {
-      events.emit('combat:light-beam-shoot');
-      return;
-    }
+    // Projectile-based weapon types — damage is handled on hit by ProjectileSystem
+    if (this._emitProjectileVFX(skill.weaponType)) return;
 
     this._attackEnemy({
       range: skill.range,
@@ -179,6 +161,15 @@ export class CombatSystem {
     }
   }
 
+  _emitProjectileVFX(weaponType) {
+    const eventName = PROJECTILE_WEAPON_EVENTS[weaponType];
+    if (eventName) {
+      events.emit(eventName);
+      return true;
+    }
+    return false;
+  }
+
   _shouldUseServerHomelandAttack() {
     return this.state.playStyle === 'multiplayer' && this.state.gameMode === 'homeland';
   }
@@ -190,27 +181,25 @@ export class CombatSystem {
   _queuePvPAttack({ range, damageMultiplier, cooldownMs, knockbackStrength, particleColor, particleCount }) {
     if (!this.remotePlayers) return;
     const playerPos = this.state.player.position;
-    const forward = new THREE.Vector3(
-      -Math.sin(this.state.player.yaw), 0, -Math.cos(this.state.player.yaw),
-    );
+    _forward.set(-Math.sin(this.state.player.yaw), 0, -Math.cos(this.state.player.yaw));
     let bestTarget = null;
     let bestAvatar = null;
     let bestScore = -Infinity;
 
     this.remotePlayers.avatars.forEach((avatar, name) => {
       if (avatar.isDead) return;
-      const toTarget = new THREE.Vector3().subVectors(avatar.root.position, playerPos);
-      const distance = toTarget.length();
+      _toTarget.subVectors(avatar.root.position, playerPos);
+      const distance = _toTarget.length();
       if (distance > range + 1.0) return;
-      toTarget.y = 0;
-      if (toTarget.lengthSq() < 0.001) {
+      _toTarget.y = 0;
+      if (_toTarget.lengthSq() < 0.001) {
         bestTarget = name;
         bestAvatar = avatar;
         bestScore = Infinity;
         return;
       }
-      toTarget.normalize();
-      const facing = forward.dot(toTarget);
+      _toTarget.normalize();
+      const facing = _forward.dot(_toTarget);
       const score = facing * 10 - distance;
       if (facing > 0.2 && score > bestScore) {
         bestScore = score;
@@ -221,24 +210,22 @@ export class CombatSystem {
 
     if (!bestTarget) return;
 
-    // Apply knockback visually on the remote avatar
     if (bestAvatar && knockbackStrength) {
-      const away = new THREE.Vector3().subVectors(bestAvatar.root.position, playerPos);
-      away.y = 0;
-      if (away.lengthSq() < 0.001) {
-        away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
+      _away.subVectors(bestAvatar.root.position, playerPos);
+      _away.y = 0;
+      if (_away.lengthSq() < 0.001) {
+        _away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
       }
-      away.normalize();
+      _away.normalize();
       const kbDir = knockbackStrength < 0 ? -1 : 1;
       const kbMag = Math.abs(knockbackStrength);
-      this.remotePlayers.applyKnockback(bestTarget, away, kbMag * kbDir);
+      this.remotePlayers.applyKnockback(bestTarget, _away, kbMag * kbDir);
     }
 
-    // Spawn hit particles on target
     if (bestAvatar && particleColor) {
       events.emit('sound:hit');
       this.particles.spawn(
-        bestAvatar.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
+        _particleOffset.clone().add(bestAvatar.root.position),
         particleColor, particleCount ?? 6,
       );
     }
@@ -276,26 +263,26 @@ export class CombatSystem {
     enemy.health -= damage;
     enemy.hitFlash = 1;
     events.emit('sound:hit');
-    const away = new THREE.Vector3().subVectors(enemy.root.position, this.state.player.position);
-    away.y = 0;
-    if (away.lengthSq() < 0.001) {
-      away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
+    _away.subVectors(enemy.root.position, this.state.player.position);
+    _away.y = 0;
+    if (_away.lengthSq() < 0.001) {
+      _away.set(Math.sin(this.state.player.yaw), 0, Math.cos(this.state.player.yaw));
     }
-    away.normalize();
+    _away.normalize();
 
     // Negative knockback = pull toward player (dark fruit)
     const kbDir = knockbackStrength < 0 ? -1 : 1;
     const kbMag = Math.abs(knockbackStrength);
-    enemy.knockback.copy(away.multiplyScalar(kbMag * kbDir));
+    enemy.knockback.copy(_away.multiplyScalar(kbMag * kbDir));
     enemy.knockbackTimer = 240;
     this.particles.spawn(
-      enemy.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)),
+      _particleOffset.clone().add(enemy.root.position),
       particleColor, particleCount,
     );
 
     if (enemy.health <= 0) {
       this.particles.spawn(
-        enemy.root.position.clone().add(new THREE.Vector3(0, 1, 0)),
+        _particleOffset.clone().setY(1).add(enemy.root.position),
         'white', 16,
       );
       this.enemies.defeat(enemy, { source: 'player' });

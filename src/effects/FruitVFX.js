@@ -2,8 +2,7 @@ import * as THREE from 'three';
 
 /**
  * Per-fruit VFX particle definitions and rendering.
- * Each fruit has a unique visual style (fire rises, ice orbits, lightning flickers, etc).
- * Extracted from WeaponModels for single-responsibility.
+ * Each fruit has a unique visual style (fire rises, ice orbits, dark vortex, etc).
  */
 
 const FRUIT_VFX = {
@@ -37,17 +36,13 @@ const FRUIT_VFX = {
   },
 };
 
-// Behavior update functions keyed by name
 const BEHAVIOR_UPDATERS = {
   rise: updateRise,
   orbit: updateOrbit,
-  flicker: updateFlicker,
   vortex: updateVortex,
   radiate: updateRadiate,
-  shockwave: updateShockwave,
   drip: updateDrip,
   swirl: updateSwirl,
-  explode: updateExplodeBehavior,
   trail: updateTrail,
 };
 
@@ -55,7 +50,6 @@ function createGeometry(geoType, size) {
   switch (geoType) {
     case 'sphere': return new THREE.SphereGeometry(size, 6, 4);
     case 'diamond': return new THREE.OctahedronGeometry(size);
-    case 'bolt': return new THREE.BoxGeometry(size * 0.3, size * 0.3, size * 4);
     case 'plane': return new THREE.PlaneGeometry(size * 0.4, size * 3);
     default: return new THREE.BoxGeometry(size, size, size);
   }
@@ -193,18 +187,6 @@ function updateOrbit(p, i, cfg, t, attacking, phase, intensity, alpha) {
   applyTransform(p, x, y, z, t * 0.5 + s, t * 0.8, t * 0.3 + s * 2, sc, alpha);
 }
 
-function updateFlicker(p, i, cfg, t, attacking, phase, intensity, alpha) {
-  const s = p.seed;
-  const flickerOn = Math.sin(t * 20 + s * 10) > (attacking ? -0.3 : 0.5);
-  if (!flickerOn) { p.mesh.visible = false; p.mat.opacity = 0; return; }
-  const a2 = s + i * 0.8;
-  const x = baseX + Math.sin(a2) * 0.15 + (Math.random() - 0.5) * 0.04;
-  const y = baseY + Math.cos(a2 * 1.3) * 0.12 + (Math.random() - 0.5) * 0.03;
-  const z = baseZ + Math.sin(a2 * 0.7) * 0.1 - 0.1;
-  const sc = cfg.size * (attacking ? 1.5 : 0.8);
-  applyTransform(p, x, y, z, Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI, sc, alpha);
-}
-
 function updateVortex(p, i, cfg, t, attacking, phase, intensity, alpha) {
   const s = p.seed;
   const idx = i / cfg.count;
@@ -225,26 +207,6 @@ function updateRadiate(p, i, cfg, t, attacking, phase, intensity, alpha) {
   const z = baseZ - 0.05;
   const sc = cfg.size * (attacking ? 1.4 : 0.6);
   applyTransform(p, x, y, z, 0, 0, rayAngle + Math.PI / 2, sc, alpha);
-}
-
-function updateShockwave(p, i, cfg, t, attacking, phase, intensity, alpha) {
-  const s = p.seed;
-  let x, y, z, sc;
-  if (attacking && phase > 0.3) {
-    const shockPhase = (phase - 0.3) / 0.7;
-    const ringAngle = (i / cfg.count) * Math.PI * 2;
-    const ringR = shockPhase * 0.35;
-    x = baseX + Math.cos(ringAngle) * ringR;
-    y = baseY - 0.2 + Math.sin(ringAngle) * ringR * 0.3;
-    z = baseZ + Math.sin(ringAngle) * ringR * 0.5;
-    sc = cfg.size * (1.5 - shockPhase);
-  } else {
-    x = baseX + Math.sin(s + t * 4) * 0.04;
-    y = baseY - 0.15 + Math.abs(Math.sin(t * 6 + s * 3)) * 0.03;
-    z = baseZ + Math.cos(s * 2 + t * 3) * 0.04;
-    sc = cfg.size * 0.5;
-  }
-  applyTransform(p, x, y, z, 0, 0, 0, sc, alpha);
 }
 
 function updateDrip(p, i, cfg, t, attacking, phase, intensity, alpha) {
@@ -270,27 +232,6 @@ function updateSwirl(p, i, cfg, t, attacking, phase, intensity, alpha) {
   const z = baseZ + Math.sin(sAngle) * sRadius - 0.1;
   const sc = cfg.size * (0.5 + intensity * 0.6);
   applyTransform(p, x, y, z, 0, 0, t * 5 + s, sc, alpha);
-}
-
-function updateExplodeBehavior(p, i, cfg, t, attacking, phase, intensity, alpha) {
-  const s = p.seed;
-  let x, y, z, sc;
-  if (attacking && phase > 0.2) {
-    const expPhase = (phase - 0.2) / 0.8;
-    const expAngle = s + (i / cfg.count) * Math.PI * 2;
-    const expR = expPhase * 0.4;
-    x = baseX + Math.cos(expAngle) * expR;
-    y = baseY + Math.sin(expAngle * 1.3) * expR - expPhase * 0.15;
-    z = baseZ + Math.sin(expAngle * 0.8) * expR * 0.5;
-    sc = cfg.size * (1.2 - expPhase * 0.8);
-    p.mat.color.setHex(Math.sin(t * 15 + s) > 0 ? cfg.colors[0] : cfg.colors[1]);
-  } else {
-    x = baseX + Math.sin(s + t * 2) * 0.04;
-    y = baseY + Math.cos(s * 2 + t * 3) * 0.03;
-    z = baseZ - 0.05;
-    sc = cfg.size * 0.3;
-  }
-  applyTransform(p, x, y, z, 0, 0, 0, sc, alpha);
 }
 
 function updateTrail(p, i, cfg, t, attacking, phase, intensity, alpha) {

@@ -1,16 +1,13 @@
 import * as THREE from 'three';
 import { events } from '../core/EventBus.js';
 
-/**
- * Listens for projectile-type combat events and spawns the corresponding
- * projectiles via ProjectileSystem. Bridges WeaponModels (which holds
- * the GLB templates) with ProjectileSystem (movement/collision/AOE).
- *
- * Supported projectile types:
- *   - fire_fist: fast single-target fireball, no explosion
- *   - fire_pillar: AOE flame tornado at player's feet, launches enemies upward
- *   - flame_emperor: slower, bigger fireball with AOE explosion on impact
- */
+// Reusable objects for projectile group creation (avoid per-spawn allocations)
+const _quat = new THREE.Quaternion();
+const _rotMatrix = new THREE.Matrix4();
+const _lookUp = new THREE.Vector3(0, 1, 0);
+const _lookOrigin = new THREE.Vector3();
+const _awayVec = new THREE.Vector3();
+
 export class FireFistSpawner {
   constructor(gameState, sceneSetup, weaponModels, projectileSystem) {
     this.state = gameState;
@@ -73,18 +70,14 @@ export class FireFistSpawner {
     const projModel = tmpl.template.clone();
     projModel.scale.copy(tmpl.baseScale).multiplyScalar(worldScale);
     projModel.position.set(0, 0, 0);
-    // Correct model orientation — rotate within the group so it faces -Z
     if (modelRotY) projModel.rotation.y = modelRotY;
 
-    const quat = new THREE.Quaternion();
-    const rotMatrix = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(), dir, new THREE.Vector3(0, 1, 0),
-    );
-    quat.setFromRotationMatrix(rotMatrix);
+    _rotMatrix.lookAt(_lookOrigin, dir, _lookUp);
+    _quat.setFromRotationMatrix(_rotMatrix);
 
     const projGroup = new THREE.Group();
     projGroup.position.copy(spawnPos);
-    projGroup.quaternion.copy(quat);
+    projGroup.quaternion.copy(_quat);
     projGroup.add(projModel);
     this.scene.particleGroup.add(projGroup);
     return projGroup;
@@ -140,7 +133,6 @@ export class FireFistSpawner {
       player.position.z + forward.z * spawnDist,
     );
 
-    // Spawn the GLB model as a rising flame tornado (thinner: scale X/Z reduced)
     const tmpl = this.weaponModels.getProjectileTemplate('fire_pillar');
     if (tmpl) {
       const pillarModel = tmpl.template.clone();
@@ -250,13 +242,11 @@ export class FireFistSpawner {
         enemy.health -= dmg;
         enemy.hitFlash = 1;
 
-        // Minimal horizontal knockback, main force is upward
-        const away = new THREE.Vector3()
-          .subVectors(enemy.root.position, pillarPos);
-        away.y = 0;
-        if (away.lengthSq() < 0.01) away.set(Math.random() - 0.5, 0, Math.random() - 0.5);
-        away.normalize();
-        enemy.knockback.copy(away.multiplyScalar(2.0 * falloff));
+        _awayVec.subVectors(enemy.root.position, pillarPos);
+        _awayVec.y = 0;
+        if (_awayVec.lengthSq() < 0.01) _awayVec.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+        _awayVec.normalize();
+        enemy.knockback.copy(_awayVec.multiplyScalar(2.0 * falloff));
         enemy.knockbackTimer = 300;
 
         // Launch enemy upward (30% less than before)
@@ -390,8 +380,8 @@ export class FireFistSpawner {
     ).normalize();
     const launchPos = spawnPos.clone()
       .addScaledVector(right, 0.16)
-      .addScaledVector(dir, 0.2)
-      .add(new THREE.Vector3(0, -0.12, 0));
+      .addScaledVector(dir, 0.2);
+    launchPos.y -= 0.12;
     const cameraOrigin = new THREE.Vector3(
       player.position.x,
       player.position.y + 1.62,
@@ -423,19 +413,14 @@ export class FireFistSpawner {
     projModel.position.set(0, 0, 0);
     projModel.rotation.set(0, 0, 0);
 
-    // Converge the release from the lower-right hand into the crosshair line quickly,
-    // then let gravity pull it into a visible spear arc.
     const launchDir = aimPoint.sub(launchPos).normalize();
 
-    const quat = new THREE.Quaternion();
-    const rotMatrix = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(), launchDir, new THREE.Vector3(0, 1, 0),
-    );
-    quat.setFromRotationMatrix(rotMatrix);
+    _rotMatrix.lookAt(_lookOrigin, launchDir, _lookUp);
+    _quat.setFromRotationMatrix(_rotMatrix);
 
     const projGroup = new THREE.Group();
     projGroup.position.copy(launchPos);
-    projGroup.quaternion.copy(quat);
+    projGroup.quaternion.copy(_quat);
     projGroup.add(projModel);
     this.scene.particleGroup.add(projGroup);
 

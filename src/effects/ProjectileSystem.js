@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import { events } from '../core/EventBus.js';
 
-/**
- * Manages world-space projectiles (fire fist, future projectile types).
- * Handles spawning, movement, enemy collision, trail particles, and cleanup.
- * Extracted from WeaponModels for single-responsibility.
- */
+// Reusable objects to avoid per-frame allocations in hot update loops
+const _velDir = new THREE.Vector3();
+const _lookMatrix = new THREE.Matrix4();
+const _lookUp = new THREE.Vector3(0, 1, 0);
+const _lookOrigin = new THREE.Vector3();
+const _away = new THREE.Vector3();
+const _avatarCenter = new THREE.Vector3();
+
 export class ProjectileSystem {
   constructor(sceneSetup, particleSystem, enemyManager, world) {
     this.scene = sceneSetup;
@@ -101,16 +104,12 @@ export class ProjectileSystem {
 
       proj.age += dt;
 
-      // Apply gravity (arc trajectory for javelin-type projectiles)
       if (proj.gravity) {
         proj.velocity.y -= proj.gravity * dt;
-        // Re-orient projectile to face velocity direction
-        const velDir = proj.velocity.clone().normalize();
-        const lookMatrix = new THREE.Matrix4().lookAt(
-          new THREE.Vector3(), velDir, new THREE.Vector3(0, 1, 0),
-        );
-        proj.group.quaternion.setFromRotationMatrix(lookMatrix);
-        proj._velDir.copy(velDir);
+        _velDir.copy(proj.velocity).normalize();
+        _lookMatrix.lookAt(_lookOrigin, _velDir, _lookUp);
+        proj.group.quaternion.setFromRotationMatrix(_lookMatrix);
+        proj._velDir.copy(_velDir);
       }
 
       proj.group.position.addScaledVector(proj.velocity, dt);
@@ -118,7 +117,6 @@ export class ProjectileSystem {
       const dist = proj.group.position.distanceTo(proj.origin);
       let hit = false;
 
-      // Check enemy collision
       const alive = this.enemyManager.getAlive();
       for (const enemy of alive) {
         const d = proj.group.position.distanceTo(enemy.root.position);
@@ -151,12 +149,10 @@ export class ProjectileSystem {
         }
       }
 
-      // Check remote player collision (PvP)
       if (!hit && this._remotePlayers && this._isPvPMode()) {
         hit = this._checkRemotePlayerCollision(proj);
       }
 
-      // Check terrain/block collision
       if (!hit) {
         hit = this._checkWorldCollision(proj);
       }
@@ -170,7 +166,6 @@ export class ProjectileSystem {
         continue;
       }
 
-      // Update trail particles
       if (proj.trailConfig && proj.trailParticles.length > 0) {
         this._updateTrail(dt, proj);
       }
@@ -184,19 +179,16 @@ export class ProjectileSystem {
     const by = Math.floor(pos.y);
     const bz = Math.floor(pos.z);
 
-    // Hit ground (below y=0) or solid block
     const hitWorld = pos.y < 0 || this.world.getBlock(bx, by, bz) != null;
     if (!hitWorld) return false;
 
     const impactPos = pos.clone();
 
-    // AOE damage nearby enemies on world collision too
     if (!proj.visualOnly && proj.aoe && proj.aoeRadius > 0) {
       const alive = this.enemyManager.getAlive();
       this._applyAOEDamage(proj, impactPos, alive);
     }
 
-    // Spawn explosion or particles
     if (proj.explodeOnImpact && this._explosionEffect) {
       this._explosionEffect.spawn(impactPos, {
         scale: proj.explosionScale,
@@ -216,10 +208,8 @@ export class ProjectileSystem {
     enemy.health -= dmg;
     enemy.hitFlash = 1;
 
-    const away = new THREE.Vector3()
-      .subVectors(enemy.root.position, proj.group.position)
-      .normalize();
-    enemy.knockback.copy(away.multiplyScalar(proj.knockback));
+    _away.subVectors(enemy.root.position, proj.group.position).normalize();
+    enemy.knockback.copy(_away.multiplyScalar(proj.knockback));
     enemy.knockbackTimer = 240;
 
     if (enemy.health <= 0) {
@@ -232,18 +222,16 @@ export class ProjectileSystem {
       const d = enemy.root.position.distanceTo(impactPos);
       if (d > proj.aoeRadius) continue;
 
-      // Damage falls off linearly with distance
       const falloff = 1 - (d / proj.aoeRadius) * 0.5;
       const def = enemy.baseDefense || 0;
       const dmg = Math.max(1, Math.round(proj.damage * falloff) - def);
       enemy.health -= dmg;
       enemy.hitFlash = 1;
 
-      const away = new THREE.Vector3()
-        .subVectors(enemy.root.position, impactPos);
-      if (away.lengthSq() < 0.01) away.set(Math.random() - 0.5, 0.5, Math.random() - 0.5);
-      away.normalize();
-      enemy.knockback.copy(away.multiplyScalar(proj.knockback * falloff));
+      _away.subVectors(enemy.root.position, impactPos);
+      if (_away.lengthSq() < 0.01) _away.set(Math.random() - 0.5, 0.5, Math.random() - 0.5);
+      _away.normalize();
+      enemy.knockback.copy(_away.multiplyScalar(proj.knockback * falloff));
       enemy.knockbackTimer = 240;
 
       if (enemy.health <= 0) {
@@ -263,8 +251,8 @@ export class ProjectileSystem {
 
     this._remotePlayers.avatars.forEach((avatar, name) => {
       if (hitName || avatar.isDead || !avatar.root.visible) return;
-      const d = pos.distanceTo(avatar.root.position.clone().add(new THREE.Vector3(0, 0.9, 0)));
-      if (d < 1.4) {
+      _avatarCenter.copy(avatar.root.position).y += 0.9;
+      if (pos.distanceTo(_avatarCenter) < 1.4) {
         hitName = name;
         hitAvatar = avatar;
       }
@@ -274,7 +262,6 @@ export class ProjectileSystem {
 
     const impactPos = pos.clone();
 
-    // Spawn explosion or particles
     if (proj.explodeOnImpact && this._explosionEffect) {
       this._explosionEffect.spawn(impactPos, {
         scale: proj.explosionScale,
@@ -284,16 +271,14 @@ export class ProjectileSystem {
       this.particles.spawn(impactPos, 'orange', 16);
     }
 
-    // Apply visual knockback on the remote avatar
     if (hitAvatar && proj.knockback) {
-      const away = new THREE.Vector3().subVectors(hitAvatar.root.position, impactPos);
-      away.y = 0;
-      if (away.lengthSq() < 0.01) away.set(Math.random() - 0.5, 0, Math.random() - 0.5);
-      away.normalize();
-      this._remotePlayers.applyKnockback(hitName, away, Math.abs(proj.knockback));
+      _away.subVectors(hitAvatar.root.position, impactPos);
+      _away.y = 0;
+      if (_away.lengthSq() < 0.01) _away.set(Math.random() - 0.5, 0, Math.random() - 0.5);
+      _away.normalize();
+      this._remotePlayers.applyKnockback(hitName, _away, Math.abs(proj.knockback));
     }
 
-    // Queue PvP damage through the server
     if (this._multiplayerClient) {
       this._multiplayerClient.queuePvPAttack({
         targetPlayer: hitName,

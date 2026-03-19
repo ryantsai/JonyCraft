@@ -325,8 +325,14 @@ function lerpAngle(from, to, alpha) {
   return from + delta * alpha;
 }
 
-// Fire skill VFX colors
 const FIRE_COLORS = [0xff2200, 0xff4400, 0xff6b35, 0xffaa00, 0xffdd44];
+
+// Reusable objects for projectile orientation
+const _quat = new THREE.Quaternion();
+const _rotMatrix = new THREE.Matrix4();
+const _lookUp = new THREE.Vector3(0, 1, 0);
+const _lookOrigin = new THREE.Vector3();
+const _spreadVec = new THREE.Vector3();
 
 export class RemotePlayers {
   constructor(sceneSetup) {
@@ -705,15 +711,11 @@ export class RemotePlayers {
         projModel.position.set(0, 0, 0);
         if (opts.glbRotY) projModel.rotation.y = opts.glbRotY;
 
-        // Orient group to face travel direction
         const projGroup = new THREE.Group();
         projGroup.position.copy(spawnPos);
-        const quat = new THREE.Quaternion();
-        const rotMatrix = new THREE.Matrix4().lookAt(
-          new THREE.Vector3(), forward, new THREE.Vector3(0, 1, 0),
-        );
-        quat.setFromRotationMatrix(rotMatrix);
-        projGroup.quaternion.copy(quat);
+        _rotMatrix.lookAt(_lookOrigin, forward, _lookUp);
+        _quat.setFromRotationMatrix(_rotMatrix);
+        projGroup.quaternion.copy(_quat);
         projGroup.add(projModel);
         this.scene.particleGroup.add(projGroup);
 
@@ -744,14 +746,14 @@ export class RemotePlayers {
       mesh.renderOrder = 58;
       this.scene.particleGroup.add(mesh);
 
+      _spreadVec.set(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.3) * 2,
+        (Math.random() - 0.5) * 2,
+      );
       this._remoteVFX.push({
         mesh, mat,
-        vel: vel.clone().addScaledVector(
-          new THREE.Vector3(
-            (Math.random() - 0.5) * 2,
-            (Math.random() - 0.3) * 2,
-            (Math.random() - 0.5) * 2,
-          ), 1),
+        vel: vel.clone().add(_spreadVec),
         age: 0,
         maxAge: opts.life + Math.random() * 0.3,
       });
@@ -863,14 +865,14 @@ export class RemotePlayers {
       mesh.renderOrder = 58;
       this.scene.particleGroup.add(mesh);
 
+      _spreadVec.set(
+        (Math.random() - 0.5) * 2,
+        (Math.random() - 0.3) * 2,
+        (Math.random() - 0.5) * 2,
+      );
       this._remoteVFX.push({
         mesh, mat,
-        vel: forward.clone().multiplyScalar(3 + Math.random() * 2).add(
-          new THREE.Vector3(
-            (Math.random() - 0.5) * 2,
-            (Math.random() - 0.3) * 2,
-            (Math.random() - 0.5) * 2,
-          )),
+        vel: forward.clone().multiplyScalar(3 + Math.random() * 2).add(_spreadVec),
         age: 0,
         maxAge: 0.3 + Math.random() * 0.3,
       });
@@ -971,7 +973,6 @@ export class RemotePlayers {
     });
     this.avatars.clear();
 
-    // Clean up VFX
     for (const p of this._remoteVFX) {
       this._cleanupVFXEntry(p);
     }

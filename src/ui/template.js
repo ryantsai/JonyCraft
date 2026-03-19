@@ -18,18 +18,24 @@ export const gameTemplate = `
           <input id="multiplayer-chat-input" class="multiplayer-chat-input" type="text" maxlength="500" placeholder="按 Enter 發送訊息（最多 500 字）" />
         </div>
       </div>
-      <div id="multiplayer-scoreboard" class="multiplayer-scoreboard" data-visible="false" aria-label="多人分數板">
-        <div class="multiplayer-scoreboard-header">
-          <span>多人分數板</span>
-          <span id="multiplayer-ping-label">Ping -- ms</span>
+      <div id="multiplayer-scoreboard" class="multiplayer-scoreboard" data-visible="false" data-collapsed="false" aria-label="多人分數板">
+        <button id="multiplayer-scoreboard-collapsed" class="multiplayer-scoreboard-collapsed-btn" type="button" aria-label="開啟分數板">📊</button>
+        <div class="multiplayer-scoreboard-panel">
+          <div class="multiplayer-scoreboard-header">
+            <span>多人分數板</span>
+            <div class="multiplayer-scoreboard-header-right">
+              <span id="multiplayer-ping-label">Ping -- ms</span>
+              <button id="multiplayer-scoreboard-toggle" class="multiplayer-scoreboard-toggle" type="button" aria-label="隱藏分數板">－</button>
+            </div>
+          </div>
+          <div class="multiplayer-scoreboard-columns">
+            <span>玩家</span>
+            <span>K</span>
+            <span>G</span>
+            <span>Ping</span>
+          </div>
+          <div id="multiplayer-scoreboard-rows" class="multiplayer-scoreboard-rows"></div>
         </div>
-        <div class="multiplayer-scoreboard-columns">
-          <span>玩家</span>
-          <span>K</span>
-          <span>G</span>
-          <span>Ping</span>
-        </div>
-        <div id="multiplayer-scoreboard-rows" class="multiplayer-scoreboard-rows"></div>
       </div>
       <div id="defense-scoreboard" class="defense-scoreboard" data-visible="false" aria-label="保衛家園記分板">
         <span>波次 <span id="def-wave">1</span></span>

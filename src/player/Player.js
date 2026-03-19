@@ -32,7 +32,7 @@ export class PlayerController {
   moveAlongAxis(player, axis, delta) {
     if (delta === 0) return false;
 
-    const maxStep = axis === 'y' ? 0.12 : 0.1;
+    const maxStep = axis === 'y' ? 0.12 : 0.05;
     const steps = Math.max(1, Math.ceil(Math.abs(delta) / maxStep));
     const stepDelta = delta / steps;
     let collided = false;
@@ -85,12 +85,13 @@ export class PlayerController {
   }
 
   playerCollides(x, y, z) {
-    const minX = Math.floor(x - PLAYER_RADIUS);
-    const maxX = Math.floor(x + PLAYER_RADIUS);
+    const EPS = 0.02;
+    const minX = Math.floor(x - PLAYER_RADIUS - EPS);
+    const maxX = Math.floor(x + PLAYER_RADIUS + EPS);
     const minY = Math.floor(y);
     const maxY = Math.floor(y + PLAYER_HEIGHT - 0.001);
-    const minZ = Math.floor(z - PLAYER_RADIUS);
-    const maxZ = Math.floor(z + PLAYER_RADIUS);
+    const minZ = Math.floor(z - PLAYER_RADIUS - EPS);
+    const maxZ = Math.floor(z + PLAYER_RADIUS + EPS);
 
     for (let px = minX; px <= maxX; px += 1) {
       for (let py = minY; py <= maxY; py += 1) {
@@ -132,6 +133,19 @@ export class PlayerController {
           const dist = Math.sqrt(dx * dx + dz * dz);
           if (dist < PLAYER_RADIUS + 0.9) return true;
         }
+      }
+    }
+
+    // Merchant NPC collision (cylinder: radius 0.6, height 2.2)
+    if (mc?.merchantPos) {
+      const mp = mc.merchantPos;
+      const mBottom = mp.y;
+      const mTop = mp.y + 2.2;
+      if (py < mTop && pTop > mBottom) {
+        const dx = x - mp.x;
+        const dz = z - mp.z;
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < PLAYER_RADIUS + 0.6) return true;
       }
     }
 
@@ -224,8 +238,46 @@ export class PlayerController {
     this.scene.syncCamera(player);
   }
 
+  /**
+   * Check if a spawn position is too close to defense objects (tower, merchant, turrets, enemies).
+   * Returns true if the position is blocked.
+   */
+  _spawnBlockedByEntities(x, z, minClearance) {
+    const mc = this.state.modeController;
+    if (mc?.towerMesh) {
+      const tp = mc.towerMesh.position;
+      const dx = x - tp.x;
+      const dz = z - tp.z;
+      if (dx * dx + dz * dz < (minClearance + 1.6) * (minClearance + 1.6)) return true;
+    }
+    if (mc?.merchantPos) {
+      const mp = mc.merchantPos;
+      const dx = x - mp.x;
+      const dz = z - mp.z;
+      if (dx * dx + dz * dz < (minClearance + 0.6) * (minClearance + 0.6)) return true;
+    }
+    if (Array.isArray(this.state.defense?.turrets)) {
+      for (const turret of this.state.defense.turrets) {
+        const dx = x - turret.x;
+        const dz = z - turret.z;
+        if (dx * dx + dz * dz < (minClearance + 0.9) * (minClearance + 0.9)) return true;
+      }
+    }
+    if (this.enemyManager) {
+      for (const enemy of this.enemyManager.getAlive()) {
+        const ep = enemy.root.position;
+        const eRadius = 0.4 * (enemy.sizeMultiplier || 1);
+        const dx = x - ep.x;
+        const dz = z - ep.z;
+        if (dx * dx + dz * dz < (minClearance + eRadius) * (minClearance + eRadius)) return true;
+      }
+    }
+    return false;
+  }
+
   setRandomSpawn() {
     const player = this.state.player;
+    const isHomeland = this.state.defense?.enabled;
     for (let attempt = 0; attempt < 40; attempt += 1) {
       const x = 4 + Math.random() * (WORLD_SIZE_X - 8);
       const z = 4 + Math.random() * (WORLD_SIZE_Z - 8);
@@ -244,6 +296,7 @@ export class PlayerController {
         }
       }
       if (surfaceY < 0) continue;
+      if (isHomeland && this._spawnBlockedByEntities(x, z, PLAYER_RADIUS + 0.5)) continue;
       player.position.set(x, surfaceY, z);
       player.velocity.set(0, 0, 0);
       player.hp = player.maxHp;
@@ -260,6 +313,7 @@ export class PlayerController {
     let bestScore = -Infinity;
     let bestPos = new THREE.Vector3(WORLD_SIZE_X / 2, 8, WORLD_SIZE_Z / 2);
     const center = new THREE.Vector2(WORLD_SIZE_X / 2, WORLD_SIZE_Z / 2);
+    const isHomeland = this.state.defense?.enabled;
 
     for (let x = 2; x < WORLD_SIZE_X - 2; x += 1) {
       for (let z = 2; z < WORLD_SIZE_Z - 2; z += 1) {
@@ -282,8 +336,20 @@ export class PlayerController {
           }
           if (clutter > 0) continue;
 
+          // Skip positions too close to defense objects
+          if (isHomeland && this._spawnBlockedByEntities(x + 0.5, z + 0.5, PLAYER_RADIUS + 0.5)) {
+            break;
+          }
+
           const distToCenter = center.distanceTo(new THREE.Vector2(x, z));
-          const score = 12 - distToCenter + y * 0.15 + (block === 'grass' ? 3 : 0);
+          let score;
+          if (isHomeland) {
+            // Prefer distance 4-7 from center (inside fortress, away from tower)
+            const idealDist = 5.5;
+            score = -Math.abs(distToCenter - idealDist) + y * 0.15 + (block === 'grass' ? 3 : 0);
+          } else {
+            score = 12 - distToCenter + y * 0.15 + (block === 'grass' ? 3 : 0);
+          }
           if (score > bestScore) {
             bestScore = score;
             bestPos.set(x + 0.5, y + 1.01, z + 0.5);

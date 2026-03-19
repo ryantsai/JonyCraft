@@ -32,6 +32,8 @@ export class HUD {
     this.multiplayerChatInput = document.querySelector('#multiplayer-chat-input');
     this.multiplayerChatToggle = document.querySelector('#multiplayer-chat-toggle');
     this.multiplayerChatCollapsed = document.querySelector('#multiplayer-chat-collapsed');
+    this.multiplayerScoreboardToggle = document.querySelector('#multiplayer-scoreboard-toggle');
+    this.multiplayerScoreboardCollapsed = document.querySelector('#multiplayer-scoreboard-collapsed');
     this._lastRenderedChatSeq = -1;
     this._lastPingUpdate = 0;
     this._lastPingValue = 0;
@@ -124,6 +126,16 @@ export class HUD {
       events.emit('sound:click');
       this._setChatCollapsed(false);
       this._focusChatInput();
+    });
+
+    this.multiplayerScoreboardToggle.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._setScoreboardCollapsed(true);
+    });
+
+    this.multiplayerScoreboardCollapsed.addEventListener('click', () => {
+      events.emit('sound:click');
+      this._setScoreboardCollapsed(false);
     });
 
     this.multiplayerChatInput.addEventListener('focus', () => {
@@ -304,6 +316,7 @@ export class HUD {
     const showScoreboard = multiplayer.enabled && multiplayer.playerStats.length > 0;
     this.multiplayerScoreboard.dataset.visible = showScoreboard ? 'true' : 'false';
     if (showScoreboard) {
+      this.multiplayerScoreboard.dataset.collapsed = multiplayer.scoreboardCollapsed ? 'true' : 'false';
       const now = performance.now();
       if (now - this._lastPingUpdate > 1000) {
         this._lastPingUpdate = now;
@@ -811,6 +824,11 @@ export class HUD {
   _setChatCollapsed(collapsed) {
     this.state.multiplayer.chatCollapsed = Boolean(collapsed);
     this.multiplayerChat.dataset.collapsed = this.state.multiplayer.chatCollapsed ? 'true' : 'false';
+  }
+
+  _setScoreboardCollapsed(collapsed) {
+    this.state.multiplayer.scoreboardCollapsed = Boolean(collapsed);
+    this.multiplayerScoreboard.dataset.collapsed = this.state.multiplayer.scoreboardCollapsed ? 'true' : 'false';
   }
 
   _submitChatInput() {

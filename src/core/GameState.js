@@ -87,6 +87,7 @@ export class GameState {
       chatMessages: [],
       chatFocused: false,
       chatCollapsed: false,
+      scoreboardCollapsed: false,
       connectionStatus: 'offline',
     };
   }

@@ -322,7 +322,9 @@ export class MultiplayerClient {
     this.state.multiplayer.pingMs = 0;
     this.state.multiplayer.latestChatSeq = 0;
     this.state.multiplayer.chatMessages = [];
-    this.state.multiplayer.chatCollapsed = false;
+    const isMobile = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+    this.state.multiplayer.chatCollapsed = isMobile;
+    this.state.multiplayer.scoreboardCollapsed = isMobile;
     this.state.multiplayer.chatFocused = false;
     this.syncAccumulatorMs = 0;
     this.lastServerTrafficAt = performance.now();
@@ -526,6 +528,7 @@ export class MultiplayerClient {
     this.state.multiplayer.latestChatSeq = 0;
     this.state.multiplayer.chatMessages = [];
     this.state.multiplayer.chatCollapsed = false;
+    this.state.multiplayer.scoreboardCollapsed = false;
     this.state.multiplayer.chatFocused = false;
     this.state.multiplayer.sessionPlayerCount = 1;
     this.pendingBlockOps = [];

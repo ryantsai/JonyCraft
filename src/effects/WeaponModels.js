@@ -63,6 +63,8 @@ export class WeaponModels {
     this._buildFirePillar();
     this._buildFlameEmperor();
     this._buildDarkPull();
+    this._buildLaserSabre();
+    this._buildLightBeam();
     this._buildDirtSkill();
     this._fruitVFX.build();
   }
@@ -107,6 +109,10 @@ export class WeaponModels {
       this._animateFlameEmperor(combat, swingMs, mod, gameState);
     } else if (wt === 'dark_pull') {
       this._animateDarkPull(combat, swingMs, mod, gameState);
+    } else if (wt === 'laser_sabre') {
+      this._animateLaserSabre(combat, swingMs, mod, gameState);
+    } else if (wt === 'light_beam') {
+      this._animateLightBeam(combat, swingMs, mod, gameState);
     } else if (wt === 'dirt') {
       this.models.dirt.group.position.set(0.58, -0.56, -0.72);
       this.models.dirt.group.rotation.set(0.22, 0.22, -0.3);
@@ -114,7 +120,7 @@ export class WeaponModels {
     }
 
     // Update fruit-specific VFX particles
-    const attackPhase = wt === 'sword'
+    const attackPhase = (wt === 'sword' || wt === 'laser_sabre')
       ? (combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / swingMs : 0)
       : (combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0);
     this._fruitVFX.update(dt, attackPhase, fruit, gameState.mode === 'playing');
@@ -1025,6 +1031,383 @@ export class WeaponModels {
         p.mat.color.setHex(wispProgress > 0.6 ? 0xff6b35 : 0xffaa00);
         p.mesh.visible = p.mat.opacity > 0.01;
       }
+    }
+  }
+
+  // ── Laser Sabre: GLB sword with continuous glow effect ──
+
+  _buildLaserSabre() {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+
+    // Continuous glow particles along the blade
+    const glowGroup = new THREE.Group();
+    glowGroup.renderOrder = 55;
+    group.add(glowGroup);
+    const glowParticles = [];
+    const glowCount = 20;
+    const glowColors = [0x00ffff, 0x44ddff, 0x88eeff, 0xaaffff, 0x00ccff];
+    for (let i = 0; i < glowCount; i++) {
+      const mat = new THREE.MeshBasicMaterial({
+        color: glowColors[i % glowColors.length],
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthTest: false,
+      });
+      const sz = 0.012 + Math.random() * 0.012;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(sz, sz, sz), mat);
+      mesh.visible = false;
+      mesh.renderOrder = 55;
+      glowGroup.add(mesh);
+      glowParticles.push({ mesh, mat, seed: Math.random() * Math.PI * 2 });
+    }
+
+    // Core blade glow (additive overlay)
+    const bladeGlowMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.25,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    const bladeGlow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.03, 0.5, 0.03),
+      bladeGlowMat,
+    );
+    bladeGlow.renderOrder = 54;
+    bladeGlow.position.set(0, 0.3, 0);
+    group.add(bladeGlow);
+
+    // Light shockwave ring — expands outward on each swing
+    const shockwaveMat = new THREE.MeshBasicMaterial({
+      color: 0xfff4a0,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    const shockwave = new THREE.Mesh(
+      new THREE.RingGeometry(0.05, 0.15, 24),
+      shockwaveMat,
+    );
+    shockwave.renderOrder = 56;
+    shockwave.visible = false;
+    group.add(shockwave);
+
+    this.models.laser_sabre = {
+      group,
+      glbModel: null,
+      glbLoaded: false,
+      glbBaseScale: new THREE.Vector3(1, 1, 1),
+      idleTime: 0,
+      glowGroup,
+      glowParticles,
+      bladeGlow,
+      bladeGlowMat,
+      mixer: null,
+      shockwave,
+      shockwaveMat,
+      wasSwinging: false,
+    };
+
+    const loader = new GLTFLoader();
+    loader.load('assets/weapons/laser_sabre.glb', (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const s = 28.0 / maxDim;
+      model.scale.set(s, s, s);
+      // Anchor at the bottom of the model (handle) so it pivots from grip
+      const center = box.getCenter(new THREE.Vector3());
+      const bottom = box.min.y;
+      model.position.set(-center.x * s, -bottom * s, -center.z * s);
+
+      // Rotate so blade points upward: flip on X so tip goes up
+      model.rotation.x = Math.PI;
+
+      // Ensure GLB renders on top of the world (no ground clipping)
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.renderOrder = 50;
+          if (child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach((mt) => { mt.depthTest = false; });
+          }
+        }
+      });
+
+      group.add(model);
+      this.models.laser_sabre.glbModel = model;
+      this.models.laser_sabre.glbBaseScale.copy(model.scale);
+      this.models.laser_sabre.glbLoaded = true;
+
+      // Set up AnimationMixer to loop all embedded GLB animations
+      if (gltf.animations && gltf.animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(model);
+        for (const clip of gltf.animations) {
+          const action = mixer.clipAction(clip);
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.play();
+        }
+        this.models.laser_sabre.mixer = mixer;
+      }
+    });
+  }
+
+  _animateLaserSabre(combat, swingMs, mod, gameState) {
+    const m = this.models.laser_sabre;
+    if (!m) return;
+
+    m.idleTime += 0.016;
+    const t = m.idleTime;
+
+    // Tick GLB animation mixer (looping effect animations)
+    if (m.mixer) m.mixer.update(0.016);
+
+    const phase = combat.swordSwingTime > 0 ? 1 - combat.swordSwingTime / swingMs : 0;
+
+    // ── Held in right hand, blade pointing straight up, swings forward ──
+    const windup = THREE.MathUtils.smoothstep(phase, 0, 0.25);
+    const release = THREE.MathUtils.smoothstep(phase, 0.2, 0.6);
+    const recover = THREE.MathUtils.smoothstep(phase, 0.65, 1);
+    const swing = release - recover * 0.9;
+
+    // Rest: far right, flat side angled toward camera, hilt visible.
+    // Swing: tips blade forward.
+    m.group.position.set(
+      1.2 - swing * 0.2,
+      -0.5 + windup * 0.15 - swing * 0.3,
+      THREE.MathUtils.lerp(-0.6, -1.1, swing),
+    );
+    m.group.rotation.set(
+      THREE.MathUtils.lerp(0.1, -1.5, swing) + windup * 0.3,
+      THREE.MathUtils.lerp(-0.5, -0.4, swing),
+      THREE.MathUtils.lerp(0.15, 0, swing),
+    );
+
+    // ── Idle sway when not swinging ──
+    if (phase === 0) {
+      const swayX = Math.sin(t * 1.6) * 0.012;
+      const swayY = Math.cos(t * 1.2) * 0.015;
+      const swayRot = Math.sin(t * 1.0) * 0.025;
+      m.group.position.x += swayX;
+      m.group.position.y += swayY;
+      m.group.rotation.z += swayRot * 0.5;
+    }
+
+    // ── Blade core glow: continuous pulsing ──
+    const pulseAlpha = 0.2 + Math.sin(t * 3.5) * 0.1;
+    const attackBoost = phase > 0 ? (1 - phase) * 0.4 : 0;
+    m.bladeGlowMat.opacity = pulseAlpha + attackBoost;
+    const pulseScale = 1 + Math.sin(t * 4.0) * 0.15;
+    m.bladeGlow.scale.set(pulseScale, 1, pulseScale);
+
+    // ── Continuous glow particles along the blade ──
+    this._updateLaserSabreGlow(m, t, phase);
+
+    // ── Light shockwave on each swing ──
+    const isSwinging = phase > 0;
+    if (isSwinging && !m.wasSwinging) {
+      // New swing started — reset shockwave
+      m.shockwaveTime = 0;
+    }
+    m.wasSwinging = isSwinging;
+
+    if (m.shockwaveTime !== undefined && m.shockwaveTime < 0.5) {
+      m.shockwaveTime += 0.016;
+      const st = m.shockwaveTime / 0.5; // 0→1 over 0.5s
+      const scale = 0.5 + st * 3.0; // expand outward
+      m.shockwave.scale.setScalar(scale);
+      m.shockwave.position.set(0, 0.3, -0.1);
+      m.shockwave.rotation.set(0, 0, t * 2);
+      // Bright flash that fades out
+      m.shockwaveMat.opacity = (1 - st) * 0.7;
+      m.shockwaveMat.color.setHex(st < 0.3 ? 0xffffff : 0xfff4a0);
+      m.shockwave.visible = true;
+    } else {
+      m.shockwave.visible = false;
+      m.shockwaveMat.opacity = 0;
+    }
+
+    m.group.visible = gameState.mode === 'playing';
+  }
+
+  _updateLaserSabreGlow(m, t, phase) {
+    const count = m.glowParticles.length;
+    const attackIntensity = phase > 0 ? Math.sin(phase * Math.PI) : 0;
+
+    for (let i = 0; i < count; i++) {
+      const p = m.glowParticles[i];
+      const s = p.seed;
+      const idx = i / count;
+
+      if (i < 10) {
+        // Layer 1: particles drifting along the blade length
+        const bladePos = ((t * 0.5 + idx * 2.0) % 1.0);
+        const y = bladePos * 0.5 + 0.05;
+        const orbitAngle = s + t * 3.0;
+        const radius = 0.025 + Math.sin(t * 4 + s) * 0.01;
+        const x = Math.cos(orbitAngle) * radius;
+        const z = Math.sin(orbitAngle) * radius;
+
+        p.mesh.position.set(x, y, z);
+        p.mesh.rotation.set(t * 3 + s, t * 2, t * 4 + s);
+
+        const fadeEdge = Math.sin(bladePos * Math.PI);
+        const flicker = 0.3 + Math.sin(t * 7 + s * 5) * 0.15;
+        p.mat.opacity = (flicker + attackIntensity * 0.3) * fadeEdge;
+        p.mesh.visible = p.mat.opacity > 0.01;
+
+        if (Math.sin(t * 5 + s * 3) > 0.4) {
+          p.mat.color.setHex(0x88eeff);
+        } else {
+          p.mat.color.setHex(0x00ffff);
+        }
+      } else if (i < 15) {
+        // Layer 2: sparking flickers
+        const flickerOn = Math.sin(t * 12 + s * 6) > 0.3;
+        if (!flickerOn) {
+          p.mesh.visible = false;
+          p.mat.opacity = 0;
+          continue;
+        }
+        const sparkY = 0.1 + Math.random() * 0.4;
+        const sparkR = 0.02 + Math.random() * 0.03;
+        const sparkAngle = s + t * 6;
+        p.mesh.position.set(
+          Math.cos(sparkAngle) * sparkR,
+          sparkY,
+          Math.sin(sparkAngle) * sparkR,
+        );
+        p.mat.opacity = 0.5 + Math.random() * 0.4;
+        p.mat.color.setHex(0xaaffff);
+        p.mesh.visible = true;
+      } else {
+        // Layer 3: wisps that detach upward from the blade tip
+        const wispCycle = ((t * 0.7 + idx * 3.0) % 1.2);
+        const wispProgress = wispCycle / 1.2;
+        const wispX = Math.sin(s * 3 + t * 1.8) * 0.03;
+        const wispY = 0.55 + wispCycle * 0.12;
+        const wispZ = Math.cos(s * 2 + t * 1.5) * 0.025;
+
+        p.mesh.position.set(wispX, wispY, wispZ);
+        p.mesh.rotation.set(0, 0, t * 2.5 + s);
+
+        const fadeIn = Math.min(1, wispProgress * 3);
+        const fadeOut = Math.max(0, 1 - (wispProgress - 0.4) / 0.6);
+        p.mat.opacity = fadeIn * fadeOut * 0.45;
+        p.mat.color.setHex(wispProgress > 0.5 ? 0x44ddff : 0x00ffff);
+        p.mesh.visible = p.mat.opacity > 0.01;
+      }
+    }
+  }
+
+  // ── Light Beam: GLB spear held in hand, thrown as projectile ──
+
+  _buildLightBeam() {
+    const group = new THREE.Group();
+    group.visible = false;
+    this.scene.heldItemPivot.add(group);
+
+    this.models.light_beam = {
+      group,
+      glbModel: null,
+      glbLoaded: false,
+      glbBaseScale: new THREE.Vector3(1, 1, 1),
+      idleTime: 0,
+      mixer: null,
+    };
+
+    const loader = new GLTFLoader();
+    loader.load('assets/weapons/light_beam.glb', (gltf) => {
+      const model = gltf.scene;
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const s = 1.8 / maxDim;
+      model.scale.set(s, s, s);
+      const center = box.getCenter(new THREE.Vector3());
+      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+
+      // Point the spear tip forward (-Z in camera space)
+      // Model tip points along -Y; rotate +90° X so tip faces -Z (forward)
+      model.rotation.x = Math.PI / 2;
+
+      // Render on top of world
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.renderOrder = 50;
+          if (child.material) {
+            const mats = Array.isArray(child.material) ? child.material : [child.material];
+            mats.forEach((mt) => { mt.depthTest = false; });
+          }
+        }
+      });
+
+      group.add(model);
+      this.models.light_beam.glbModel = model;
+      this.models.light_beam.glbBaseScale.copy(model.scale);
+      this.models.light_beam.glbLoaded = true;
+
+      // Loop embedded animations
+      if (gltf.animations && gltf.animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(model);
+        for (const clip of gltf.animations) {
+          const action = mixer.clipAction(clip);
+          action.setLoop(THREE.LoopRepeat, Infinity);
+          action.play();
+        }
+        this.models.light_beam.mixer = mixer;
+      }
+    });
+  }
+
+  _animateLightBeam(combat, swingMs, mod, gameState) {
+    const m = this.models.light_beam;
+    if (!m) return;
+
+    m.idleTime += 0.016;
+    const t = m.idleTime;
+    if (m.mixer) m.mixer.update(0.016);
+
+    const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
+
+    // Throw animation: wind up behind shoulder, then thrust forward
+    const windup = THREE.MathUtils.smoothstep(phase, 0, 0.3);
+    const thrust = THREE.MathUtils.smoothstep(phase, 0.25, 0.6);
+    const recover = THREE.MathUtils.smoothstep(phase, 0.6, 1);
+    const throw_ = thrust - recover * 0.9;
+
+    // Rest: held at right side, spear pointing forward horizontally.
+    // Throw: pull back then thrust forward like a javelin throw.
+    m.group.position.set(
+      0.6 - throw_ * 0.25,
+      -0.45 + windup * 0.2 - throw_ * 0.1,
+      THREE.MathUtils.lerp(-0.8, -1.5, throw_) + windup * 0.4,
+    );
+    // Spear stays level (x≈0), slight Y turn inward
+    m.group.rotation.set(
+      THREE.MathUtils.lerp(0, -0.1, throw_) + windup * 0.15,
+      THREE.MathUtils.lerp(-0.15, -0.05, throw_),
+      0,
+    );
+
+    // Idle sway
+    if (phase === 0) {
+      m.group.position.x += Math.sin(t * 1.4) * 0.01;
+      m.group.position.y += Math.cos(t * 1.1) * 0.012;
+    }
+
+    // Hide briefly at end of throw (spear is "released")
+    if (phase > 0.55 && phase < 0.9) {
+      m.group.visible = false;
+    } else {
+      m.group.visible = gameState.mode === 'playing';
     }
   }
 

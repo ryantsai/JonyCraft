@@ -41,7 +41,7 @@ export class CombatSystem {
     combat.attackSeq = (combat.attackSeq || 0) + 1;
 
     // Drive the correct weapon animation
-    if (skill.weaponType === 'sword') {
+    if (skill.weaponType === 'sword' || skill.weaponType === 'laser_sabre') {
       combat.swordSwingTime = skill.swingMs;
       events.emit('sound:sword');
     } else {
@@ -66,6 +66,7 @@ export class CombatSystem {
       else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
       else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
       else if (skill.weaponType === 'dark_pull') events.emit('combat:dark-pull-cast');
+      else if (skill.weaponType === 'light_beam') events.emit('combat:light-beam-shoot');
       this._queueHomelandAttack({
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
@@ -80,6 +81,7 @@ export class CombatSystem {
       else if (skill.weaponType === 'flame_emperor') events.emit('combat:flame-emperor-shoot');
       else if (skill.weaponType === 'fire_pillar') events.emit('combat:fire-pillar-cast');
       else if (skill.weaponType === 'dark_pull') events.emit('combat:dark-pull-cast');
+      else if (skill.weaponType === 'light_beam') events.emit('combat:light-beam-shoot');
       this._queuePvPAttack({
         range: skill.range,
         damageMultiplier: skill.damage ?? 1,
@@ -89,7 +91,7 @@ export class CombatSystem {
         particleCount: skill.particleCount,
       });
       // Also try to hit local enemies (mobs in test mode)
-      if (!['fire_fist', 'flame_emperor', 'fire_pillar'].includes(skill.weaponType)) {
+      if (!['fire_fist', 'flame_emperor', 'fire_pillar', 'light_beam'].includes(skill.weaponType)) {
         this._attackEnemy({
           range: skill.range,
           knockbackStrength: skill.knockback,
@@ -117,6 +119,10 @@ export class CombatSystem {
     }
     if (skill.weaponType === 'dark_pull') {
       events.emit('combat:dark-pull-cast');
+      return;
+    }
+    if (skill.weaponType === 'light_beam') {
+      events.emit('combat:light-beam-shoot');
       return;
     }
 

@@ -39,6 +39,7 @@ export class FireFistSpawner {
     events.on('combat:fire-fist-shoot', () => this._spawnFireFist());
     events.on('combat:fire-pillar-cast', () => this._spawnFirePillar());
     events.on('combat:flame-emperor-shoot', () => this._spawnFlameEmperor());
+    events.on('combat:light-beam-shoot', () => this._spawnLightBeam());
   }
 
   update(dt) {
@@ -371,6 +372,56 @@ export class FireFistSpawner {
       explodeOnImpact: true,
       explosionScale: 3.0,
       explosionColors: [0xff2200, 0xff4400, 0xffaa00, 0xffdd44, 0xff6b35],
+    });
+  }
+
+  _spawnLightBeam() {
+    const tmpl = this.weaponModels.getProjectileTemplate('light_beam');
+    if (!tmpl) return;
+
+    const { dir, spawnPos, player } = this._getPlayerDirectionAndSpawn();
+    const skill = this.state.getSelectedSkill();
+
+    // Clone model and orient spear tip along travel direction
+    const projModel = tmpl.template.clone();
+    const worldScale = 3.0;
+    projModel.scale.copy(tmpl.baseScale).multiplyScalar(worldScale);
+    projModel.position.set(0, 0, 0);
+    // Model tip points along -Y; rotate +90° X so tip faces -Z (forward in group space)
+    projModel.rotation.x = Math.PI / 2;
+
+    const quat = new THREE.Quaternion();
+    const rotMatrix = new THREE.Matrix4().lookAt(
+      new THREE.Vector3(), dir, new THREE.Vector3(0, 1, 0),
+    );
+    quat.setFromRotationMatrix(rotMatrix);
+
+    const projGroup = new THREE.Group();
+    projGroup.position.copy(spawnPos);
+    projGroup.quaternion.copy(quat);
+    projGroup.add(projModel);
+    this.scene.particleGroup.add(projGroup);
+
+    // Launch upward for a visible javelin arc; gravity pulls it down
+    const launchDir = dir.clone();
+    launchDir.y += 0.35;
+    launchDir.normalize();
+
+    this.projectileSystem.spawn({
+      group: projGroup,
+      velocity: launchDir.multiplyScalar(45),
+      origin: spawnPos.clone(),
+      maxRange: ((skill.range || 8) * 2) + 2,
+      damage: (skill.damage ?? 2) * player.baseAttack,
+      knockback: skill.knockback ?? 5.0,
+      trailConfig: {
+        count: 20,
+        size: 0.12,
+        colors: [0xfff4a0, 0xffffff, 0xffee88],
+        riseSpeed: 0.5,
+      },
+      explodeOnImpact: false,
+      gravity: 25,
     });
   }
 }

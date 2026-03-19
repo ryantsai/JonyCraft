@@ -19,10 +19,6 @@ const FRUIT_VFX = {
     count: 8, geo: 'diamond', size: 0.04,
     behavior: 'orbit', colors: [0x88ddff, 0xffffff],
   },
-  lightning: {
-    count: 8, geo: 'bolt', size: 0.025,
-    behavior: 'flicker', colors: [0xffee44, 0xffffff],
-  },
   dark: {
     count: 8, geo: 'sphere', size: 0.04,
     behavior: 'vortex', colors: [0x6a3d99, 0x220044],
@@ -31,10 +27,6 @@ const FRUIT_VFX = {
     count: 8, geo: 'plane', size: 0.05,
     behavior: 'radiate', colors: [0xffffa0, 0xffffff],
   },
-  quake: {
-    count: 10, geo: 'box', size: 0.05,
-    behavior: 'shockwave', colors: [0xc0a030, 0xffdd66],
-  },
   magma: {
     count: 8, geo: 'sphere', size: 0.05,
     behavior: 'drip', colors: [0xcc3300, 0xff8800],
@@ -42,10 +34,6 @@ const FRUIT_VFX = {
   sand: {
     count: 10, geo: 'box', size: 0.03,
     behavior: 'swirl', colors: [0xd4a843, 0xeedd88],
-  },
-  bomb: {
-    count: 10, geo: 'box', size: 0.04,
-    behavior: 'explode', colors: [0xff4444, 0xffaa22],
   },
 };
 

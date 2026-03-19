@@ -839,13 +839,10 @@ export class RemotePlayers {
     // Simple burst particles in the attack direction
     const colors = fruitId === 'flame' ? FIRE_COLORS
       : fruitId === 'ice' ? [0x6ec6ff, 0xaaddff, 0xffffff]
-      : fruitId === 'lightning' ? [0xffe060, 0xffffff, 0xffcc00]
       : fruitId === 'dark' ? [0x6a3d99, 0x442266, 0x884488]
       : fruitId === 'light' ? [0xfff4a0, 0xffffff, 0xffee88]
-      : fruitId === 'quake' ? [0xc0a030, 0xffffff, 0xddcc88]
       : fruitId === 'magma' ? [0xcc3300, 0xff4400, 0xff8800]
       : fruitId === 'sand' ? [0xd4a843, 0xeedd88, 0xccbb77]
-      : fruitId === 'bomb' ? [0xff4444, 0xff8800, 0xffcc00]
       : [0xffffff, 0xcccccc, 0xffddaa]; // rubber or default
 
     const spawnPos = new THREE.Vector3(

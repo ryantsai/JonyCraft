@@ -45,7 +45,7 @@ export class ProjectileSystem {
    * @param {boolean} [opts.visualOnly] - impacts/explosions only, no damage applied
    */
   spawn({ group, velocity, origin, maxRange, damage, knockback, trailConfig,
-    aoe = false, aoeRadius = 0, explodeOnImpact = false, explosionScale = 1, explosionColors, visualOnly = false }) {
+    aoe = false, aoeRadius = 0, explodeOnImpact = false, explosionScale = 1, explosionColors, visualOnly = false, gravity = 0 }) {
     const trailParticles = [];
     if (trailConfig) {
       for (let i = 0; i < trailConfig.count; i++) {
@@ -87,6 +87,7 @@ export class ProjectileSystem {
       explosionScale,
       explosionColors,
       visualOnly,
+      gravity,
       alive: true,
       age: 0,
       _velDir: velocity.clone().normalize(),
@@ -99,6 +100,19 @@ export class ProjectileSystem {
       if (!proj.alive) continue;
 
       proj.age += dt;
+
+      // Apply gravity (arc trajectory for javelin-type projectiles)
+      if (proj.gravity) {
+        proj.velocity.y -= proj.gravity * dt;
+        // Re-orient projectile to face velocity direction
+        const velDir = proj.velocity.clone().normalize();
+        const lookMatrix = new THREE.Matrix4().lookAt(
+          new THREE.Vector3(), velDir, new THREE.Vector3(0, 1, 0),
+        );
+        proj.group.quaternion.setFromRotationMatrix(lookMatrix);
+        proj._velDir.copy(velDir);
+      }
+
       proj.group.position.addScaledVector(proj.velocity, dt);
 
       const dist = proj.group.position.distanceTo(proj.origin);

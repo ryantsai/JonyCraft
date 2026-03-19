@@ -1377,24 +1377,23 @@ export class WeaponModels {
 
     const phase = combat.punchTime > 0 ? 1 - combat.punchTime / swingMs : 0;
 
-    // Throw animation: wind up behind shoulder, then thrust forward
+    // Throw animation: wind up by the shoulder, then spear-thrust toward center
     const windup = THREE.MathUtils.smoothstep(phase, 0, 0.3);
     const thrust = THREE.MathUtils.smoothstep(phase, 0.25, 0.6);
     const recover = THREE.MathUtils.smoothstep(phase, 0.6, 1);
     const throw_ = thrust - recover * 0.9;
 
-    // Rest: held at right side, spear pointing forward horizontally.
-    // Throw: pull back then thrust forward like a javelin throw.
+    // Rest: lower-right diagonal spear pose.
+    // Throw: pull back slightly, then drive the tip toward the crosshair.
     m.group.position.set(
-      0.6 - throw_ * 0.25,
-      -0.45 + windup * 0.2 - throw_ * 0.1,
-      THREE.MathUtils.lerp(-0.8, -1.5, throw_) + windup * 0.4,
+      0.82 - throw_ * 0.26 + windup * 0.06,
+      -0.78 + windup * 0.14 - throw_ * 0.12,
+      THREE.MathUtils.lerp(-0.9, -1.54, throw_) + windup * 0.2,
     );
-    // Spear stays level (x≈0), slight Y turn inward
     m.group.rotation.set(
-      THREE.MathUtils.lerp(0, -0.1, throw_) + windup * 0.15,
-      THREE.MathUtils.lerp(-0.15, -0.05, throw_),
-      0,
+      0.24 + windup * 0.16 - throw_ * 0.24,
+      THREE.MathUtils.lerp(-0.66, -0.42, throw_),
+      THREE.MathUtils.lerp(1.08, 0.84, throw_),
     );
 
     // Idle sway

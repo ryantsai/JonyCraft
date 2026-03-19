@@ -381,47 +381,69 @@ export class FireFistSpawner {
 
     const { dir, spawnPos, player } = this._getPlayerDirectionAndSpawn();
     const skill = this.state.getSelectedSkill();
+    const right = new THREE.Vector3(
+      Math.cos(player.yaw),
+      0,
+      -Math.sin(player.yaw),
+    ).normalize();
+    const launchPos = spawnPos.clone()
+      .addScaledVector(right, 0.22)
+      .addScaledVector(dir, 0.2)
+      .add(new THREE.Vector3(0, -0.12, 0));
 
     // Clone model and orient spear tip along travel direction
     const projModel = tmpl.template.clone();
-    const worldScale = 3.0;
+    projModel.traverse((child) => {
+      if (!child.isMesh || !child.material) return;
+      if (Array.isArray(child.material)) {
+        child.material = child.material.map((material) => {
+          const next = material.clone();
+          next.depthTest = true;
+          return next;
+        });
+      } else {
+        child.material = child.material.clone();
+        child.material.depthTest = true;
+      }
+    });
+    const worldScale = 3.5;
     projModel.scale.copy(tmpl.baseScale).multiplyScalar(worldScale);
     projModel.position.set(0, 0, 0);
-    // Model tip points along -Y; rotate +90° X so tip faces -Z (forward in group space)
-    projModel.rotation.x = Math.PI / 2;
+    projModel.rotation.set(0, 0, 0);
+
+    // Launch mostly forward with a slight loft so gravity creates a readable arc.
+    const launchDir = dir.clone();
+    launchDir.y = Math.max(launchDir.y, -0.1);
+    launchDir.y += 0.18;
+    launchDir.normalize();
 
     const quat = new THREE.Quaternion();
     const rotMatrix = new THREE.Matrix4().lookAt(
-      new THREE.Vector3(), dir, new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(), launchDir, new THREE.Vector3(0, 1, 0),
     );
     quat.setFromRotationMatrix(rotMatrix);
 
     const projGroup = new THREE.Group();
-    projGroup.position.copy(spawnPos);
+    projGroup.position.copy(launchPos);
     projGroup.quaternion.copy(quat);
     projGroup.add(projModel);
     this.scene.particleGroup.add(projGroup);
 
-    // Launch upward for a visible javelin arc; gravity pulls it down
-    const launchDir = dir.clone();
-    launchDir.y += 0.35;
-    launchDir.normalize();
-
     this.projectileSystem.spawn({
       group: projGroup,
-      velocity: launchDir.multiplyScalar(45),
-      origin: spawnPos.clone(),
-      maxRange: ((skill.range || 8) * 2) + 2,
+      velocity: launchDir.multiplyScalar(31),
+      origin: launchPos.clone(),
+      maxRange: (skill.range || 16) + 8,
       damage: (skill.damage ?? 2) * player.baseAttack,
       knockback: skill.knockback ?? 5.0,
       trailConfig: {
-        count: 20,
-        size: 0.12,
-        colors: [0xfff4a0, 0xffffff, 0xffee88],
-        riseSpeed: 0.5,
+        count: 36,
+        size: 0.18,
+        colors: [0xfff7c9, 0xffffff, 0xffef9b, 0xffd54f],
+        riseSpeed: -0.35,
       },
       explodeOnImpact: false,
-      gravity: 25,
+      gravity: 26,
     });
   }
 }

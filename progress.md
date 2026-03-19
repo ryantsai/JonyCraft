@@ -228,6 +228,22 @@ TODO
   - browser verification also confirmed `.status-bar` and `#status-message` are no longer present in the DOM
   - bundled `develop-web-game` Playwright client completed successfully against `http://127.0.0.1:4173` with `test-actions.json`
 
+2026-03-19
+- Refined Light fruit `light_beam` spear pose and projectile feel:
+  - updated `src/effects/WeaponModels.js` so the held spear now rests from the lower-right toward screen center instead of standing upright
+  - updated `src/effects/FireFistSpawner.js` so the thrown spear launches from a more right-hand release point, uses cloned projectile materials, and aligns to the lofted travel direction instead of keeping the old upright orientation
+  - increased Light Beam skill range in `src/config/fruits.js` from `8.0` to `16.0` and refreshed the skill description to match
+  - retuned Light Beam flight to read as a thrown spear: lower launch speed, stronger gravity, longer travel, larger/brighter trail, and less "floating into the sky" behavior
+- Verification:
+  - `npm run build` passes after the Light Beam pose/projectile changes
+  - bundled `develop-web-game` Playwright client still runs successfully against the app and captured a regression artifact in `output/web-game-light-beam-client/shot-0.png` with state in `output/web-game-light-beam-client/state-0.json`
+  - direct Playwright validation confirmed:
+    - idle first-person spear pose is now diagonal from the lower-right toward center in `output/light-beam-fixed-idle.png`
+    - the thrown spear is no longer upright mid-flight and shows a readable ballistic path/trail in `output/light-beam-fixed-arc-clear.png`
+
+TODO
+- The bundled web-game client still cannot drive the full fruit-selection flow by itself because the current UI needs multiple DOM clicks before gameplay; direct Playwright remains the reliable path for fruit-specific combat checks until a deeper debug/start hook is added.
+
 2026-03-18
 - 新增多人模式聊天系統（Roblox 風格 UI）：
   - `src/ui/template.js` / `src/style.css` / `src/ui/HUD.js` 新增左上半透明聊天窗、`T` 快捷鍵聚焦、輸入框、可折疊為聊天圖示、聚焦時滾輪瀏覽歷史訊息。

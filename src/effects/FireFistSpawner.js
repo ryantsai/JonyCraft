@@ -381,15 +381,27 @@ export class FireFistSpawner {
 
     const { dir, spawnPos, player } = this._getPlayerDirectionAndSpawn();
     const skill = this.state.getSelectedSkill();
+    const projectileSpeed = 31;
+    const projectileGravity = 26;
     const right = new THREE.Vector3(
       Math.cos(player.yaw),
       0,
       -Math.sin(player.yaw),
     ).normalize();
     const launchPos = spawnPos.clone()
-      .addScaledVector(right, 0.22)
+      .addScaledVector(right, 0.16)
       .addScaledVector(dir, 0.2)
       .add(new THREE.Vector3(0, -0.12, 0));
+    const cameraOrigin = new THREE.Vector3(
+      player.position.x,
+      player.position.y + 1.62,
+      player.position.z,
+    );
+    const crosshairDistance = THREE.MathUtils.clamp((skill.range || 16) * 0.5, 6, 10);
+    const crosshairPoint = cameraOrigin.clone().addScaledVector(dir, crosshairDistance);
+    const aimPoint = crosshairPoint.clone();
+    const flightTime = Math.max(0.01, launchPos.distanceTo(aimPoint) / projectileSpeed);
+    aimPoint.y += 0.5 * projectileGravity * flightTime * flightTime;
 
     // Clone model and orient spear tip along travel direction
     const projModel = tmpl.template.clone();
@@ -411,11 +423,9 @@ export class FireFistSpawner {
     projModel.position.set(0, 0, 0);
     projModel.rotation.set(0, 0, 0);
 
-    // Launch mostly forward with a slight loft so gravity creates a readable arc.
-    const launchDir = dir.clone();
-    launchDir.y = Math.max(launchDir.y, -0.1);
-    launchDir.y += 0.18;
-    launchDir.normalize();
+    // Converge the release from the lower-right hand into the crosshair line quickly,
+    // then let gravity pull it into a visible spear arc.
+    const launchDir = aimPoint.sub(launchPos).normalize();
 
     const quat = new THREE.Quaternion();
     const rotMatrix = new THREE.Matrix4().lookAt(
@@ -431,7 +441,7 @@ export class FireFistSpawner {
 
     this.projectileSystem.spawn({
       group: projGroup,
-      velocity: launchDir.multiplyScalar(31),
+      velocity: launchDir.multiplyScalar(projectileSpeed),
       origin: launchPos.clone(),
       maxRange: (skill.range || 16) + 8,
       damage: (skill.damage ?? 2) * player.baseAttack,
@@ -443,7 +453,7 @@ export class FireFistSpawner {
         riseSpeed: -0.35,
       },
       explodeOnImpact: false,
-      gravity: 26,
+      gravity: projectileGravity,
     });
   }
 }

@@ -234,12 +234,15 @@ TODO
   - updated `src/effects/FireFistSpawner.js` so the thrown spear launches from a more right-hand release point, uses cloned projectile materials, and aligns to the lofted travel direction instead of keeping the old upright orientation
   - increased Light Beam skill range in `src/config/fruits.js` from `8.0` to `16.0` and refreshed the skill description to match
   - retuned Light Beam flight to read as a thrown spear: lower launch speed, stronger gravity, longer travel, larger/brighter trail, and less "floating into the sky" behavior
+  - adjusted Light Beam launch convergence so the projectile now bends into the crosshair line from the right-hand release instead of flying on a parallel offset ray
 - Verification:
   - `npm run build` passes after the Light Beam pose/projectile changes
   - bundled `develop-web-game` Playwright client still runs successfully against the app and captured a regression artifact in `output/web-game-light-beam-client/shot-0.png` with state in `output/web-game-light-beam-client/state-0.json`
   - direct Playwright validation confirmed:
     - idle first-person spear pose is now diagonal from the lower-right toward center in `output/light-beam-fixed-idle.png`
     - the thrown spear is no longer upright mid-flight and shows a readable ballistic path/trail in `output/light-beam-fixed-arc-clear.png`
+    - projected-screen measurements after the convergence fix show the projectile tightening into center very quickly: at `80ms` it is about `+62.8px / +38.4px` from screen center and at `120ms` it is nearly centered at `+2.5px / +7.8px`
+    - screenshot `output/light-beam-crosshair-aligned.png` shows the spear tracking much closer to the crosshair during launch
 
 TODO
 - The bundled web-game client still cannot drive the full fruit-selection flow by itself because the current UI needs multiple DOM clicks before gameplay; direct Playwright remains the reliable path for fruit-specific combat checks until a deeper debug/start hook is added.

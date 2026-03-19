@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import math
 import random
 from typing import Any
 
 from storage import SessionRecord
+
+log = logging.getLogger("multiplayer")
 
 
 WAVE_DURATION = 100.0
@@ -148,6 +151,10 @@ def start_next_wave(session: SessionRecord) -> None:
     count = 4 + math.floor(defense["wave"] * 1.8)
     for index in range(count):
         _spawn_enemy(defense, wave_scale, index * 7)
+    log.info(
+        "WAVE_START session=%s wave=%d enemies=%d scale=%.2f",
+        session.session_id, defense["wave"], count, wave_scale,
+    )
 
 
 def _active_players(session: SessionRecord) -> list[tuple[str, dict[str, Any]]]:
@@ -205,6 +212,11 @@ def process_attack(session: SessionRecord, player_name: str, attack: dict[str, A
     if enemy["health"] <= 0:
         defense["enemies"] = [item for item in defense["enemies"] if item["id"] != enemy["id"]]
         _award_enemy_defeat(player.state, defense, enemy)
+        log.info(
+            "ENEMY_KILL session=%s player=%s enemy_type=%s wave=%d remaining=%d",
+            session.session_id, player_name, enemy["type"],
+            defense["wave"], len(defense["enemies"]),
+        )
 
 
 # Shop item definitions mirroring client shopItems.js
@@ -326,6 +338,10 @@ def process_purchase(session: SessionRecord, player_name: str, purchase: str) ->
     if cost is None or defense["totalGold"] < cost:
         return
     defense["totalGold"] -= cost
+    log.info(
+        "SHOP_PURCHASE session=%s player=%s item=%s cost=%d gold_remaining=%d",
+        session.session_id, player_name, purchase, cost, defense["totalGold"],
+    )
     buyer = session.players.get(player_name)
     if buyer is not None:
         buyer.state.setdefault("scoreGold", 0)
@@ -440,6 +456,11 @@ def tick_homeland_session(session: SessionRecord, dt: float, server_time: float)
         defense["status"] = "defeated"
         defense["timeLeft"] = 0.0
         defense["enemies"] = []
+        log.info(
+            "TOWER_DESTROYED session=%s wave=%d kills=%d gold=%d",
+            session.session_id, defense["wave"],
+            defense.get("totalKills", 0), defense.get("totalGold", 0),
+        )
         return
 
     if not defense["enemies"] or float(defense["timeLeft"]) <= 0.0:

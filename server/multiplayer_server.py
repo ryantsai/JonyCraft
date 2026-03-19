@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import logging.handlers
+import os
 import sys
 import threading
 import time
@@ -10,6 +13,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
+
+log = logging.getLogger("multiplayer")
 
 from homeland_sim import ensure_homeland_state, process_actions, tick_homeland_session
 from pvp_sim import process_pvp_actions, tick_pvp_session
@@ -90,6 +95,10 @@ class SessionStore:
             ]
             for name in stale_players:
                 session.players.pop(name, None)
+                log.info(
+                    "PLAYER_IDLE_DROP player=%s session=%s (%s)",
+                    name, session_id, session.name,
+                )
 
             if session.players:
                 self._save_locked(session)
@@ -97,6 +106,7 @@ class SessionStore:
                 expired_session_ids.append(session_id)
 
         for session_id in expired_session_ids:
+            log.info("SESSION_EXPIRED session=%s", session_id)
             self._sessions.pop(session_id, None)
             self._repository.delete_session(session_id)
 
@@ -125,6 +135,10 @@ class SessionStore:
             session.players[player_name] = PlayerRecord(name=player_name)
             self._sessions[session.session_id] = session
             self._save_locked(session)
+            log.info(
+                "SESSION_CREATE player=%s session=%s name=%r mode=%s",
+                player_name, session.session_id, session.name, session.mode,
+            )
             return session.summary()
 
     def join_session(self, session_id: str, player_name: str) -> dict[str, Any]:
@@ -132,19 +146,31 @@ class SessionStore:
             self._cleanup_locked()
             session = self._require_locked(session_id)
             player = session.players.get(player_name)
-            if player is None:
+            is_new = player is None
+            if is_new:
                 player = PlayerRecord(name=player_name)
                 session.players[player_name] = player
             player.last_seen = now_ts()
             self._save_locked(session)
+            if is_new:
+                log.info(
+                    "PLAYER_JOIN player=%s session=%s (%s) players=%d",
+                    player_name, session.session_id, session.name, len(session.players),
+                )
             return session.summary()
 
     def leave_session(self, session_id: str, player_name: str) -> dict[str, Any]:
         with self._lock:
             self._cleanup_locked()
             session = self._require_locked(session_id)
+            was_present = player_name in session.players
             session.players.pop(player_name, None)
             self._save_locked(session)
+            if was_present:
+                log.info(
+                    "PLAYER_LEAVE player=%s session=%s (%s) players=%d",
+                    player_name, session.session_id, session.name, len(session.players),
+                )
             return session.summary()
 
     def sync_session(self, session_id: str, player_name: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -218,6 +244,10 @@ class SessionStore:
                             "message": text,
                             "sentAt": player.last_seen,
                         }
+                    )
+                    log.info(
+                        "CHAT session=%s player=%s msg=%r",
+                        session.session_id, player_name, sanitize_log_text(text, 120),
                     )
 
             should_persist = (
@@ -369,12 +399,12 @@ class MultiplayerHTTPServer(ThreadingHTTPServer):
         _, exc, _ = sys.exc_info()
         host = client_address[0] if client_address else "<unknown>"
         if isinstance(exc, ConnectionResetError):
-            print(f"[multiplayer] {host} connection reset by peer")
+            log.debug("%s connection reset by peer", host)
             return
         if isinstance(exc, BrokenPipeError):
-            print(f"[multiplayer] {host} disconnected before the response completed")
+            log.debug("%s disconnected before the response completed", host)
             return
-        print(f"[multiplayer] {host} unexpected server error: {exc}")
+        log.error("%s unexpected server error: %s", host, exc)
 
 
 class MultiplayerHandler(BaseHTTPRequestHandler):
@@ -434,7 +464,7 @@ class MultiplayerHandler(BaseHTTPRequestHandler):
             self._suppress_next_request_log = False
             return
         request_line = sanitize_log_text(getattr(self, "requestline", "<unknown request>"))
-        print(f"[multiplayer] {self.address_string()} {request_line} -> {code} ({size} bytes)")
+        log.debug("%s %s -> %s (%s bytes)", self.address_string(), request_line, code, size)
 
     def log_error(self, format: str, *args: Any) -> None:  # noqa: A003
         if format == "code %d, message %s" and len(args) >= 2:
@@ -445,16 +475,16 @@ class MultiplayerHandler(BaseHTTPRequestHandler):
                 detail = "received an HTTPS/TLS handshake on the plain HTTP port"
             else:
                 detail = sanitize_log_text(message)
-            print(f"[multiplayer] {self.address_string()} bad request {status_code}: {detail}")
+            log.warning("%s bad request %s: %s", self.address_string(), status_code, detail)
             self._suppress_next_request_log = True
             return
 
         formatted = sanitize_log_text(format % args if args else format)
-        print(f"[multiplayer] {self.address_string()} error: {formatted}")
+        log.error("%s %s", self.address_string(), formatted)
 
     def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
         formatted = sanitize_log_text(format % args if args else format)
-        print(f"[multiplayer] {self.address_string()} {formatted}")
+        log.debug("%s %s", self.address_string(), formatted)
 
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or 0)
@@ -499,6 +529,38 @@ class MultiplayerHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
 
+def setup_logging(level_name: str, log_dir: str | Path) -> None:
+    """Configure logging with console + daily-rotating file output."""
+    level = getattr(logging, level_name.upper(), logging.INFO)
+    log.setLevel(level)
+
+    formatter = logging.Formatter(
+        fmt="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # Console handler (stderr)
+    console = logging.StreamHandler(sys.stderr)
+    console.setLevel(level)
+    console.setFormatter(formatter)
+    log.addHandler(console)
+
+    # Daily rotating file handler — 1 log file per day, keep 30 days
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    file_handler = logging.handlers.TimedRotatingFileHandler(
+        filename=log_path / "multiplayer.log",
+        when="midnight",
+        interval=1,
+        backupCount=30,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(level)
+    file_handler.setFormatter(formatter)
+    file_handler.suffix = "%Y-%m-%d"
+    log.addHandler(file_handler)
+
+
 def run_server(host: str, port: int, database_path: str | Path) -> None:
     global STORE
 
@@ -507,13 +569,14 @@ def run_server(host: str, port: int, database_path: str | Path) -> None:
     start_tick_loop(STORE)
 
     server = MultiplayerHTTPServer((host, port), MultiplayerHandler)
-    print(f"JonyCraft multiplayer server running on http://{host}:{port}")
-    print(f"SQLite persistence: {Path(database_path).resolve()}")
-    print("Homeland multiplayer waves/tower/enemies are simulated authoritatively on the server.")
+    log.info("JonyCraft multiplayer server running on http://%s:%d", host, port)
+    log.info("SQLite persistence: %s", Path(database_path).resolve())
+    log.info("Homeland multiplayer waves/tower/enemies are simulated authoritatively on the server.")
+    log.info("Log level: %s", logging.getLevelName(log.level))
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nShutting down multiplayer server...")
+        log.info("Shutting down multiplayer server...")
     finally:
         server.server_close()
 
@@ -523,9 +586,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1", help="Bind host")
     parser.add_argument("--port", default=8765, type=int, help="Bind port")
     parser.add_argument("--database", default=str(DEFAULT_DATABASE), help="SQLite database path")
+    parser.add_argument(
+        "--log-level",
+        default=os.environ.get("LOG_LEVEL", "info"),
+        choices=["debug", "info", "warning", "error"],
+        help="Logging level (default: info, or LOG_LEVEL env var)",
+    )
+    parser.add_argument(
+        "--log-dir",
+        default=None,
+        help="Directory for log files (default: same as --database directory)",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    log_dir = args.log_dir or os.environ.get("LOG_DIR") or str(Path(args.database).resolve().parent)
+    setup_logging(args.log_level, log_dir)
     run_server(args.host, args.port, args.database)

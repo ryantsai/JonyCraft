@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import math
 import random
 from typing import Any
 
 from storage import SessionRecord
+
+log = logging.getLogger("multiplayer")
 
 PVP_MAX_HP = 20.0
 PVP_RESPAWN_DELAY = 2.0
@@ -122,6 +125,10 @@ def process_pvp_attack(
         attacker.state["pvpKills"] += 1
         attacker.state.setdefault("scoreKills", 0)
         attacker.state["scoreKills"] = int(attacker.state.get("pvpKills", 0))
+        log.info(
+            "PVP_KILL session=%s killer=%s victim=%s weapon=%s",
+            session.session_id, attacker_name, target_name, weapon_type,
+        )
 
 
 def process_pvp_actions(

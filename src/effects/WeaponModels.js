@@ -1312,10 +1312,57 @@ export class WeaponModels {
   _buildLightBeam() {
     const group = new THREE.Group();
     group.visible = false;
+    group.renderOrder = 80;
     this.scene.heldItemPivot.add(group);
+
+    const heldVisual = new THREE.Group();
+    heldVisual.renderOrder = 80;
+    group.add(heldVisual);
+
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0xf8d84a,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: 0xffef9b,
+      transparent: true,
+      opacity: 0.42,
+      blending: THREE.AdditiveBlending,
+      depthTest: false,
+      depthWrite: false,
+    });
+
+    const shaft = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.12, 1.7),
+      beamMat,
+    );
+    shaft.position.z = -0.88;
+    shaft.renderOrder = 80;
+    heldVisual.add(shaft);
+
+    const tip = new THREE.Mesh(
+      new THREE.ConeGeometry(0.16, 0.34, 6),
+      beamMat,
+    );
+    tip.rotation.x = Math.PI / 2;
+    tip.position.z = -1.86;
+    tip.renderOrder = 80;
+    heldVisual.add(tip);
+
+    const glow = new THREE.Mesh(
+      new THREE.BoxGeometry(0.2, 0.2, 1.95),
+      glowMat,
+    );
+    glow.position.z = -0.98;
+    glow.renderOrder = 81;
+    heldVisual.add(glow);
 
     this.models.light_beam = {
       group,
+      heldVisual,
+      glow,
+      glowMat,
       glbModel: null,
       glbLoaded: false,
       glbBaseScale: new THREE.Vector3(1, 1, 1),
@@ -1324,32 +1371,21 @@ export class WeaponModels {
     };
 
     const loader = new GLTFLoader();
-    loader.load('assets/weapons/light_beam.glb', (gltf) => {
+    loader.load(assetUrl('assets/weapons/light_beam.glb'), (gltf) => {
       const model = gltf.scene;
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const s = 1.8 / maxDim;
+      const s = 2.8 / maxDim;
       model.scale.set(s, s, s);
       const center = box.getCenter(new THREE.Vector3());
-      model.position.set(-center.x * s, -center.y * s - 0.18, -center.z * s + 0.08);
+      const bottom = box.min.y;
+      model.position.set(-center.x * s, -bottom * s, -center.z * s + 0.02);
 
       // Point the spear tip forward (-Z in camera space)
       // Model tip points along -Y; rotate +90° X so tip faces -Z (forward)
       model.rotation.x = Math.PI / 2;
 
-      // Render on top of world
-      model.traverse((child) => {
-        if (child.isMesh) {
-          child.renderOrder = 50;
-          if (child.material) {
-            const mats = Array.isArray(child.material) ? child.material : [child.material];
-            mats.forEach((mt) => { mt.depthTest = false; });
-          }
-        }
-      });
-
-      group.add(model);
       this.models.light_beam.glbModel = model;
       this.models.light_beam.glbBaseScale.copy(model.scale);
       this.models.light_beam.glbLoaded = true;
@@ -1386,15 +1422,23 @@ export class WeaponModels {
     // Rest: lower-right diagonal spear pose.
     // Throw: pull back slightly, then drive the tip toward the crosshair.
     m.group.position.set(
-      0.88 - throw_ * 0.22 + windup * 0.05,
-      -0.96 + windup * 0.12 - throw_ * 0.08,
-      THREE.MathUtils.lerp(-1.02, -1.64, throw_) + windup * 0.16,
+      THREE.MathUtils.lerp(0.92, 0.54, throw_) + windup * 0.04,
+      THREE.MathUtils.lerp(-0.42, -0.24, throw_) + windup * 0.08 - throw_ * 0.04,
+      THREE.MathUtils.lerp(-0.24, -0.88, throw_) + windup * 0.08,
     );
     m.group.rotation.set(
-      0.12 + windup * 0.12 - throw_ * 0.18,
-      THREE.MathUtils.lerp(-0.72, -0.48, throw_),
-      THREE.MathUtils.lerp(1.18, 0.92, throw_),
+      THREE.MathUtils.lerp(0.34, 0.08, throw_) + windup * 0.04,
+      THREE.MathUtils.lerp(-0.12, 0.02, throw_),
+      THREE.MathUtils.lerp(-1.02, -0.46, throw_),
     );
+
+    if (m.glowMat) {
+      m.glowMat.opacity = 0.32 + Math.sin(t * 3.4) * 0.1 + (1 - throw_) * 0.06;
+    }
+    if (m.glow) {
+      const pulse = 1 + Math.sin(t * 4.2) * 0.06;
+      m.glow.scale.set(1.05 + pulse * 0.08, 1.05 + pulse * 0.08, pulse);
+    }
 
     // Idle sway
     if (phase === 0) {

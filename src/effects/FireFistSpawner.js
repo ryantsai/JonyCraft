@@ -371,7 +371,7 @@ export class FireFistSpawner {
 
     const { dir, spawnPos, player } = this._getPlayerDirectionAndSpawn();
     const skill = this.state.getSelectedSkill();
-    const projectileSpeed = 62;
+    const projectileSpeed = 186;
     const projectileGravity = 0;
     const right = new THREE.Vector3(
       Math.cos(player.yaw),

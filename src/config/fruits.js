@@ -263,10 +263,10 @@ export const FRUITS = [
       {
         id: 'light_beam',
         name: '光束',
-        desc: '投擲光之矛貫穿敵人，範圍32.0，攻擊力×2，CD 0.5秒。超遠距直線穿刺',
+        desc: '投擲光之矛貫穿敵人，範圍96.0，攻擊力×2，CD 0.5秒。超遠距直線穿刺',
         icon: assetUrl('assets/kenney/skills/rubber_punch.png'),
         kind: 'attack',
-        range: 32.0,
+        range: 96.0,
         swingMs: 200,
         cooldownMs: 500,
         knockback: 5.0,

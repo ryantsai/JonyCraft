@@ -1332,7 +1332,7 @@ export class WeaponModels {
       const s = 1.8 / maxDim;
       model.scale.set(s, s, s);
       const center = box.getCenter(new THREE.Vector3());
-      model.position.set(-center.x * s, -center.y * s, -center.z * s);
+      model.position.set(-center.x * s, -center.y * s - 0.18, -center.z * s + 0.08);
 
       // Point the spear tip forward (-Z in camera space)
       // Model tip points along -Y; rotate +90° X so tip faces -Z (forward)
@@ -1386,14 +1386,14 @@ export class WeaponModels {
     // Rest: lower-right diagonal spear pose.
     // Throw: pull back slightly, then drive the tip toward the crosshair.
     m.group.position.set(
-      0.82 - throw_ * 0.26 + windup * 0.06,
-      -0.78 + windup * 0.14 - throw_ * 0.12,
-      THREE.MathUtils.lerp(-0.9, -1.54, throw_) + windup * 0.2,
+      0.88 - throw_ * 0.22 + windup * 0.05,
+      -0.96 + windup * 0.12 - throw_ * 0.08,
+      THREE.MathUtils.lerp(-1.02, -1.64, throw_) + windup * 0.16,
     );
     m.group.rotation.set(
-      0.24 + windup * 0.16 - throw_ * 0.24,
-      THREE.MathUtils.lerp(-0.66, -0.42, throw_),
-      THREE.MathUtils.lerp(1.08, 0.84, throw_),
+      0.12 + windup * 0.12 - throw_ * 0.18,
+      THREE.MathUtils.lerp(-0.72, -0.48, throw_),
+      THREE.MathUtils.lerp(1.18, 0.92, throw_),
     );
 
     // Idle sway

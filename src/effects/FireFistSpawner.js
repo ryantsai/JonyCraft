@@ -371,8 +371,8 @@ export class FireFistSpawner {
 
     const { dir, spawnPos, player } = this._getPlayerDirectionAndSpawn();
     const skill = this.state.getSelectedSkill();
-    const projectileSpeed = 31;
-    const projectileGravity = 26;
+    const projectileSpeed = 62;
+    const projectileGravity = 0;
     const right = new THREE.Vector3(
       Math.cos(player.yaw),
       0,
@@ -387,11 +387,9 @@ export class FireFistSpawner {
       player.position.y + 1.62,
       player.position.z,
     );
-    const crosshairDistance = THREE.MathUtils.clamp((skill.range || 16) * 0.5, 6, 10);
+    const crosshairDistance = skill.range || 32;
     const crosshairPoint = cameraOrigin.clone().addScaledVector(dir, crosshairDistance);
     const aimPoint = crosshairPoint.clone();
-    const flightTime = Math.max(0.01, launchPos.distanceTo(aimPoint) / projectileSpeed);
-    aimPoint.y += 0.5 * projectileGravity * flightTime * flightTime;
 
     // Clone model and orient spear tip along travel direction
     const projModel = tmpl.template.clone();
@@ -428,7 +426,7 @@ export class FireFistSpawner {
       group: projGroup,
       velocity: launchDir.multiplyScalar(projectileSpeed),
       origin: launchPos.clone(),
-      maxRange: (skill.range || 16) + 8,
+      maxRange: skill.range || 32,
       damage: (skill.damage ?? 2) * player.baseAttack,
       knockback: skill.knockback ?? 5.0,
       trailConfig: {
